@@ -2,6 +2,7 @@
   "name": "edit-html",
   "version": "0.1.0",
   "description": "Review and edit agent-generated HTML in the browser, then send the whole batch back to your agent.",
+  "author": "Peter Yang",
   "type": "module",
   "bin": {
     "edit-html": "src/cli.js"
