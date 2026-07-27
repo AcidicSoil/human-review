@@ -27,11 +27,24 @@ export class Store {
     return this.data;
   }
 
+  /**
+   * Merge over whatever is on disk rather than overwriting it. If a second
+   * server is ever running, a blind write would silently drop the pages and
+   * comments it owns.
+   */
   save() {
     ensureStateDir();
     const target = statePath();
+    let onDisk = { pages: {} };
+    try {
+      const parsed = JSON.parse(fs.readFileSync(target, "utf8"));
+      if (parsed && parsed.pages) onDisk = parsed;
+    } catch {
+      // No readable state yet; ours becomes the file.
+    }
+    const merged = { ...onDisk, pages: { ...onDisk.pages, ...this.data.pages } };
     const tmp = `${target}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2));
+    fs.writeFileSync(tmp, JSON.stringify(merged, null, 2));
     fs.renameSync(tmp, target);
   }
 
