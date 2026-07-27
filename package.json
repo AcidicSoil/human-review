@@ -1,0 +1,31 @@
+{
+  "name": "edit-html",
+  "version": "0.1.0",
+  "description": "Review and edit agent-generated HTML in the browser, then send the whole batch back to your agent.",
+  "type": "module",
+  "bin": {
+    "edit-html": "src/cli.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "start": "node src/cli.js"
+  },
+  "keywords": [
+    "html",
+    "review",
+    "comments",
+    "agent",
+    "claude-code",
+    "codex",
+    "cli"
+  ],
+  "license": "MIT"
+}

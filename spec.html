@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>edit-html — Product Spec</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&amp;family=Playfair+Display:ital,wght@1,700&amp;display=swap" rel="stylesheet">
+  <script>
+    try {
+      var savedTheme = localStorage.getItem("spec-theme");
+      if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+    } catch (error) {}
+  </script>
+  <style>
+    :root {
+      --canvas: #faf8f3;
+      --surface: #ffffff;
+      --ink: #1c1b18;
+      --ink-2: #6e6b64;
+      --ink-3: #9a968d;
+      --chip: #f1eee7;
+      --line: rgba(28, 27, 24, 0.16);
+      --line-soft: rgba(28, 27, 24, 0.08);
+      --shadow: 0 8px 24px rgba(28, 27, 24, 0.07);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas: #17170f;
+        --surface: #232320;
+        --ink: #f3f1eb;
+        --ink-2: #a6a39b;
+        --ink-3: #726f67;
+        --chip: #2c2b27;
+        --line: rgba(243, 241, 235, 0.16);
+        --line-soft: rgba(243, 241, 235, 0.09);
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --canvas: #17170f;
+      --surface: #232320;
+      --ink: #f3f1eb;
+      --ink-2: #a6a39b;
+      --ink-3: #726f67;
+      --chip: #2c2b27;
+      --line: rgba(243, 241, 235, 0.16);
+      --line-soft: rgba(243, 241, 235, 0.09);
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    :root[data-theme="light"] {
+      --canvas: #faf8f3;
+      --surface: #ffffff;
+      --ink: #1c1b18;
+      --ink-2: #6e6b64;
+      --ink-3: #9a968d;
+      --chip: #f1eee7;
+      --line: rgba(28, 27, 24, 0.16);
+      --line-soft: rgba(28, 27, 24, 0.08);
+      --shadow: 0 8px 24px rgba(28, 27, 24, 0.07);
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--canvas); color-scheme: light dark; }
+    body {
+      margin: 0;
+      padding: 0 20px 96px;
+      background: var(--canvas);
+      color: var(--ink);
+      font: 15.5px/1.6 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, textarea, select { font: inherit; }
+    a {
+      color: inherit;
+      text-decoration-color: var(--ink-3);
+      text-underline-offset: 3px;
+    }
+    a:hover { text-decoration-color: var(--ink); }
+    img { display: block; max-width: 100%; }
+    .wrap { width: min(100%, 900px); margin-inline: auto; }
+
+    .masthead {
+      width: min(100%, 900px);
+      margin: 52px auto 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .masthead-copy { flex: 1; min-width: 0; }
+    .kicker {
+      margin: 0 0 12px;
+      color: var(--ink-3);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+    .title {
+      margin: 0 0 10px;
+      font: italic 700 clamp(34px, 5vw, 48px)/1.05 "Playfair Display", Georgia, serif;
+      letter-spacing: -0.01em;
+    }
+    .tagline {
+      max-width: 58ch;
+      margin: 0;
+      color: var(--ink-2);
+      font-size: 16.5px;
+    }
+    .theme-toggle {
+      width: 40px;
+      height: 40px;
+      flex: none;
+      margin-top: 4px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .theme-toggle:hover { background: var(--chip); }
+
+    .tabs {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      width: min(100%, 900px);
+      margin: 30px auto 0;
+      padding: 12px 0;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--line-soft);
+      background: var(--canvas);
+    }
+    .tab {
+      padding: 8px 18px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--ink-2);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .tab:hover { background: var(--chip); }
+    .tab[aria-selected="true"] {
+      background: var(--ink);
+      color: var(--canvas);
+    }
+    .tab:focus-visible,
+    .theme-toggle:focus-visible {
+      outline: 2px solid var(--ink-3);
+      outline-offset: 2px;
+    }
+
+    .panel { display: none; padding-top: 36px; }
+    .panel.active { display: block; }
+    h2 {
+      margin: 52px 0 8px;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+    }
+    h2:first-child { margin-top: 0; }
+    h3 {
+      margin: 34px 0 8px;
+      font-size: 16px;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+    }
+    h4 {
+      margin: 26px 0 8px;
+      color: var(--ink-2);
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+    p { max-width: 70ch; margin: 10px 0; }
+    .subtle { color: var(--ink-2); font-size: 14px; }
+    .goals { margin: 14px 0; padding-left: 22px; }
+    .goals li { margin: 7px 0; }
+    code {
+      padding: 1px 6px;
+      border-radius: 6px;
+      background: var(--chip);
+      font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .status {
+      display: inline-block;
+      padding: 3px 11px;
+      border-radius: 999px;
+      background: var(--chip);
+      color: var(--ink-2);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .table-wrap {
+      width: 100%;
+      margin: 16px 0;
+      overflow-x: auto;
+      border-radius: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th {
+      padding: 0 14px 10px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-3);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    td {
+      padding: 11px 14px 11px 0;
+      border-bottom: 1px solid var(--line-soft);
+      vertical-align: top;
+    }
+    td:first-child { font-weight: 600; }
+
+    .cards,
+    .mock-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin: 18px 0;
+    }
+    .cards.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mock-grid.stack { grid-template-columns: 1fr; gap: 22px; }
+    .card,
+    .mock {
+      border: 1px solid var(--line-soft);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .card { padding: 18px 20px; }
+    .card h3 { margin: 0 0 6px; font-size: 14.5px; }
+    .card p { margin: 0; color: var(--ink-2); font-size: 13.5px; }
+    .mock { margin: 0; overflow: hidden; }
+    .mock img {
+      width: 100%;
+      height: auto;
+      background: var(--chip);
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .mock figcaption {
+      padding: 14px 16px 16px;
+      color: var(--ink-2);
+      font-size: 13.5px;
+    }
+    .mock figcaption strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--ink);
+    }
+    .trade-off {
+      margin: 20px 0;
+      padding: 2px 0 2px 20px;
+      border-left: 2px solid var(--line);
+    }
+    .trade-off h3 { margin: 0 0 4px; font-size: 15px; }
+    .trade-off p { margin: 4px 0; color: var(--ink-2); font-size: 14px; }
+
+    @media (max-width: 640px) {
+      body { padding-inline: 16px; padding-bottom: 64px; }
+      .masthead { margin-top: 32px; }
+      .tabs {
+        margin-top: 20px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab { flex: 0 0 auto; }
+      .panel { padding-top: 28px; }
+      h2 { margin-top: 40px; }
+      .cards,
+      .cards.three,
+      .mock-grid { grid-template-columns: 1fr; }
+      .table-wrap table { min-width: 620px; }
+      .table-wrap.compact table { min-width: 520px; }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .panel.active { animation: panel-in 180ms ease-out; }
+      @keyframes panel-in {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: none; }
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-copy">
+      <p class="kicker">Last updated July 26, 2026</p>
+      <h1 class="title">edit-html</h1>
+      <p class="tagline">Review and edit agent-generated HTML in the browser, then send the whole batch back to your agent.</p>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle color theme">◐</button>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Specification sections">
+    <button class="tab" id="tab-product" type="button" role="tab" aria-selected="true" aria-controls="panel-product" tabindex="0" data-panel="product">Product</button>
+    <button class="tab" id="tab-design" type="button" role="tab" aria-selected="false" aria-controls="panel-design" tabindex="-1" data-panel="design">Design</button>
+    <button class="tab" id="tab-tech" type="button" role="tab" aria-selected="false" aria-controls="panel-tech" tabindex="-1" data-panel="tech">Tech</button>
+  </nav>
+
+  <main>
+    <section class="panel active wrap" id="panel-product" role="tabpanel" aria-labelledby="tab-product" data-panel="product">
+      <h2>Problem + goal</h2>
+      <p>People who work with coding agents (Claude Code, Codex, and others) increasingly receive work as HTML artifacts: specs, plans, reports, newsletter drafts, landing pages, slide decks. Anthropic itself promotes HTML as the preferred format for agent output (<a href="https://claude.com/blog/using-claude-code-the-unreasonable-effectiveness-of-html">Claude blog: "The unreasonable effectiveness of HTML"</a>). But the review loop is stuck in the terminal: you open the file, spot problems, then type a long prose message describing each one — or paste annotated screenshots. Small copy fixes that you could type yourself in five seconds cost a full agent round-trip.</p>
+      <p>The pain is validated by a wave of new tools attacking pieces of it: <a href="https://github.com/kunchenguid/lavish-axi">lavish-axi</a> (annotate elements and text, send to agent — but read-only, no direct editing, no persistent comments), <a href="https://github.com/backnotprop/plannotator">plannotator</a> (plan and diff markup for 9+ agents), <a href="https://markloop.io/">Markloop</a> (hosted comments over MCP), and <a href="https://github.com/u-ichi/reviewable-html-workbench">reviewable-html-workbench</a> (inline comment threads). None lets you fix the small things yourself and comment on the rest in one pass, locally, with any agent. Outside the agent world, <a href="https://vercel.com/blog/introducing-commenting-on-preview-deployments">Vercel Preview Comments</a> and tools like <a href="https://usepastel.com/">Pastel</a> prove in-place commenting is how people want to review web content.</p>
+      <ul class="goals">
+        <li><strong>300 weekly npm downloads within 8 weeks of launch</strong> — the output metric that proves an agent-agnostic review tool is wanted.</li>
+        <li><strong>≥5 artifacts per week reviewed in edit-html by Peter</strong> — dogfooding across docs, newsletters, and landing pages drives quality and credible launch content.</li>
+        <li><strong>Median full loop under 3 minutes</strong> — from <code>edit-html &lt;file&gt;</code> to feedback sent, agent fix applied, and page reloaded; loop speed is the reason to adopt.</li>
+      </ul>
+
+      <h2>Solution</h2>
+      <p>A CLI that opens any HTML file as an editable page in a local browser: fix small things by typing, comment on everything else by selecting it, then send the whole batch — comments and the list of your edits — to whatever agent you use.</p>
+      <p class="subtle"><strong>Core loop:</strong> Agent writes HTML → <code>edit-html &lt;file&gt;</code> opens it → human edits directly (autosaved) and comments in the rail → Send N to agent → agent applies fixes → page hot-reloads → repeat.</p>
+      <p class="subtle"><strong>Scope:</strong> Local single-user review, one page at a time. No modes, no accounts, no hosting, no multiplayer, no agent chat. Distributed as an npm CLI named <code>edit-html</code> (verified available July 26, 2026), plus a small skill that teaches agents when to run it.</p>
+
+      <h2>Requirements</h2>
+
+      <h3>M1: Review core <span class="status">Not started</span></h3>
+
+      <h4>CLI</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Open</td><td><code>edit-html &lt;file.html&gt;</code> starts a local server on a free port (reusing a running instance if one exists), registers a session keyed by <code>sha256(realpath(file))</code>, and opens the default browser. Exits 1 with <code>File not found: &lt;path&gt;</code> if the file doesn't exist.</td></tr>
+            <tr><td>Untouched artifact</td><td>The artifact loads in an iframe with exactly one injected <code>&lt;script&gt;</code> tag before <code>&lt;/body&gt;</code>. Opening the saved file directly in a browser renders identically to opening it in edit-html — edit-html never writes its own markup, highlights, or attributes into the file.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Document</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Full-bleed rendering</td><td>The artifact fills the area left of the rail and renders exactly as it would standalone — its own background, width, type, and layout. edit-html imposes no page frame, max-width, or paper background, so a document artifact that centres itself still looks like a document and a landing page still runs edge to edge.</td></tr>
+            <tr><td>Always editable</td><td>The document is <code>contenteditable</code> at all times — there is no editing mode and no mode toggle. Clicking places a cursor and typing changes the page immediately. A text selection anchors a comment rather than switching any mode.</td></tr>
+            <tr><td>Element delete</td><td>Hovering a target element outlines it and shows a floating <code>✕</code> chip at its top-right corner. Clicking the chip removes the element and logs it to Your edits as <code>deleted</code>.</td></tr>
+            <tr><td>Target resolution</td><td>Commentable and deletable targets are resolved from <code>data-container</code> / <code>data-block</code> attributes when the artifact has them, using their value as the display label. Otherwise edit-html falls back to the nearest block-level ancestor with visible content, labelled from its nearest preceding heading plus tag (for example <code>Problem · p</code>), truncated at 40 characters.</td></tr>
+            <tr><td>Autosave</td><td>Edits write to the original file continuously, debounced ~800ms after the last keystroke. No Save button exists. Status appears in the rail as <code>Saving to &lt;filename&gt;…</code> (amber dot) then <code>Saved to &lt;filename&gt; · 2:41 PM</code> (green dot). Write failures replace the line with <code>Couldn't save — retrying…</code> in the danger color and retry every 2s.</td></tr>
+            <tr><td>⌘S</td><td>Intercepted and swallowed so the browser's Save dialog never appears. If unsaved keystrokes exist it flushes them immediately; otherwise it re-shows the saved status line. It is reassurance only, never a state change.</td></tr>
+            <tr><td>Revert all</td><td><code>Revert all</code> in the Your edits header restores the current page — and its file on disk — to exactly how the agent last left it, then clears that page's edit list. Confirm dialog: "Discard all N of your edits?" Comments are not affected.</td></tr>
+            <tr><td>⌘-click to interact</td><td>A plain click always edits or comments; <code>⌘</code>-click (<code>Ctrl</code> on Windows and Linux) activates the artifact's own behavior — following a link, switching a tab, opening an accordion. Hovering a link or button shows the hint <code>⌘-click to open</code>. Without the modifier, links never navigate and buttons never fire.</td></tr>
+            <tr><td>External links</td><td>A <code>⌘</code>-clicked link to a non-local URL opens in a new browser tab and leaves the review untouched, since edit-html can only edit local files.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Feedback rail</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Compose on selection</td><td>Releasing a non-empty text selection in the document opens the compose card at the top of the rail with the textarea already focused, chip <code>Selection</code>, the quoted text, and hint <code>Esc to dismiss</code>. The selected range highlights in amber. Compose never floats over the document.</td></tr>
+            <tr><td>Compose on element</td><td>Clicking a target element with no active selection opens the same card with chip <code>Element</code> and the resolved label in place of a quote; the element outlines instead of highlighting.</td></tr>
+            <tr><td>Commit</td><td>Textarea placeholder <code>What should change?</code>. <code>Add comment</code> (or <code>Enter</code>) commits; <code>Shift+Enter</code> inserts a newline; <code>Cancel</code> or <code>Esc</code> discards and removes the pending highlight.</td></tr>
+            <tr><td>Dismiss protection</td><td>Selecting elsewhere or clicking away dismisses an <em>empty</em> compose card and drops its highlight. If any text has been typed, the card stays and its highlight persists — typed feedback is never destroyed by a stray click, including by navigating away.</td></tr>
+            <tr><td>Comment card</td><td>Header is author · relative time, then <code>Jump to</code> and <code>✕</code>. Body is the quote (or element label) above the feedback text. There is no resolve action and no status chip: a comment exists until you delete it or send it. <code>✕</code> deletes the comment and its highlight with no confirm.</td></tr>
+            <tr><td>Card ↔ highlight</td><td>Clicking a card makes it active (left amber rail marker) and outlines its anchor in the document. <code>Jump to</code> smooth-scrolls the anchor to roughly the upper third of the viewport. Clicking a highlight in the document activates its card.</td></tr>
+            <tr><td>Hidden anchors</td><td>If an anchor sits inside a collapsed or hidden region of the same page (a tab panel, an accordion), activating its card first tries to reveal it by clicking the control that <code>aria-controls</code> it. If that fails, the card shows a <code>not in this view</code> badge instead of scrolling nowhere.</td></tr>
+            <tr><td>Empty state</td><td>With no comments and nothing composing, the rail shows a dashed placeholder: <code>Select text or click an element to comment on it</code>.</td></tr>
+            <tr><td>Your edits</td><td>Once any edit exists, a <code>YOUR EDITS n</code> section lists one row per changed target — its resolved label and kind (<code>edited</code> amber dot / <code>deleted</code> red dot), deduped by label+kind. It sits below comments, above the footer, with the save status line beneath its header.</td></tr>
+            <tr><td>Panel collapse</td><td>A 22×46px handle on the rail's left edge collapses it to 0 and back; the glyph flips <code>›</code>/<code>‹</code> with title <code>Hide comments panel</code>/<code>Show comments panel</code>. Collapsed state persists for the session.</td></tr>
+            <tr><td>Chrome theme</td><td>A ☾/☀ toggle in the rail header switches the app chrome between light and dark and persists. It never touches the document, which always renders exactly as the agent authored it.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Page changes</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>One page at a time</td><td>The rail always shows the feedback for the page currently on screen. Comments and edits belong to a file, not to a browsing session, and there is no cross-page aggregation anywhere in the product.</td></tr>
+            <tr><td>Navigating is free</td><td>Nothing gates navigation and nothing is lost by it: edits are already on disk from autosave, and comments persist by file path. Arriving at a new page shows an empty rail; returning to a page restores every comment and highlight exactly as you left them.</td></tr>
+            <tr><td>Pending compose</td><td>Navigating with text typed into the compose card commits it as a comment on the page you are leaving rather than discarding it, consistent with dismiss protection.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>M2: Agent loop <span class="status">Not started</span></h3>
+
+      <h4>Send</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Send N to agent</td><td>One primary action at the rail footer, labelled <code>Send N to agent</code> where N is this page's comments plus edits. It submits those comments, that edit list, and the optional overall note as a single batch. Sending is independent of saving: edits are already on disk before you send.</td></tr>
+            <tr><td>Button states</td><td>Disabled and muted as <code>Nothing to send yet</code> when N is 0. Active with the <code>⌘⏎</code> hint when N &gt; 0. After sending it reads <code>Sent — waiting for agent</code> and stays disabled until new feedback exists.</td></tr>
+            <tr><td>Overall note</td><td>An auto-growing <code>Overall note…</code> textarea above the button (max 40vh) carries page-level feedback not tied to any anchor. It clears on send.</td></tr>
+            <tr><td>Agent working</td><td>After sending, a single footer line appears: amber dot + <code>Agent working — page reloads when fixes land</code>. It is status, not a message: the agent has no reply channel and never writes text into the rail. The changed page is the only response.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>CLI</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Poll</td><td><code>edit-html poll &lt;file.html&gt;</code> long-polls the browser session that file opened — not the file itself — so one command keeps listening even after you navigate to another page. It prints one JSON object to stdout when a batch arrives: <code>{ status, file, comments, edits, overall_note, dom_snapshot }</code>, where <code>file</code> is the absolute path of the page the feedback is about. Whitespace heartbeats keep the connection alive through proxies and CLI timeouts; wait narration goes to stderr only.</td></tr>
+            <tr><td>Payload</td><td>Each comment carries <code>id</code>, <code>kind</code> (<code>selection</code> or <code>element</code>), <code>quote</code>, <code>anchor</code>, and <code>feedback</code>. Each edit carries <code>label</code> and <code>kind</code> (<code>edited</code> or <code>deleted</code>) so the agent knows which parts the human already changed and must not revert.</td></tr>
+            <tr><td>Delivery</td><td>At-least-once: a batch stays pending until the agent acknowledges with <code>edit-html poll &lt;file&gt; --ack</code>, so a crashed agent can re-poll without losing feedback. Sent comments disappear from the rail on acknowledgement.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h4>Live behavior</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Hot reload</td><td>A file watcher reloads the page when the agent edits the file on screen, preserving scroll position and re-anchoring remaining highlights. edit-html's own autosaves are echo-suppressed so typing never triggers a reload. Edits to a file you are not currently viewing reload nothing and are picked up when you next visit it.</td></tr>
+            <tr><td>Edit conflict</td><td>If the agent's write lands while unflushed keystrokes exist, edit-html flushes first, then reloads and takes the agent's version. The affected rows leave Your edits and the line <code>Agent rewrote 2 blocks you had edited</code> appears in their place.</td></tr>
+            <tr><td>Orphaned anchors</td><td>A comment whose anchor can no longer be found after an edit or reload keeps its card, drops its highlight, and shows an <code>orphaned</code> badge; the quoted text still ships to the agent.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>M3: Public release <span class="status">Not started</span></h3>
+
+      <h4>Packaging</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>npm</td><td>Published as <code>edit-html</code> so <code>npx -y edit-html &lt;file.html&gt;</code> works with zero install. Node ≥20; macOS, Linux, Windows.</td></tr>
+            <tr><td>Agent setup</td><td><code>edit-html setup</code> installs a skill or instructions file for detected agents (Claude Code <code>.claude/skills/</code>, Codex <code>AGENTS.md</code> snippet) teaching the loop: write HTML, open it with <code>edit-html &lt;file&gt;</code>, then <code>edit-html poll &lt;file&gt;</code> and apply feedback. It also documents the optional <code>data-block</code> convention for better edit labels. Any other agent is supported through the JSON contract — no per-agent code in core.</td></tr>
+            <tr><td>Docs</td><td>README covers quick start, a demo GIF of the full loop, and the JSON contract. Free and open source; distribution through Peter's channels and a skills.sh listing.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Open decisions</h2>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Decision</th><th>Why it is open</th><th>Owner · date</th></tr></thead>
+          <tbody>
+            <tr><td>Keyboard-driven artifacts</td><td><code>⌘</code>-click covers links, tabs, and accordions, but slide decks and prototypes are driven by arrow keys, which <code>contenteditable</code> consumes for the caret. Fixing it needs an Interact state that hands keys back — a second mode, on a different axis than the commenting/editing split that was cut. Deferred until M1 dogfooding shows whether it bites.</td><td>Peter · after M1</td></tr>
+            <tr><td>Per-edit revert</td><td>M1 ships all-or-nothing <code>Revert all</code> plus native ⌘Z. Per-row revert needs a per-block edit journal with before/after content rather than one pristine snapshot. Revisit if losing good edits to undo one bad edit proves annoying in practice.</td><td>Peter · after M1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel wrap" id="panel-design" role="tabpanel" aria-labelledby="tab-design" data-panel="design" hidden>
+      <h2>Direction</h2>
+      <p>The artifact renders as itself, edge to edge, and the rail sits beside it. There is no top bar and no toolbar: the only persistent chrome is the rail, and everything it holds is either something you wrote or something about to be sent. Status that used to justify a top bar — filename, save state, agent activity — is demoted to one line of text each, in the rail, and only while it is true.</p>
+      <div class="cards three">
+        <article class="card"><h3>No modes</h3><p>The document is always editable. A selection is a comment anchor, never a mode change — so nothing has to be switched before you act.</p></article>
+        <article class="card"><h3>The artifact is sacred</h3><p>Chrome theming and chrome layout both stop at the rail. The artifact keeps its own width, background, and type, and nothing edit-html draws is ever written to the file.</p></article>
+        <article class="card"><h3>One primary action</h3><p>Send is the only button that commits anything outward. Saving is ambient and continuous, so it needs a status line, not a control.</p></article>
+      </div>
+
+      <h2>Representative designs</h2>
+      <div class="mock-grid stack">
+        <figure class="mock">
+          <img src="spec-assets/main-value-screen.png" alt="edit-html reviewing a product spec: an editable document with two amber-highlighted passages, and a right rail headed FEEDBACK 2 holding two comment cards, each showing author, relative time, Jump to, ✕, the quoted text, and the feedback. An Overall note field and a dark Send 2 to agent button sit at the rail footer.">
+          <figcaption><strong>Main value screen — reviewing</strong>Shows the always-editable document with anchored highlights, the comment card contract (author · time · <code>Jump to</code> · <code>✕</code>, no resolve and no status chip), the panel-collapse handle on the rail edge, and the single primary action <code>Send 2 to agent</code>. The centred sheet and warm margin come from this artifact's own styling — edit-html imposes no frame.</figcaption>
+        </figure>
+        <figure class="mock">
+          <img src="spec-assets/main-action-screen.png" alt="edit-html mid-edit: the metrics callout has been deleted from the document and the M1 milestone row is outlined. The rail shows a compose card tagged Element for M1 Review core with a focused What should change? textarea and Add comment / Cancel, above the two existing comments, then a YOUR EDITS 2 section with Revert all, the line Saving to redline-spec.html…, rows for Problem body edited and Metrics callout deleted, and a Send 4 to agent button.">
+          <figcaption><strong>Main action screen — composing and editing</strong>Shows compose-in-the-rail on an element target (chip <code>Element</code>, <code>Esc to dismiss</code>), the Your edits list with <code>Revert all</code> and the autosave status line, and how N in <code>Send 4 to agent</code> counts this page's comments plus edits.</figcaption>
+        </figure>
+      </div>
+
+      <h2>System and components</h2>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Dimension</th><th>Rule</th></tr></thead>
+          <tbody>
+            <tr><td>Color</td><td>Two independent palettes. <strong>Chrome</strong> (themed) light: canvas <code>#eceae4</code>, rail <code>#fbfaf7</code>, card <code>#ffffff</code>, hairline <code>#e4e2db</code>, text <code>#26241e</code>, muted <code>#8b877d</code>, faint <code>#b6b2a8</code>, button <code>#1b1a16</code>; dark: <code>#171614</code> / <code>#1f1e1b</code> / <code>#262420</code> / <code>#2f2d29</code> / <code>#eae7e0</code> / <code>#9c968a</code> / <code>#6e6961</code> / <code>#f0ede6</code>. <strong>Artifact</strong>: no palette — it keeps its own. Signals: amber <code>#c99500</code> saving, green <code>#7d9370</code> saved, danger <code>#b23b2e</code> delete. Highlight <code>rgba(245,196,0,.32)</code>, hover <code>rgba(243,176,0,.5)</code>, selection <code>rgba(245,196,0,.42)</code> — the only colors edit-html paints onto the artifact, and all translucent so they read over any background.</td></tr>
+            <tr><td>Typography</td><td>System sans throughout the chrome: 13px/1.5 base, comment body 13px, quotes 12px italic, rail section labels 11px/600 uppercase 0.08em tracking. The artifact's own type is never overridden.</td></tr>
+            <tr><td>Spacing and shape</td><td>Rail is a fixed 352px column; the artifact takes all remaining width. Radii: cards and inputs 6–8px, chips 999px, edge handle 7px 0 0 7px. One shadow, on the compose card (<code>0 4px 14px -8px</code>); everything else is hairlines.</td></tr>
+            <tr><td>Icons and motion</td><td>Glyphs only — <code>✕</code> delete, <code>›</code>/<code>‹</code> collapse, <code>☾</code>/<code>☀</code> theme, plus 5–6px status dots. No icon set. Compose and Your edits enter with a 130–140ms ease-out rise; the delete chip pops in 120ms; scroll-to-anchor is smooth. All animation is suppressed under <code>prefers-reduced-motion</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Purpose</th><th>States</th><th>Required behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Artifact surface</td><td>The page under review</td><td>idle, focused, hover-target, hover-interactive</td><td>Always editable and full-bleed; hovering a target outlines it and reveals its delete chip; hovering a link or button shows the <code>⌘-click to open</code> hint; never adopts the chrome theme or layout</td></tr>
+            <tr><td>Highlight</td><td>Mark a commented range</td><td>pending, committed, active, orphaned</td><td>Translucent amber wash, darker on hover; clicking activates its card; stripped at serialization so it never reaches the file</td></tr>
+            <tr><td>Delete chip</td><td>Remove an element</td><td>hidden, hover, focus</td><td>23px circle overlapping the target's top-right corner; inverts to danger on hover; removal logs an edit row</td></tr>
+            <tr><td>Compose card</td><td>Write a comment in the rail</td><td>selection, element</td><td>Opens focused at the top of the rail; kind chip plus <code>Esc to dismiss</code>; empty dismisses on click-away, non-empty persists and commits on navigation</td></tr>
+            <tr><td>Comment card</td><td>Hold one piece of feedback</td><td>default, active, orphaned, not-in-view</td><td>author · time · <code>Jump to</code> · <code>✕</code>; active shows an inset amber rail marker; no resolve, no status chip</td></tr>
+            <tr><td>Edit row</td><td>Account for one direct change</td><td>edited, deleted</td><td>Colored dot, resolved label, kind at the right; deduped by label+kind; appears only once at least one edit exists</td></tr>
+            <tr><td>Save line</td><td>Report autosave truthfully</td><td>saving, saved, failed</td><td>Dot + text under the Your edits header; never a button; failure states are visible and self-retrying</td></tr>
+            <tr><td>Send button</td><td>Commit the batch outward</td><td>empty, ready, sent</td><td>Full-width footer button; counts this page's comments + edits; <code>⌘⏎</code>; disabled while awaiting the agent</td></tr>
+            <tr><td>Edge handle</td><td>Collapse the rail</td><td>open, collapsed</td><td>Fixed at the rail's left edge, vertically centred; glyph and title flip with state</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel wrap" id="panel-tech" role="tabpanel" aria-labelledby="tab-tech" data-panel="tech" hidden>
+      <h2>Architecture</h2>
+      <p class="subtle">Nothing is built yet. Research is complete: a full teardown of MIT-licensed lavish-axi, whose SDK injection, long-poll, and file-path session identity edit-html adopts — its gaps (direct editing, persistent comments) are exactly edit-html's additions. The interaction model is settled in the Claude Design file <code>Redline.dc.html</code>, mirrored locally under <code>design-ref/</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Choice + status</th><th>Why</th><th>Cost or risk</th></tr></thead>
+          <tbody>
+            <tr><td>CLI + server</td><td>Node 20+, Express · not started</td><td>Boring, proven; matches lavish-axi's working model</td><td>None meaningful</td></tr>
+            <tr><td>Browser UI</td><td>Vanilla JS, no framework · not started</td><td>One injected SDK plus one chrome page; no build step</td><td>Hand-rolled DOM state for rail and compose</td></tr>
+            <tr><td>Artifact isolation</td><td>Sandboxed iframe + postMessage · not started</td><td>Full-bleed rendering means the artifact's CSS would otherwise collide with the rail's; the iframe makes isolation free</td><td>Selection, edits, and serialization must round-trip postMessage</td></tr>
+            <tr><td>Edit capture</td><td><code>contenteditable</code> + <code>input</code> events, target resolved per the Product rules · not started</td><td>Instant visible edits; <code>data-block</code> when present, DOM heuristic otherwise, so arbitrary artifacts work</td><td>Heuristic labels are worse than authored ones; caret behavior at complex layout boundaries</td></tr>
+            <tr><td>Persistence</td><td>Debounced serialize + atomic write (tmp + rename) · not started</td><td>Continuous autosave with no Save button; atomic rename prevents half-written files</td><td>Serializer must strip highlights and the injected script every time</td></tr>
+            <tr><td>Highlights</td><td><code>&lt;mark data-anchor&gt;</code> in the live DOM · not started</td><td>Survives <code>contenteditable</code> reflow far better than the Custom Highlight API, which loses ranges on edit</td><td>Pollutes the DOM, so serialization must unwrap them — covered by a test</td></tr>
+            <tr><td>Navigation</td><td>Intercepted in the iframe SDK · not started</td><td>Plain clicks stay inert so editing is unambiguous; <code>⌘</code>-click resolves the target, and a local file becomes the new active page in the same browser session</td><td><code>⌘</code>-click is not discoverable without the hover hint</td></tr>
+            <tr><td>File watching</td><td>chokidar with echo suppression · not started</td><td>Agent writes hot-reload; own writes don't</td><td>Suppression window must survive rapid autosaves</td></tr>
+            <tr><td>State</td><td>JSON at <code>~/.edit-html/state.json</code> · not started</td><td>No DB; survives restarts; comments and edits keyed by file-path hash so pages are independent</td><td>Whole-file rewrite per mutation (fine at this scale)</td></tr>
+            <tr><td>Agent transport</td><td>Long-poll HTTP + stdout JSON, subscribed per browser session · not started</td><td>Any agent with a shell works with zero setup; session-scoped polling means one command survives navigation</td><td>No native MCP integration; wrapper possible later</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="subtle"><strong>Running cost:</strong> $0 — local-only, nothing leaves the machine. Support surface is GitHub issues.</p>
+
+      <h2>Data model</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entity</th><th>Purpose</th><th>Important fields + relationships</th><th>Access</th></tr></thead>
+          <tbody>
+            <tr><td>Browser session</td><td>One open edit-html window and the agent listening to it</td><td><code>id</code>, <code>entry_file</code>, <code>active_file</code>, <code>poll_state</code>. Owns nothing durable — it only routes a sent batch to the waiting poll</td><td>Discarded when the window closes; the agent subscribes by entry file</td></tr>
+            <tr><td>Page</td><td>Everything known about one HTML file</td><td><code>key</code> (sha256 of realpath), <code>file</code>, <code>pristine</code> (agent's last version, for Revert all), <code>pending_batch</code>, <code>updated_at</code>; owns its Comments and Edits. Pages are fully independent — no page references another</td><td>Local user only, in <code>~/.edit-html/state.json</code></td></tr>
+            <tr><td>Comment</td><td>One piece of anchored feedback</td><td><code>id</code>, <code>kind</code> (<code>selection</code>/<code>element</code>), <code>quote</code>, <code>anchor</code> (selector + node path + offsets + quote context), <code>feedback</code>, <code>created_at</code>; no resolve or status field by design</td><td>Read by the agent on poll; removed on acknowledgement or ✕</td></tr>
+            <tr><td>Edit</td><td>Account for one direct change</td><td><code>label</code> (authored or heuristic), <code>kind</code> (<code>edited</code>/<code>deleted</code>), <code>at</code>; unique on label+kind. Ships with the batch so the agent won't undo human work</td><td>Cleared by Revert all, by acknowledgement, or when the agent rewrites that target</td></tr>
+            <tr><td>Artifact file</td><td>The reviewed HTML itself</td><td>At the user's original path; written by autosave and by the agent, never by anything else. Serialization strips the injected script and all <code>&lt;mark data-anchor&gt;</code> wrappers</td><td>File-system permissions; edit-html stores no metadata inside it</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Trade-offs</h2>
+      <article class="trade-off">
+        <h3>Continuous autosave with no Save button</h3>
+        <p>Every keystroke eventually reaches the real file, so a bad edit is already persisted and the only undo is all-or-nothing <code>Revert all</code>. Accepted because the file is agent-generated and cheap to regenerate — and because it is what makes navigation lossless. <strong>Exit:</strong> the per-block edit journal in Open decisions, which makes per-row revert possible without changing the interaction model.</p>
+      </article>
+      <article class="trade-off">
+        <h3>DOM serialization on save</h3>
+        <p>The saved file is the browser's re-serialization, so whitespace and attribute formatting may drift from the agent's source even in untouched sections — and a serializer bug could strip artifact markup wholesale. <strong>Exit:</strong> a parse5 source-map diff that patches only edited ranges, with a golden-file round-trip test as the near-term guard.</p>
+      </article>
+      <article class="trade-off">
+        <h3>Anchor drift after edits</h3>
+        <p>Direct edits can invalidate comment anchors, the highest-risk area of the product; <code>&lt;mark&gt;</code> wrappers survive most edits but not a rewritten paragraph. The quote-plus-context fallback re-anchors the rest and the orphaned state makes failure visible instead of silent. <strong>Exit:</strong> none needed if the re-anchoring test suite is built before the rail, as planned.</p>
+      </article>
+
+      <h2>Build plan</h2>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>Milestone</th><th>Ships</th><th>Done when</th></tr></thead>
+          <tbody>
+            <tr><td>M1: Review core</td><td>CLI open, server, SDK injection, full-bleed always-editable artifact, target resolution, element delete, autosave and Revert all, ⌘-click navigation, compose-in-rail, comment cards, Your edits, panel collapse, chrome theming</td><td>On a sample artifact: comment on two selections and one element, edit two blocks and delete one, and the file on disk contains exactly those changes with no <code>&lt;mark&gt;</code> or injected script; <code>Revert all</code> restores the agent's version byte-for-byte; reopening restores every comment and highlight; ⌘-clicking to a second local page and back preserves both pages' feedback independently</td></tr>
+            <tr><td>M2: Agent loop</td><td><code>Send N to agent</code>, session-scoped <code>edit-html poll</code> with <code>--ack</code>, hot reload with echo suppression, edit-conflict and orphaned-anchor handling</td><td>A full loop runs with both Claude Code and Codex: send comments plus edits, the agent applies fixes without reverting human edits, the page hot-reloads with scroll preserved, and a single poll command survives navigating between two pages</td></tr>
+            <tr><td>M3: Public release</td><td>npm publish as <code>edit-html</code>, <code>edit-html setup</code> for Claude Code and Codex, README and demo GIF, launch content</td><td><code>npx -y edit-html file.html</code> works on a clean machine and a stranger can complete the core loop from the README alone</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+      var panels = Array.from(document.querySelectorAll('[role="tabpanel"]'));
+
+      function activate(name, moveFocus, updateHash) {
+        var nextTab = tabs.find(function (tab) { return tab.dataset.panel === name; }) || tabs[0];
+        tabs.forEach(function (tab) {
+          var active = tab === nextTab;
+          tab.setAttribute("aria-selected", String(active));
+          tab.tabIndex = active ? 0 : -1;
+        });
+        panels.forEach(function (panel) {
+          var active = panel.dataset.panel === nextTab.dataset.panel;
+          panel.classList.toggle("active", active);
+          panel.hidden = !active;
+        });
+        if (moveFocus) nextTab.focus();
+        if (updateHash && history.replaceState) {
+          history.replaceState(null, "", "#" + nextTab.dataset.panel);
+        }
+        window.scrollTo({ top: 0, behavior: "auto" });
+      }
+
+      tabs.forEach(function (tab, index) {
+        tab.addEventListener("click", function () {
+          activate(tab.dataset.panel, false, true);
+        });
+        tab.addEventListener("keydown", function (event) {
+          var nextIndex = null;
+          if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+          if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+          if (event.key === "Home") nextIndex = 0;
+          if (event.key === "End") nextIndex = tabs.length - 1;
+          if (nextIndex === null) return;
+          event.preventDefault();
+          activate(tabs[nextIndex].dataset.panel, true, true);
+        });
+      });
+
+      window.addEventListener("hashchange", function () {
+        activate(location.hash.slice(1), false, false);
+      });
+      activate(location.hash.slice(1) || "product", false, false);
+
+      var themeToggle = document.getElementById("theme-toggle");
+      themeToggle.addEventListener("click", function () {
+        var current = document.documentElement.dataset.theme ||
+          (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        var next = current === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem("spec-theme", next); } catch (error) {}
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edit-html-test-"));
+process.env.EDIT_HTML_STATE_DIR = path.join(tmp, "state");
+
+const { Store, resolveAsset } = await import("../src/state.js");
+
+function page(name, body) {
+  const file = path.join(tmp, name);
+  fs.writeFileSync(file, body);
+  return file;
+}
+
+test("openPage records the agent's version as the revert target", () => {
+  const store = new Store();
+  const file = page("a.html", "<h1>v1</h1>");
+  const opened = store.openPage(file, "<h1>v1</h1>");
+  assert.equal(opened.pristine, "<h1>v1</h1>");
+  assert.deepEqual(opened.comments, []);
+  assert.equal(store.pageForFile(file).key, opened.key);
+});
+
+test("reopening a page keeps its comments", () => {
+  const store = new Store();
+  const file = page("b.html", "<h1>v1</h1>");
+  const { key } = store.openPage(file, "<h1>v1</h1>");
+  store.addComment(key, { id: "c1", kind: "selection", quote: "v1", feedback: "tighten" });
+
+  const reloaded = new Store();
+  assert.equal(reloaded.page(key).comments.length, 1);
+  assert.equal(reloaded.page(key).comments[0].feedback, "tighten");
+});
+
+test("edits dedupe on label and kind", () => {
+  const store = new Store();
+  const { key } = store.openPage(page("c.html", "<p>x</p>"), "<p>x</p>");
+  store.addEdit(key, "Problem body", "edited");
+  store.addEdit(key, "Problem body", "edited");
+  store.addEdit(key, "Problem body", "deleted");
+  assert.equal(store.page(key).edits.length, 2);
+});
+
+test("an agent rewrite becomes the new pristine and clears edits", () => {
+  const store = new Store();
+  const { key } = store.openPage(page("d.html", "<p>v1</p>"), "<p>v1</p>");
+  store.addEdit(key, "Body", "edited");
+  store.setPristine(key, "<p>v2</p>");
+  assert.equal(store.page(key).pristine, "<p>v2</p>");
+  assert.deepEqual(store.page(key).edits, []);
+});
+
+test("clearSent removes only the delivered comments", () => {
+  const store = new Store();
+  const { key } = store.openPage(page("e.html", "<p>x</p>"), "<p>x</p>");
+  store.addComment(key, { id: "c1", feedback: "one" });
+  store.addComment(key, { id: "c2", feedback: "two" });
+  store.addEdit(key, "Body", "edited");
+  store.clearSent(key, ["c1"]);
+  assert.deepEqual(store.page(key).comments.map((c) => c.id), ["c2"]);
+  assert.deepEqual(store.page(key).edits, []);
+});
+
+test("pages are independent of one another", () => {
+  const store = new Store();
+  const a = store.openPage(page("p1.html", "<p>a</p>"), "<p>a</p>");
+  const b = store.openPage(page("p2.html", "<p>b</p>"), "<p>b</p>");
+  store.addComment(a.key, { id: "x", feedback: "on a" });
+  assert.equal(store.page(a.key).comments.length, 1);
+  assert.equal(store.page(b.key).comments.length, 0);
+});
+
+test("resolveAsset refuses to escape the artifact's directory", () => {
+  const file = path.join(tmp, "dir", "index.html");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, "<p>x</p>");
+  assert.equal(resolveAsset(file, "style.css"), path.join(tmp, "dir", "style.css"));
+  assert.equal(resolveAsset(file, "nested/app.js"), path.join(tmp, "dir", "nested", "app.js"));
+  assert.equal(resolveAsset(file, "../secret.txt"), null);
+  assert.equal(resolveAsset(file, "../../etc/passwd"), null);
+});
+
+test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
