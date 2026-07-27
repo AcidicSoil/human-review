@@ -6,9 +6,25 @@ Your agent writes a spec, a plan, a newsletter draft, a landing page. You open i
 fix the small stuff by typing, comment on everything else by selecting it, and send
 it all back in one go. No modes, no save button, no account, no database.
 
+## Install
+
+Nothing to install — `npx` fetches it on demand:
+
 ```sh
 npx -y edit-html path/to/file.html
 ```
+
+Prefer it always available? `npm install -g edit-html`, then just `edit-html <file>`.
+
+Then teach your agent when to reach for it:
+
+```sh
+edit-html setup --global
+```
+
+That writes a skill to `~/.claude/skills/edit-html/` so Claude Code offers a review
+in every project. Drop `--global` to set up only the current repo (that also adds an
+`AGENTS.md` section for Codex).
 
 ## The loop
 
