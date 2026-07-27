@@ -86,11 +86,18 @@ export class Store {
     });
   }
 
-  /** Edits are deduped by label+kind so retyping one block stays one row. */
-  addEdit(key, label, kind) {
+  /**
+   * Edits are deduped by label+kind so retyping one block stays one row, but
+   * the text is refreshed every time so `after` is always the latest wording.
+   */
+  addEdit(key, label, kind, before, after) {
     return this.update(key, (page) => {
-      const already = page.edits.some((e) => e.label === label && e.kind === kind);
-      if (!already) page.edits.push({ label, kind, at: Date.now() });
+      const row = page.edits.find((e) => e.label === label && e.kind === kind);
+      if (row) {
+        if (after !== undefined) row.after = after;
+        return;
+      }
+      page.edits.push({ label, kind, before, after, at: Date.now() });
     });
   }
 

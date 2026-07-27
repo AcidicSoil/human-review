@@ -534,13 +534,27 @@ function boot() {
     if (!hoverTarget) return;
     const target = targetFor(hoverTarget);
     const label = target ? target.label : "Element";
+    const before = hoverTarget.textContent;
     hoverTarget.remove();
     hoverTarget = null;
     place(els.outline, null);
     showChip(null);
-    post("eh:edit", { label, kind: "deleted" });
+    post("eh:edit", { label, kind: "deleted", before, after: "" });
     flushSave();
   });
+
+  // beforeinput still sees the untouched wording, so capture it once per block.
+  const originalText = new WeakMap();
+  document.addEventListener(
+    "beforeinput",
+    (event) => {
+      if (isOurs(event.target)) return;
+      const sel = document.getSelection();
+      const target = targetFor(sel && sel.anchorNode ? sel.anchorNode : event.target);
+      if (target && !originalText.has(target.el)) originalText.set(target.el, target.el.textContent);
+    },
+    true
+  );
 
   document.addEventListener("input", (event) => {
     if (isOurs(event.target)) return;
@@ -552,7 +566,12 @@ function boot() {
     const sel = document.getSelection();
     const node = sel && sel.anchorNode ? sel.anchorNode : event.target;
     const target = targetFor(node);
-    post("eh:edit", { label: target ? target.label : "Document body", kind: "edited" });
+    post("eh:edit", {
+      label: target ? target.label : "Document body",
+      kind: "edited",
+      before: target ? originalText.get(target.el) : undefined,
+      after: target ? target.el.textContent : undefined,
+    });
     scheduleSave();
   });
 

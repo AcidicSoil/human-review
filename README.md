@@ -67,33 +67,36 @@ so you don't have to explain the loop yourself.
 ```json
 {
   "status": "feedback",
-  "file": "/abs/path/to/file.html",
-  "comments": [
+  "pages": [
     {
-      "id": "c_335f9ecfbcfa",
-      "kind": "selection",
-      "quote": "Support tickets about lost context grew 40% last quarter",
-      "anchor": { "prefix": "tools. ", "quote": "…", "suffix": ", and three" },
-      "feedback": "Cite the source for the 40% figure."
-    },
-    {
-      "id": "c_05ca654a2724",
-      "kind": "element",
-      "quote": "Metrics callout",
-      "anchor": { "selector": "div > div", "label": "Metrics callout" },
-      "feedback": "Move this below the Solution section."
+      "file": "/abs/path/to/page.html",
+      "comments": [
+        {
+          "id": "c_335f9ecfbcfa",
+          "kind": "selection",
+          "quote": "Support tickets about lost context grew 40% last quarter",
+          "anchor": { "prefix": "tools. ", "quote": "…", "suffix": ", and three" },
+          "feedback": "Cite the source for the 40% figure."
+        }
+      ],
+      "edits": [
+        { "label": "Lede", "kind": "edited",
+          "before": "the original wording", "after": "your exact new wording" }
+      ]
     }
   ],
-  "edits": [{ "label": "Lede", "kind": "edited" }],
-  "overall_note": "Overall this reads well, just tighten the risks section.",
-  "next_step": "…"
+  "overall_note": "Tighten the risks section."
 }
 ```
 
+One batch covers every page you visited, so you can walk a whole site with
+`⌘`-click, leave feedback as you go, and send it all at once.
+
 Two rules for the agent:
 
-1. **`edits` are changes the human already made and saved.** Re-read the file before
-   editing and never revert them.
+1. **`edits` are changes you already made.** `after` carries your exact wording, so
+   an agent can apply it to the real source — useful when the HTML was generated
+   from MDX or Markdown and would otherwise be overwritten on the next build.
 2. **There is no reply channel.** The user sees your work when the page reloads,
    which happens automatically once you save the file.
 

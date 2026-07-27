@@ -322,6 +322,16 @@ body.collapsed .handle { right: 0; }
 }
 .edit-more:hover { background: var(--soft); color: var(--strong-txt); }
 
+.other-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.other-row:hover { background: var(--soft); }
+
 .rail-foot { flex: none; padding: 12px; border-top: 1px solid var(--hair-2); }
 .rail-foot textarea { min-height: 58px; max-height: 40vh; margin-bottom: 9px; font-size: 12.5px; overflow-y: auto; resize: vertical; }
 

@@ -137,36 +137,60 @@ export function createServer() {
     return true;
   }
 
+  /** Every page you left feedback on ships in one batch, grouped by file. */
+  function collectPages(session) {
+    const out = [];
+    for (const key of session.visited) {
+      const page = store.page(key);
+      if (!page) continue;
+      if (!page.comments.length && !page.edits.length) continue;
+      out.push({
+        key,
+        file: page.file,
+        comments: page.comments.map((c) => ({
+          id: c.id,
+          kind: c.kind,
+          quote: c.quote,
+          anchor: c.anchor,
+          feedback: c.feedback,
+        })),
+        edits: page.edits.map((e) => ({ label: e.label, kind: e.kind, before: e.before, after: e.after })),
+      });
+    }
+    return out;
+  }
+
+  /** Pages with feedback that are not the one on screen. */
+  function otherPages(session) {
+    return collectPages(session)
+      .filter((p) => p.key !== session.activeKey)
+      .map((p) => ({ key: p.key, filename: path.basename(p.file), count: p.comments.length + p.edits.length }));
+  }
+
   function sendBatch(sessionId, note) {
     const session = sessions.get(sessionId);
     if (!session) return { error: "unknown session" };
-    const key = session.activeKey;
-    const page = store.page(key);
-    if (!page) return { error: "unknown page" };
+
+    const pages = collectPages(session);
+    if (!pages.length && !note) return { error: "nothing to send" };
 
     const batch = {
       status: "feedback",
-      file: page.file,
-      comments: page.comments.map((c) => ({
-        id: c.id,
-        kind: c.kind,
-        quote: c.quote,
-        anchor: c.anchor,
-        feedback: c.feedback,
-      })),
-      edits: page.edits.map((e) => ({ label: e.label, kind: e.kind })),
+      pages: pages.map(({ file, comments, edits }) => ({ file, comments, edits })),
       overall_note: note || "",
       sent_at: new Date().toISOString(),
       next_step:
-        "Apply this feedback to `file`. Items under `edits` are changes the human already made — keep them. " +
-        "When the file is updated, run the same poll command again with --ack to clear this batch and wait for more.",
+        "Apply this feedback. Each entry in `pages` names the file it belongs to. Items under `edits` are " +
+        "changes the human already made: `after` is their exact new wording, so carry it across verbatim, and " +
+        "never revert it. When every page is updated, run the same poll command again with --ack to clear this " +
+        "batch and wait for more.",
     };
 
-    if (!batch.comments.length && !batch.edits.length && !batch.overall_note) {
-      return { error: "nothing to send" };
-    }
-
-    const record = { batch, key, ids: page.comments.map((c) => c.id), delivered: false };
+    const record = {
+      batch,
+      delivered: false,
+      cleanup: pages.map((p) => ({ key: p.key, ids: p.comments.map((c) => c.id) })),
+    };
     batches.set(session.entryKey, record);
     record.delivered = deliver(session.entryKey, batch);
     broadcastAgent(session.entryKey);
@@ -177,7 +201,7 @@ export function createServer() {
     const pending = batches.get(entryKey);
     if (!pending) return false;
     batches.delete(entryKey);
-    store.clearSent(pending.key, pending.ids);
+    for (const { key, ids } of pending.cleanup) store.clearSent(key, ids);
     for (const session of sessionsForEntry(entryKey)) emit(session, "refresh", {});
     broadcastAgent(entryKey);
     return true;
@@ -277,7 +301,7 @@ export function createServer() {
         lastWritten.set(page.key, hash(stripSdk(html)));
         watchPage(page.key);
         const id = uid("s");
-        sessions.set(id, { id, entryKey: page.key, activeKey: page.key, clients: new Set() });
+        sessions.set(id, { id, entryKey: page.key, activeKey: page.key, visited: new Set([page.key]), clients: new Set() });
         return json(res, 200, { sessionId: id, key: page.key, path: `/s/${id}` });
       }
 
@@ -329,7 +353,13 @@ export function createServer() {
         const [, key, action, tail] = pageMatch;
         if (!store.page(key)) return json(res, 404, { error: "unknown page" });
 
-        if (!action && req.method === "GET") return json(res, 200, pageState(key));
+        if (!action && req.method === "GET") {
+          const sid = url.searchParams.get("session");
+          const session = sid ? sessions.get(sid) : null;
+          const body = pageState(key, session);
+          if (session) body.others = otherPages(session);
+          return json(res, 200, body);
+        }
 
         if (action === "comment" && req.method === "POST") {
           const body = await readBody(req);
@@ -355,7 +385,8 @@ export function createServer() {
           const body = await readBody(req);
           const label = String(body.label || "Document");
           const kind = body.kind === "deleted" ? "deleted" : "edited";
-          store.addEdit(key, label, kind);
+          const cap = (s) => (typeof s === "string" ? s.slice(0, 4000) : undefined);
+          store.addEdit(key, label, kind, cap(body.before), cap(body.after));
           return json(res, 200, { page: pageState(key) });
         }
 
@@ -394,7 +425,23 @@ export function createServer() {
       if (bootMatch && req.method === "GET") {
         const session = sessions.get(bootMatch[1]);
         if (!session) return json(res, 404, { error: "unknown session" });
-        return json(res, 200, { key: session.activeKey, page: pageState(session.activeKey, session) });
+        return json(res, 200, {
+          key: session.activeKey,
+          page: pageState(session.activeKey, session),
+          others: otherPages(session),
+        });
+      }
+
+      // --- jump straight to a page already in this window
+      const gotoMatch = route.match(/^\/api\/session\/(\w+)\/goto$/);
+      if (gotoMatch && req.method === "POST") {
+        const session = sessions.get(gotoMatch[1]);
+        if (!session) return json(res, 404, { error: "unknown session" });
+        const body = await readBody(req);
+        if (!store.page(body.key)) return json(res, 404, { error: "unknown page" });
+        session.activeKey = body.key;
+        session.visited.add(body.key);
+        return json(res, 200, { key: body.key });
       }
 
       // --- navigation between local pages inside one window
@@ -414,6 +461,7 @@ export function createServer() {
         lastWritten.set(page.key, hash(stripSdk(html)));
         watchPage(page.key);
         session.activeKey = page.key;
+        session.visited.add(page.key);
         return json(res, 200, { key: page.key, page: pageState(page.key) });
       }
 

@@ -21,6 +21,7 @@ const state = {
   orphans: new Set(),
   pollCommand: "",
   editsExpanded: false,
+  others: [],
   scroll: { x: 0, y: 0 },
   reloading: false,
 };
@@ -43,7 +44,8 @@ const toFrame = (message) => frame.contentWindow && frame.contentWindow.postMess
 
 async function loadPage(key, { reload = true } = {}) {
   state.key = key;
-  state.page = await api(`/api/page/${key}`);
+  state.page = await api(`/api/page/${key}?session=${state.sessionId}`);
+  state.others = state.page.others || [];
   state.orphans = new Set();
   state.compose = null;
   state.active = null;
@@ -195,8 +197,40 @@ function render() {
     renderSave();
   }
 
+  // --- pages you left feedback on but are not looking at
+  const others = state.others || [];
+  const othersBox = $("othersBox");
+  othersBox.hidden = others.length === 0;
+  if (others.length) {
+    $("othersCount").textContent = String(others.length);
+    const list = $("othersList");
+    list.textContent = "";
+    for (const other of others) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "edit-row other-row";
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = other.filename;
+      const count = document.createElement("span");
+      count.className = "kind";
+      count.textContent = String(other.count);
+      row.append(label, count);
+      row.addEventListener("click", async () => {
+        await api(`/api/session/${state.sessionId}/goto`, {
+          method: "POST",
+          body: JSON.stringify({ key: other.key }),
+        });
+        state.scroll = { x: 0, y: 0 };
+        await loadPage(other.key);
+      });
+      list.append(row);
+    }
+  }
+
   // --- send
-  const total = comments.length + edits.length;
+  const otherTotal = others.reduce((sum, o) => sum + o.count, 0);
+  const total = comments.length + edits.length + otherTotal;
   const send = $("send");
   const busy = state.agent === "working" || state.agent === "stranded" || state.sent;
   send.disabled = total === 0 || busy;
@@ -335,7 +369,7 @@ window.addEventListener("message", async (event) => {
     case "eh:edit":
       state.page = (await api(`/api/page/${state.key}/edit`, {
         method: "POST",
-        body: JSON.stringify({ label: msg.label, kind: msg.kind }),
+        body: JSON.stringify({ label: msg.label, kind: msg.kind, before: msg.before, after: msg.after }),
       })).page;
       state.sent = false;
       render();
