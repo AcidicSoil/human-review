@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { Store, resolveAsset } from "./state.js";
 import { injectSdk, stripSdk } from "./html-transform.js";
 import { ensureStateDir, pageKey, realFile, serverPath } from "./paths.js";
+import { invocation } from "./setup.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -71,10 +72,16 @@ export function createServer() {
     }
   }
 
+  /**
+   * A pending batch only means "working" once an agent has actually taken it.
+   * Feedback sent with nothing listening is "stranded", and the browser says so.
+   */
   function agentState(entryKey) {
-    if (batches.has(entryKey)) return "working";
+    const pending = batches.get(entryKey);
+    if (pending && pending.delivered) return "working";
     const set = pollers.get(entryKey);
-    return set && set.size ? "listening" : "idle";
+    if (set && set.size) return "listening";
+    return pending ? "stranded" : "idle";
   }
 
   function broadcastAgent(entryKey) {
@@ -159,8 +166,9 @@ export function createServer() {
       return { error: "nothing to send" };
     }
 
-    batches.set(session.entryKey, { batch, key, ids: page.comments.map((c) => c.id) });
-    deliver(session.entryKey, batch);
+    const record = { batch, key, ids: page.comments.map((c) => c.id), delivered: false };
+    batches.set(session.entryKey, record);
+    record.delivered = deliver(session.entryKey, batch);
     broadcastAgent(session.entryKey);
     return { ok: true };
   }
@@ -228,9 +236,12 @@ export function createServer() {
   // scripts are fetched from a null origin and need CORS to load at all.
   const CORS = { "access-control-allow-origin": "*" };
 
-  function pageState(key) {
+  function pageState(key, session) {
     const page = store.page(key);
     if (!page) return null;
+    // The entry file is what the agent polls, even after navigating elsewhere.
+    const entry = session ? store.page(session.entryKey) : null;
+    const pollFile = entry ? entry.file : page.file;
     return {
       key: page.key,
       file: page.file,
@@ -238,6 +249,7 @@ export function createServer() {
       comments: page.comments,
       edits: page.edits,
       canRevert: typeof page.pristine === "string" && page.pristine.length > 0,
+      pollCommand: `${invocation()} poll ${JSON.stringify(pollFile)}`,
     };
   }
 
@@ -382,7 +394,7 @@ export function createServer() {
       if (bootMatch && req.method === "GET") {
         const session = sessions.get(bootMatch[1]);
         if (!session) return json(res, 404, { error: "unknown session" });
-        return json(res, 200, { key: session.activeKey, page: pageState(session.activeKey) });
+        return json(res, 200, { key: session.activeKey, page: pageState(session.activeKey, session) });
       }
 
       // --- navigation between local pages inside one window
@@ -436,6 +448,7 @@ export function createServer() {
 
         const pending = batches.get(entryKey);
         if (pending) {
+          pending.delivered = true;
           broadcastAgent(entryKey);
           return json(res, 200, pending.batch);
         }

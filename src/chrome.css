@@ -340,6 +340,31 @@ body.collapsed .handle { right: 0; }
   line-height: 1.4;
 }
 
+/* Shown after Send when nothing is polling, so the loop never dead-ends. */
+.handoff {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--strong-border);
+  border-radius: 8px;
+  background: var(--card);
+  animation: rise 140ms ease-out;
+}
+.handoff-title { margin: 0 0 4px; font-size: 12px; font-weight: 600; }
+.handoff-body { margin: 0 0 8px; color: var(--mute); font-size: 11.5px; line-height: 1.45; }
+.handoff-cmd {
+  margin-bottom: 8px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  background: var(--input-bg);
+  border: 1px solid var(--hair);
+  overflow-x: auto;
+}
+.handoff-cmd code {
+  font: 11.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre;
+}
+.handoff .btn-ghost { padding: 5px 9px; font-size: 11.5px; }
+
 .toast {
   position: fixed;
   left: 50%;

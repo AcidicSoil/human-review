@@ -30,14 +30,20 @@ shadow.innerHTML = `
     .box { position: fixed; pointer-events: none; z-index: 2147483646; border-radius: 3px; display: none; }
     .outline { border: 1px solid #c2beb4; }
     .active { border: 1px solid #1b1a16; }
-    .chip {
-      position: fixed; z-index: 2147483647; width: 23px; height: 23px; display: none;
-      align-items: center; justify-content: center; padding: 0;
-      border: 1px solid #e4e2db; border-radius: 50%; background: #fff; color: #b23b2e;
-      font: 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      cursor: pointer; box-shadow: 0 2px 8px rgba(27,26,22,.14); pointer-events: auto;
+    .chips {
+      position: fixed; z-index: 2147483647; display: none; gap: 4px;
+      pointer-events: auto;
     }
-    .chip:hover { background: #b23b2e; color: #fff; border-color: #b23b2e; }
+    .chip {
+      width: 23px; height: 23px; display: flex;
+      align-items: center; justify-content: center; padding: 0;
+      border: 1px solid #e4e2db; border-radius: 50%; background: #fff; color: #6b6862;
+      font: 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      cursor: pointer; box-shadow: 0 2px 8px rgba(27,26,22,.14);
+    }
+    .chip:hover { background: #1b1a16; color: #fff; border-color: #1b1a16; }
+    .chip.danger { color: #b23b2e; }
+    .chip.danger:hover { background: #b23b2e; color: #fff; border-color: #b23b2e; }
     .hint {
       position: fixed; z-index: 2147483647; display: none; padding: 3px 7px;
       border-radius: 5px; background: #1b1a16; color: #fbfaf7; white-space: nowrap;
@@ -47,7 +53,13 @@ shadow.innerHTML = `
   </style>
   <div class="box outline" id="outline"></div>
   <div class="box active" id="activeBox"></div>
-  <button class="chip" id="chip" title="Delete element" aria-label="Delete element">&#10005;</button>
+  <div class="chips" id="chips">
+    <button class="chip" id="chipComment" title="Comment on this block" aria-label="Comment on this block">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+           stroke-width="1.5" stroke-linejoin="round"><path d="M2.6 3.2h10.8v7.2H7.2l-3.1 2.4v-2.4H2.6z"/></svg>
+    </button>
+    <button class="chip danger" id="chipDelete" title="Delete this block" aria-label="Delete this block">&#10005;</button>
+  </div>
   <div class="hint" id="hint"></div>
 `;
 
@@ -56,7 +68,9 @@ const mountOverlay = () => {
   if (!host.isConnected) document.documentElement.appendChild(host);
   els.outline = shadow.getElementById("outline");
   els.activeBox = shadow.getElementById("activeBox");
-  els.chip = shadow.getElementById("chip");
+  els.chips = shadow.getElementById("chips");
+  els.chipComment = shadow.getElementById("chipComment");
+  els.chipDelete = shadow.getElementById("chipDelete");
   els.hint = shadow.getElementById("hint");
 };
 
@@ -78,14 +92,19 @@ function place(box, el, pad = 2) {
 }
 
 function showChip(el) {
-  if (!el) {
-    els.chip.style.display = "none";
+  if (!el || !el.isConnected) {
+    els.chips.style.display = "none";
     return;
   }
   const r = el.getBoundingClientRect();
-  els.chip.style.display = "flex";
-  els.chip.style.left = `${Math.max(4, r.right - 11)}px`;
-  els.chip.style.top = `${Math.max(4, r.top - 11)}px`;
+  // A target in a collapsed tab has no box; don't strand the chips in a corner.
+  if (!r.width && !r.height) {
+    els.chips.style.display = "none";
+    return;
+  }
+  els.chips.style.display = "flex";
+  els.chips.style.left = `${Math.max(4, r.right - 50)}px`;
+  els.chips.style.top = `${Math.max(4, r.top - 11)}px`;
 }
 
 function showHint(text, x, y) {
@@ -523,7 +542,19 @@ function boot() {
     showHint("");
   });
 
-  els.chip.addEventListener("click", (event) => {
+  // Any block can be commented on, not just authored containers and media.
+  els.chipComment.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!hoverTarget) return;
+    const target = targetFor(hoverTarget);
+    if (!target) return;
+    const sel = document.getSelection();
+    if (sel) sel.removeAllRanges();
+    openElementCompose(target);
+  });
+
+  els.chipDelete.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
     if (!hoverTarget) return;

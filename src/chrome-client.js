@@ -19,6 +19,7 @@ const state = {
   savedAt: "",
   sent: false,
   orphans: new Set(),
+  pollCommand: "",
   scroll: { x: 0, y: 0 },
   reloading: false,
 };
@@ -183,7 +184,7 @@ function render() {
   // --- send
   const total = comments.length + edits.length;
   const send = $("send");
-  const busy = state.agent === "working" || state.sent;
+  const busy = state.agent === "working" || state.agent === "stranded" || state.sent;
   send.disabled = total === 0 || busy;
   send.textContent = busy ? "Sent — waiting for agent" : total ? `Send ${total} to agent` : "Nothing to send yet";
   if (!send.disabled) {
@@ -193,9 +194,16 @@ function render() {
     send.append(" ", key);
   }
 
-  const agentLine = $("agentLine");
-  agentLine.hidden = state.agent !== "working";
+  // After sending, say what happens next. If nothing is polling, the loop would
+  // otherwise dead-end silently, so hand over the exact command to run.
+  const working = state.agent === "working";
+  $("agentLine").hidden = !working;
   $("agentText").textContent = "Agent working — page reloads when fixes land";
+
+  // Server-authoritative, so it survives a browser refresh.
+  const stranded = state.agent === "stranded";
+  $("handoff").hidden = !stranded;
+  if (stranded) $("handoffCmd").textContent = state.pollCommand || page.pollCommand || "";
 }
 
 function renderSave() {
@@ -402,6 +410,19 @@ $("revert").addEventListener("click", async () => {
   }
 });
 
+$("handoffCopy").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  try {
+    await navigator.clipboard.writeText($("handoffCmd").textContent);
+    button.textContent = "Copied";
+    setTimeout(() => {
+      button.textContent = "Copy command";
+    }, 1600);
+  } catch {
+    toast("Couldn't copy — select the command and copy it manually");
+  }
+});
+
 $("note").addEventListener("input", (event) => {
   const el = event.target;
   el.style.height = "auto";
@@ -473,7 +494,6 @@ function connect() {
   });
   source.addEventListener("agent", (event) => {
     state.agent = JSON.parse(event.data).state;
-    if (state.agent !== "working") state.sent = false;
     render();
   });
   source.addEventListener("refresh", async () => {
@@ -495,6 +515,7 @@ function connect() {
   } catch {}
 
   const bootstrap = await api(`/api/session/${state.sessionId}/page`).catch(() => null);
+  if (bootstrap && bootstrap.page) state.pollCommand = bootstrap.page.pollCommand;
   const key = bootstrap ? bootstrap.key : new URLSearchParams(location.search).get("key");
   await loadPage(key);
   connect();

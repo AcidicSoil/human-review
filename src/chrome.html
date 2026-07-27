@@ -59,6 +59,12 @@
         <textarea id="note" rows="2" placeholder="Overall note…"></textarea>
         <button type="button" id="send" class="send" disabled>Nothing to send yet</button>
         <div class="agent-line" id="agentLine" hidden><span class="dot amber"></span><span id="agentText"></span></div>
+        <div class="handoff" id="handoff" hidden>
+          <p class="handoff-title">Sent — but no agent is listening yet.</p>
+          <p class="handoff-body">Run this in the terminal where your agent is working:</p>
+          <div class="handoff-cmd"><code id="handoffCmd"></code></div>
+          <button type="button" id="handoffCopy" class="btn-ghost">Copy command</button>
+        </div>
       </div>
     </aside>
   </div>
