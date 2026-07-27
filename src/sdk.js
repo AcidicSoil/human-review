@@ -54,10 +54,6 @@ shadow.innerHTML = `
   <div class="box outline" id="outline"></div>
   <div class="box active" id="activeBox"></div>
   <div class="chips" id="chips">
-    <button class="chip" id="chipComment" title="Comment on this block" aria-label="Comment on this block">
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-           stroke-width="1.5" stroke-linejoin="round"><path d="M2.6 3.2h10.8v7.2H7.2l-3.1 2.4v-2.4H2.6z"/></svg>
-    </button>
     <button class="chip danger" id="chipDelete" title="Delete this block" aria-label="Delete this block">&#10005;</button>
   </div>
   <div class="hint" id="hint"></div>
@@ -69,7 +65,6 @@ const mountOverlay = () => {
   els.outline = shadow.getElementById("outline");
   els.activeBox = shadow.getElementById("activeBox");
   els.chips = shadow.getElementById("chips");
-  els.chipComment = shadow.getElementById("chipComment");
   els.chipDelete = shadow.getElementById("chipDelete");
   els.hint = shadow.getElementById("hint");
 };
@@ -103,7 +98,7 @@ function showChip(el) {
     return;
   }
   els.chips.style.display = "flex";
-  els.chips.style.left = `${Math.max(4, r.right - 50)}px`;
+  els.chips.style.left = `${Math.max(4, r.right - 11)}px`;
   els.chips.style.top = `${Math.max(4, r.top - 11)}px`;
 }
 
@@ -269,22 +264,12 @@ function targetFor(node) {
 
   const heading = precedingHeading(block);
   const tag = block.tagName.toLowerCase();
-  const label = heading ? `${clip(heading, 26)} · ${tag}` : clip(block.textContent, 40) || tag;
+  // Siblings of the same tag would otherwise share a label and collapse into
+  // one edit row, so number them.
+  const twins = block.parentElement ? [...block.parentElement.children].filter((c) => c.tagName === block.tagName) : [];
+  const ordinal = twins.length > 1 ? ` ${twins.indexOf(block) + 1}` : "";
+  const label = heading ? `${clip(heading, 26)} · ${tag}${ordinal}` : clip(block.textContent, 40) || tag;
   return { el: block, label, authored: false };
-}
-
-/** Only authored containers and media are clickable comment targets. */
-function containerFor(node) {
-  const el = node && node.nodeType === 1 ? node : node && node.parentElement;
-  if (!el || isOurs(el)) return null;
-  const authored = el.closest("[data-container]");
-  if (authored) return { el: authored, label: clip(authored.getAttribute("data-container")) };
-  const media = el.closest("img, svg, canvas, video, picture, iframe, figure");
-  if (media) {
-    const alt = media.getAttribute("alt") || media.getAttribute("aria-label") || "";
-    return { el: media, label: clip(alt || media.tagName.toLowerCase()) };
-  }
-  return null;
 }
 
 // ------------------------------------------------------------ serialization
@@ -374,6 +359,7 @@ function settleSelection() {
 }
 
 function openElementCompose(container) {
+  if (pending && pending.element === container.el) return;
   pending = { kind: "element", element: container.el };
   place(els.activeBox, container.el);
   post("eh:compose", {
@@ -483,12 +469,12 @@ function boot() {
     if (isOurs(event.target)) return;
     setTimeout(() => {
       if (settleSelection()) return;
-      const container = containerFor(event.target);
-      if (container) {
-        openElementCompose(container);
+      const target = targetFor(event.target);
+      if (target) {
+        openElementCompose(target);
         return;
       }
-      if (!composeOpen) post("eh:dismiss", {});
+      post("eh:dismiss", {});
     }, 0);
   });
 
@@ -540,18 +526,6 @@ function boot() {
     place(els.outline, null);
     showChip(null);
     showHint("");
-  });
-
-  // Any block can be commented on, not just authored containers and media.
-  els.chipComment.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!hoverTarget) return;
-    const target = targetFor(hoverTarget);
-    if (!target) return;
-    const sel = document.getSelection();
-    if (sel) sel.removeAllRanges();
-    openElementCompose(target);
   });
 
   els.chipDelete.addEventListener("click", (event) => {

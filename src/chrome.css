@@ -309,6 +309,19 @@ body.collapsed .handle { right: 0; }
 .edit-row .label { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .edit-row .kind { margin-left: auto; color: var(--faint-2); font-size: 11px; white-space: nowrap; }
 
+.edit-more {
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-top: 1px solid var(--hair-2);
+  background: transparent;
+  color: var(--faint-2);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.edit-more:hover { background: var(--soft); color: var(--strong-txt); }
+
 .rail-foot { flex: none; padding: 12px; border-top: 1px solid var(--hair-2); }
 .rail-foot textarea { min-height: 58px; max-height: 40vh; margin-bottom: 9px; font-size: 12.5px; overflow-y: auto; resize: vertical; }
 

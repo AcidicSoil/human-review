@@ -20,6 +20,7 @@ const state = {
   sent: false,
   orphans: new Set(),
   pollCommand: "",
+  editsExpanded: false,
   scroll: { x: 0, y: 0 },
   reloading: false,
 };
@@ -164,7 +165,9 @@ function render() {
     $("editCount").textContent = String(edits.length);
     const rows = $("editList");
     rows.textContent = "";
-    for (const edit of edits) {
+    const LIMIT = 5;
+    const shown = state.editsExpanded ? edits : edits.slice(0, LIMIT);
+    for (const edit of shown) {
       const row = document.createElement("div");
       row.className = `edit-row${edit.kind === "deleted" ? " deleted" : ""}`;
       const pip = document.createElement("span");
@@ -177,6 +180,17 @@ function render() {
       kind.textContent = edit.kind;
       row.append(pip, label, kind);
       rows.append(row);
+    }
+    if (edits.length > LIMIT) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "edit-more";
+      more.textContent = state.editsExpanded ? "Show fewer" : `${edits.length - LIMIT} more…`;
+      more.addEventListener("click", () => {
+        state.editsExpanded = !state.editsExpanded;
+        render();
+      });
+      rows.append(more);
     }
     renderSave();
   }
@@ -236,7 +250,8 @@ function setActive(id, scroll) {
  * document so you can type over it or delete it; click the card when you want
  * to comment on it instead.
  */
-function openCompose(detail) {
+async function openCompose(detail) {
+  if (state.compose && $("composeText").value.trim()) await commitCompose();
   state.compose = detail;
   render();
   toFrame({ type: "eh:composeOpen" });
@@ -302,7 +317,7 @@ window.addEventListener("message", async (event) => {
       break;
     }
     case "eh:compose":
-      openCompose({ kind: msg.kind, quote: msg.quote, anchor: msg.anchor });
+      await openCompose({ kind: msg.kind, quote: msg.quote, anchor: msg.anchor });
       break;
     case "eh:dismiss":
       if (!$("composeText").value.trim()) cancelCompose();
