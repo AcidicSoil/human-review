@@ -60,6 +60,10 @@ edit-html poll <file.html> --ack # acknowledge the last batch and keep waiting
 `edit-html setup` writes a Claude Code skill and an `AGENTS.md` section for Codex,
 so you don't have to explain the loop yourself.
 
+Run `poll` in the foreground and keep the agent turn open. If a harness returns a
+process or session handle, the agent must keep waiting on that handle until `poll`
+exits. If the harness times out, run the same command again; feedback is saved.
+
 ### The JSON contract
 
 `poll` prints one object to stdout and nothing else. Progress goes to stderr.

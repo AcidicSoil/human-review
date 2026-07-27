@@ -23,6 +23,11 @@ select anything to comment on it, and send you the whole batch at once.
    npx -y edit-html poll path/to/file.html
    ```
 
+   Keep this command in the foreground. Do not end your turn while it is waiting.
+   If your shell returns a process or session handle, keep waiting on that handle
+   until the command exits. If the harness times out, run the same poll command
+   again; the feedback is saved.
+
 4. Apply what comes back, then wait again. `--ack` clears the batch you just handled:
 
    ```sh

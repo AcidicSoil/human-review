@@ -30,6 +30,11 @@ After writing an HTML file the user will read, open it for them with
 until they send feedback. Apply the JSON that comes back and poll again with
 \`--ack\`.
 
+Keep the poll command in the foreground and do not end the turn while it waits.
+If the shell returns a process or session handle, keep waiting on that handle until
+the command exits. If the harness times out, run the same poll command again;
+feedback is saved.
+
 The batch groups feedback by page under \`pages\`, so fix every page listed. Items
 under \`edits\` are changes the user already made: \`after\` is their exact wording,
 so carry it across verbatim and never revert it — and if the HTML was generated

@@ -232,9 +232,19 @@ function render() {
   const otherTotal = others.reduce((sum, o) => sum + o.count, 0);
   const total = comments.length + edits.length + otherTotal;
   const send = $("send");
-  const busy = state.agent === "working" || state.agent === "stranded" || state.sent;
+  const delivered = state.agent === "working";
+  const stranded = state.agent === "stranded";
+  const busy = delivered || stranded || state.sent;
   send.disabled = total === 0 || busy;
-  send.textContent = busy ? "Sent — waiting for agent" : total ? `Send ${total} to agent` : "Nothing to send yet";
+  send.textContent = delivered
+    ? "Feedback delivered"
+    : stranded
+      ? "Sent — agent is not listening"
+      : state.sent
+        ? "Sent — waiting for agent"
+        : total
+          ? `Send ${total} to agent`
+          : "Nothing to send yet";
   if (!send.disabled) {
     const key = document.createElement("span");
     key.className = "key";
@@ -244,12 +254,10 @@ function render() {
 
   // After sending, say what happens next. If nothing is polling, the loop would
   // otherwise dead-end silently, so hand over the exact command to run.
-  const working = state.agent === "working";
-  $("agentLine").hidden = !working;
-  $("agentText").textContent = "Agent working — page reloads when fixes land";
+  $("agentLine").hidden = !delivered;
+  $("agentText").textContent = "Feedback delivered — page reloads when fixes land";
 
   // Server-authoritative, so it survives a browser refresh.
-  const stranded = state.agent === "stranded";
   $("handoff").hidden = !stranded;
   if (stranded) $("handoffCmd").textContent = state.pollCommand || page.pollCommand || "";
 }
