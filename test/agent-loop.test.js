@@ -131,13 +131,17 @@ test("timeout, status, and a batch that outlives its server", async (t) => {
     fs.rmSync(path.join(process.env.HUMAN_REVIEW_STATE_DIR, "server.json"), { force: true });
 
     const second = spawnServer();
-    t.after(() => stop(second));
-    await waitForServer(server.pid);
-
-    const result = await collect(cli("poll", file, "--timeout", "10"));
-    assert.equal(result.code, 0, result.stderr);
-    const batch = JSON.parse(result.stdout);
-    assert.equal(batch.status, "feedback");
-    assert.equal(batch.pages[0].comments[0].feedback, "Sharper, please.");
+    try {
+      await waitForServer(server.pid);
+      const result = await collect(cli("poll", file, "--timeout", "10"));
+      assert.equal(result.code, 0, result.stderr);
+      const batch = JSON.parse(result.stdout);
+      assert.equal(batch.status, "feedback");
+      assert.equal(batch.pages[0].comments[0].feedback, "Sharper, please.");
+    } finally {
+      // Kill the server before the outer cleanup deletes its state dir —
+      // Windows cannot remove files a live process still holds open.
+      await stop(second);
+    }
   });
 });

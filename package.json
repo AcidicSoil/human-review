@@ -16,7 +16,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test --test-force-exit",
     "start": "node src/cli.js"
   },
   "keywords": [
