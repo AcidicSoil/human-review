@@ -1,107 +1,97 @@
 # human-review
 
-Review agent-generated HTML and Markdown in your browser, then send every edit and comment back to your agent in one batch. Your agent writes a spec, a plan, a newsletter draft, a landing page — you open it, fix the small stuff by typing, comment on everything else by selecting it, and hit Send. No modes, no save button, no account, no database.
+Review your AI agent's drafts the way you'd review a Google Doc — not by typing paragraphs into chat.
+
+Your agent writes a spec, a plan, a newsletter draft, a landing page. Instead of describing every change in chat ("in the third paragraph, change X to Y…"), you open the file in your browser, fix the small stuff by typing directly into the page, select anything bigger and leave a comment, then hit Send. Your agent gets all of it at once, makes the changes, and the page refreshes so you can see them. Repeat until it's right.
 
 ```
-agent writes a file  →  human-review <file>  →  you edit + comment  →  Send N to agent
-        ↑                                                               │
-        └────────────  page hot-reloads  ←  agent applies fixes  ←──────┘
+agent writes a file  →  human-review <file>  →  you edit + comment  →  Send to agent
+        ↑                                                                  │
+        └────────────  page refreshes  ←  agent applies your feedback  ←───┘
 ```
 
-## What it does
+Works with HTML and Markdown files.
 
-| You do | human-review does |
-|--------|----------------|
-| Type over any text | Autosaves straight to the real file — `⌘S` is just reassurance |
-| Select a phrase | Opens a comment card anchored to that exact quote |
-| Click an image, chart, or block | Attaches feedback to the whole element |
-| Hover and click `✕` | Deletes the block, records it as feedback |
-| `⌘`-click a link | Walks a multi-page site; every page keeps its own feedback |
-| Open a `.md` file | Renders it for review; edits go back as feedback, the source is never touched |
-| Hit `Revert all` | Restores the file to exactly how the agent left it |
-| Hit Send | Delivers one JSON batch covering every page you visited |
+## What you can do
 
-Two special cases it handles for you: pages whose own scripts rewrite the DOM (a self-rendering chart, say) are detected automatically and switched to feedback-only mode so the file is never corrupted, and feedback you send survives timeouts, dead polls, and server restarts.
+| You do | What happens |
+|--------|--------------|
+| Type over any text | Saves straight to the real file — no save button needed |
+| Select a phrase | A comment box opens, anchored to that exact text |
+| Click an image, chart, or section | Your comment covers that whole block |
+| Hover and click `✕` | Deletes the block and tells the agent you did |
+| `⌘`-click a link | Review a multi-page site; every page keeps its own feedback |
+| Click `Revert all` | Puts the file back exactly how the agent left it |
+| Hit Send | Everything — edits and comments from every page — goes to the agent in one batch |
+
+It also handles the tricky cases for you: Markdown files and pages that draw themselves with JavaScript can't be corrupted by your edits (your changes go to the agent as feedback instead of touching the file), and feedback you've sent is never lost, even if the agent or your computer restarts.
 
 ## Install
 
-Nothing to install — `npx` fetches it on demand:
+You can skip installing entirely — `npx` fetches and runs it on demand, which is also how your agent will call it:
 
 ```sh
 npx -y human-review path/to/file.html
 ```
 
-Prefer it always available? `npm install -g human-review`, then just `human-review <file>`.
-
-Then teach your agent when to reach for it:
+Or install it once so the shorter command works everywhere:
 
 ```sh
-human-review setup --global
+npm install -g human-review
 ```
 
-That writes a skill to `~/.claude/skills/human-review/` so Claude Code offers a review in every project. Drop `--global` to set up only the current repo (that also adds an `AGENTS.md` section for Codex).
-
-## Use
-
-**1. Review a file.** Open it, edit and comment in the browser, hit Send:
+Either way, run setup once to teach your agent when to reach for it:
 
 ```sh
-human-review spec.html
+npx -y human-review setup --global
 ```
 
-**2. Wire up an agent.** Anything that can run a shell works. The agent opens the file, then blocks on `poll` until you hit Send:
+That installs a skill for Claude Code so it offers you a review whenever it writes something you'll read. Drop `--global` to set up only the current project (that also adds instructions to `AGENTS.md` for Codex).
+
+## How the agent side works
+
+Any agent that can run a shell command can use this — no SDK, no API keys. The agent opens the file for you, then waits for your feedback:
 
 ```sh
-human-review <file>                          # open it for the human
-human-review poll <file> --timeout 600       # wait for feedback, print it as JSON
-human-review poll <file> --ack --timeout 600 # acknowledge the batch, keep waiting
-human-review status <file>                   # is feedback waiting? answers instantly
+human-review <file>                     # open it in the human's browser
+human-review poll <file> --timeout 600  # wait for feedback (up to 10 min)
+human-review status <file>              # check for feedback without waiting
 ```
 
-A timed-out poll exits 0 with `{"status":"timeout"}` so agents can loop deliberately instead of hanging. `poll` prints one object to stdout and nothing else:
+When you hit Send, the waiting `poll` command prints your feedback as JSON and the agent takes it from there:
 
 ```json
 {
   "status": "feedback",
   "pages": [
     {
-      "file": "/abs/path/to/page.html",
+      "file": "/path/to/page.html",
       "comments": [
-        {
-          "id": "c_335f9ecfbcfa",
-          "kind": "selection",
-          "quote": "Support tickets about lost context grew 40% last quarter",
-          "anchor": { "prefix": "tools. ", "quote": "…", "suffix": ", and three" },
-          "feedback": "Cite the source for the 40% figure."
-        }
+        { "quote": "the text you selected",
+          "feedback": "what you want changed" }
       ],
       "edits": [
-        { "label": "Lede", "kind": "edited",
-          "before": "the original wording", "after": "your exact new wording" }
+        { "label": "Lede", "before": "the original wording",
+          "after": "your exact new wording" }
       ]
     }
   ],
-  "overall_note": "Tighten the risks section."
+  "overall_note": "anything you typed in the note box"
 }
 ```
 
-Two rules for the agent:
+Two rules the agent is told to follow:
 
-1. **`edits` are changes the human already made.** `after` carries their exact wording — apply it verbatim, and if the file was generated from MDX or Markdown, apply it to the source too.
-2. **There is no reply channel.** The human sees your work when the page reloads, which happens automatically once you save the file.
+1. **Your direct edits are final.** The agent carries your exact wording across and never rewrites it — and if the file was generated from another source (like Markdown or MDX), it applies your edit there too.
+2. **No replies in chat.** The agent answers by fixing the file; you see the result when the page refreshes.
 
-**3. Name your sections (optional).** Add `data-block` to the regions you author and the edit list uses your names instead of guessing from the DOM; `data-container` also makes a block clickable as a comment target:
+Authoring tip: add `data-block="Section name"` to parts of your HTML and the feedback list uses your names instead of guessing from the page structure.
 
-```html
-<p data-block="Problem body">…</p>
-<div data-container="Metrics callout">…</div>
-```
+## Private by design
 
-## Local only
+Everything runs on your machine. No account, no cloud, no database — your comments live in one local file (`~/.human-review/state.json`) that you can delete any time. The only network traffic is npm downloading the package.
 
-There is no database and no server beyond a `127.0.0.1` process that exits when idle. Comments live in a single JSON file at `~/.human-review/state.json`; delete it any time. The only thing that ever touches the network is npm fetching this package.
-
-The local server requires a per-run secret token on every API call and rejects requests whose `Host` header is not localhost, so neither another local process nor a malicious web page doing DNS rebinding can read or write your files through human-review. Saved files are stripped of everything human-review injects, so they render exactly as they do standalone.
+The local server only answers its own browser page and CLI — every request needs a secret token created fresh each run, so no other website or program can read or change your files through it. And saved files come out clean: nothing human-review adds to the page ever ends up on disk.
 
 ## Files
 
