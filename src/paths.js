@@ -4,8 +4,8 @@ import path from "node:path";
 import fs from "node:fs";
 
 export function stateDir() {
-  const override = process.env.EDIT_HTML_STATE_DIR;
-  return override ? path.resolve(override) : path.join(homedir(), ".edit-html");
+  const override = process.env.HUMAN_REVIEW_STATE_DIR;
+  return override ? path.resolve(override) : path.join(homedir(), ".human-review");
 }
 
 export function statePath() {

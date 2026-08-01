@@ -5,8 +5,8 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edit-html-markdown-"));
-process.env.EDIT_HTML_STATE_DIR = path.join(tmp, "state");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-markdown-"));
+process.env.HUMAN_REVIEW_STATE_DIR = path.join(tmp, "state");
 
 const { start } = await import("../src/server.js");
 const { isMarkdown, renderMarkdownPage } = await import("../src/markdown.js");
@@ -20,7 +20,7 @@ function request(port, token, { method = "GET", route = "/", body = null } = {})
         method,
         path: route,
         headers: {
-          "x-edit-html-token": token,
+          "x-human-review-token": token,
           ...(body ? { "content-type": "application/json" } : {}),
         },
       },

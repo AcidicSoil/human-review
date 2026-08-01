@@ -1,5 +1,5 @@
 /**
- * edit-html chrome. Owns the rail UI and every call to the local server.
+ * human-review chrome. Owns the rail UI and every call to the local server.
  * It never touches the artifact DOM directly — the SDK does that, over
  * postMessage, because the artifact iframe is sandboxed to a null origin.
  */
@@ -33,7 +33,7 @@ const state = {
 async function api(path, options) {
   const res = await fetch(path, {
     ...options,
-    headers: { "content-type": "application/json", "x-edit-html-token": state.token, ...(options && options.headers) },
+    headers: { "content-type": "application/json", "x-human-review-token": state.token, ...(options && options.headers) },
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
@@ -521,7 +521,7 @@ $("handle").addEventListener("click", () => {
   handle.title = collapsed ? "Show comments panel" : "Hide comments panel";
   handle.setAttribute("aria-label", handle.title);
   try {
-    localStorage.setItem("edit-html:collapsed", collapsed ? "1" : "0");
+    localStorage.setItem("human-review:collapsed", collapsed ? "1" : "0");
   } catch {}
 });
 
@@ -529,7 +529,7 @@ $("theme").addEventListener("click", () => {
   const dark = document.documentElement.dataset.theme !== "dark";
   applyTheme(dark);
   try {
-    localStorage.setItem("edit-html:theme", dark ? "dark" : "light");
+    localStorage.setItem("human-review:theme", dark ? "dark" : "light");
   } catch {}
 });
 
@@ -596,8 +596,8 @@ function connect() {
 
 (async function start() {
   try {
-    applyTheme(localStorage.getItem("edit-html:theme") === "dark");
-    if (localStorage.getItem("edit-html:collapsed") === "1") $("handle").click();
+    applyTheme(localStorage.getItem("human-review:theme") === "dark");
+    if (localStorage.getItem("human-review:collapsed") === "1") $("handle").click();
   } catch {}
 
   const bootstrap = await api(`/api/session/${state.sessionId}/page`).catch(() => null);

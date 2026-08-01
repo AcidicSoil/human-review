@@ -3,7 +3,7 @@
 const SDK_TAG_RE = /<script[^>]*\bdata-eh-sdk\b[^>]*><\/script>/gi;
 
 /**
- * Add the one script tag edit-html injects. Everything else about the artifact
+ * Add the one script tag human-review injects. Everything else about the artifact
  * is left byte-identical, so the saved file renders the same standalone.
  */
 export function injectSdk(html, key) {

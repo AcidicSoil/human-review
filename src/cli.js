@@ -10,15 +10,15 @@ import { installSkills, shellQuote } from "./setup.js";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(here, "..", "package.json"), "utf8"));
 
-const HELP = `edit-html ${pkg.version}
+const HELP = `human-review ${pkg.version}
 
-  edit-html <file.html>            Open a file for review in your browser
-  edit-html poll <file.html>       Wait for feedback, print it as JSON (for agents)
+  human-review <file.html>            Open a file for review in your browser
+  human-review poll <file.html>       Wait for feedback, print it as JSON (for agents)
       --ack                        Acknowledge the last batch, then keep waiting
       --timeout <secs>             Exit with {"status":"timeout"} if nothing arrives
-  edit-html status <file.html>     Report whether feedback is waiting, without blocking
-  edit-html setup                  Teach Claude Code / Codex how to use edit-html
-  edit-html setup --global         ...for every project, not just this one
+  human-review status <file.html>     Report whether feedback is waiting, without blocking
+  human-review setup                  Teach Claude Code / Codex how to use human-review
+  human-review setup --global         ...for every project, not just this one
 
 Everything runs locally. No account, no database, no network.
 `;
@@ -42,7 +42,7 @@ function request(server, options, body) {
         host: "127.0.0.1",
         port,
         ...options,
-        headers: { ...(token ? { "x-edit-html-token": token } : {}), ...(options.headers || {}) },
+        headers: { ...(token ? { "x-human-review-token": token } : {}), ...(options.headers || {}) },
       },
       (res) => {
         let raw = "";
@@ -85,7 +85,7 @@ async function ensureServer() {
     const record = readServerRecord();
     if (record && record.port && (await alive(record.port))) return record;
   }
-  throw new Error("Could not start the local edit-html server.");
+  throw new Error("Could not start the local human-review server.");
 }
 
 function openBrowser(url) {
@@ -118,7 +118,7 @@ async function openCommand(file) {
   openBrowser(url);
   console.log(`Reviewing ${path.basename(target)}`);
   console.log(url);
-  console.log(`\nWaiting for feedback? Run:\n  edit-html poll ${shellQuote(target)}`);
+  console.log(`\nWaiting for feedback? Run:\n  human-review poll ${shellQuote(target)}`);
 }
 
 /**
@@ -141,7 +141,7 @@ function pollOnce(server, file, ack, timeoutMs) {
         port: server.port,
         method: "GET",
         path: `/api/poll?${query}`,
-        headers: { "x-edit-html-token": server.token || "" },
+        headers: { "x-human-review-token": server.token || "" },
       },
       (res) => {
         let raw = "";
@@ -168,7 +168,7 @@ function printTimeout(waitedSecs) {
     status: "timeout",
     waited_seconds: waitedSecs,
     next_step:
-      "No feedback yet. Run the same poll command again to keep waiting, or `edit-html status <file>` to check without blocking.",
+      "No feedback yet. Run the same poll command again to keep waiting, or `human-review status <file>` to check without blocking.",
   };
   process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
 }
@@ -197,7 +197,7 @@ async function pollCommand(file, { ack = false, timeoutSecs = 0 } = {}) {
       process.stdout.write(`${JSON.stringify(batch, null, 2)}\n`);
       return;
     } catch {
-      process.stderr.write("Unexpected response from the edit-html server; retrying.\n");
+      process.stderr.write("Unexpected response from the human-review server; retrying.\n");
     }
   }
   process.stderr.write("Gave up waiting for feedback.\n");
@@ -279,11 +279,11 @@ function parsePollArgs(rest) {
 try {
   if (argv[0] === "poll") {
     const { file, ack, timeoutSecs } = parsePollArgs(argv.slice(1));
-    if (!file) throw new Error("Usage: edit-html poll <file.html> [--ack] [--timeout <secs>]");
+    if (!file) throw new Error("Usage: human-review poll <file.html> [--ack] [--timeout <secs>]");
     await pollCommand(file, { ack, timeoutSecs });
   } else if (argv[0] === "status") {
     const file = argv.find((a, i) => i > 0 && !a.startsWith("-"));
-    if (!file) throw new Error("Usage: edit-html status <file.html>");
+    if (!file) throw new Error("Usage: human-review status <file.html>");
     await statusCommand(file);
   } else if (argv[0] === "setup") {
     const isGlobal = argv.includes("--global") || argv.includes("-g");

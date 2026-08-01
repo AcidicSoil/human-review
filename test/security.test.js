@@ -5,8 +5,8 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edit-html-security-"));
-process.env.EDIT_HTML_STATE_DIR = path.join(tmp, "state");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-security-"));
+process.env.HUMAN_REVIEW_STATE_DIR = path.join(tmp, "state");
 
 const { start } = await import("../src/server.js");
 
@@ -51,7 +51,7 @@ test("the local server refuses strangers", async (t) => {
     const res = await request(port, {
       method: "POST",
       route: "/api/session",
-      headers: { "x-edit-html-token": token },
+      headers: { "x-human-review-token": token },
       body: { file },
     });
     assert.equal(res.status, 200);
@@ -65,7 +65,7 @@ test("the local server refuses strangers", async (t) => {
   await t.test("status reports idle before any feedback is sent", async () => {
     const res = await request(port, {
       route: `/api/status?file=${encodeURIComponent(file)}`,
-      headers: { "x-edit-html-token": token },
+      headers: { "x-human-review-token": token },
     });
     assert.equal(res.status, 200);
     const body = JSON.parse(res.raw);
@@ -78,20 +78,20 @@ test("the local server refuses strangers", async (t) => {
     const opened = await request(port, {
       method: "POST",
       route: "/api/session",
-      headers: { "x-edit-html-token": token },
+      headers: { "x-human-review-token": token },
       body: { file },
     });
     const { key } = JSON.parse(opened.raw);
     const res = await request(port, {
       route: `/api/page/${key}/raw`,
-      headers: { "x-edit-html-token": token },
+      headers: { "x-human-review-token": token },
     });
     assert.equal(res.status, 200);
     assert.match(JSON.parse(res.raw).html, /<p>Hi<\/p>/);
   });
 
   await t.test("the server record keeps its token private", () => {
-    const record = path.join(process.env.EDIT_HTML_STATE_DIR, "server.json");
+    const record = path.join(process.env.HUMAN_REVIEW_STATE_DIR, "server.json");
     const saved = JSON.parse(fs.readFileSync(record, "utf8"));
     assert.equal(saved.token, token);
     if (process.platform !== "win32") {

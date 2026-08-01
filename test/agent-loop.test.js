@@ -8,10 +8,10 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edit-html-loop-"));
-process.env.EDIT_HTML_STATE_DIR = path.join(tmp, "state");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-loop-"));
+process.env.HUMAN_REVIEW_STATE_DIR = path.join(tmp, "state");
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const env = { ...process.env, EDIT_HTML_STATE_DIR: process.env.EDIT_HTML_STATE_DIR };
+const env = { ...process.env, HUMAN_REVIEW_STATE_DIR: process.env.HUMAN_REVIEW_STATE_DIR };
 
 function request(server, method, route, body) {
   return new Promise((resolve, reject) => {
@@ -22,7 +22,7 @@ function request(server, method, route, body) {
         method,
         path: route,
         headers: {
-          "x-edit-html-token": server.token || "",
+          "x-human-review-token": server.token || "",
           ...(body ? { "content-type": "application/json" } : {}),
         },
       },
@@ -63,7 +63,7 @@ function spawnServer() {
 }
 
 async function waitForServer(notPid) {
-  const record = path.join(process.env.EDIT_HTML_STATE_DIR, "server.json");
+  const record = path.join(process.env.HUMAN_REVIEW_STATE_DIR, "server.json");
   for (let attempt = 0; attempt < 150; attempt += 1) {
     try {
       const saved = JSON.parse(fs.readFileSync(record, "utf8"));

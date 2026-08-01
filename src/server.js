@@ -36,7 +36,7 @@ const MIME = {
 const MAX_BODY = 24 * 1024 * 1024;
 const POLL_HEARTBEAT_MS = 15000;
 const WATCH_INTERVAL_MS = 400;
-const IDLE_SHUTDOWN_MS = Number(process.env.EDIT_HTML_IDLE_MS || 45 * 60 * 1000);
+const IDLE_SHUTDOWN_MS = Number(process.env.HUMAN_REVIEW_IDLE_MS || 45 * 60 * 1000);
 /** A window with no live connection this long is treated as closed for good. */
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
@@ -62,7 +62,7 @@ export function createServer() {
     Object.entries(store.allBatches()).map(([key, record]) => [key, { batch: record.batch, cleanup: record.cleanup, delivered: false }])
   );
   const watched = new Map(); // key -> { file }
-  const lastWritten = new Map(); // key -> content hash edit-html itself wrote
+  const lastWritten = new Map(); // key -> content hash human-review itself wrote
 
   let lastActivity = Date.now();
   const touch = () => {
@@ -133,7 +133,7 @@ export function createServer() {
     const page = store.page(key);
     if (!page) throw new Error("unknown page");
     const clean = stripSdk(html);
-    const tmp = `${page.file}.edit-html.tmp`;
+    const tmp = `${page.file}.human-review.tmp`;
     fs.writeFileSync(tmp, clean);
     fs.renameSync(tmp, page.file);
     lastWritten.set(key, hash(clean));
@@ -324,7 +324,7 @@ export function createServer() {
       // Every API route needs the per-run token; static assets and the
       // unguessable /s/<id> chrome page do not.
       if (route.startsWith("/api/")) {
-        const provided = req.headers["x-edit-html-token"] || url.searchParams.get("token") || "";
+        const provided = req.headers["x-human-review-token"] || url.searchParams.get("token") || "";
         if (provided !== token) return json(res, 401, { error: "missing or invalid token" });
       }
 
@@ -354,7 +354,7 @@ export function createServer() {
         const id = route.slice(3);
         if (!sessions.has(id)) {
           res.writeHead(404, { "content-type": "text/plain" });
-          return res.end("This review session has ended. Run edit-html <file> again.");
+          return res.end("This review session has ended. Run human-review <file> again.");
         }
         seen(sessions.get(id));
         const shell = fs.readFileSync(path.join(here, "chrome.html"), "utf8");

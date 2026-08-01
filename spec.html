@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>edit-html — Product Spec</title>
+  <title>human-review — Product Spec</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&amp;family=Playfair+Display:ital,wght@1,700&amp;display=swap" rel="stylesheet">
@@ -305,7 +305,7 @@
   <header class="masthead">
     <div class="masthead-copy">
       <p class="kicker">Last updated July 26, 2026</p>
-      <h1 class="title">edit-html</h1>
+      <h1 class="title">human-review</h1>
       <p class="tagline">Review and edit agent-generated HTML in the browser, then send the whole batch back to your agent.</p>
     </div>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle color theme">◐</button>
@@ -324,14 +324,14 @@
       <p>The pain is validated by a wave of new tools attacking pieces of it: <a href="https://github.com/kunchenguid/lavish-axi">lavish-axi</a> (annotate elements and text, send to agent — but read-only, no direct editing, no persistent comments), <a href="https://github.com/backnotprop/plannotator">plannotator</a> (plan and diff markup for 9+ agents), <a href="https://markloop.io/">Markloop</a> (hosted comments over MCP), and <a href="https://github.com/u-ichi/reviewable-html-workbench">reviewable-html-workbench</a> (inline comment threads). None lets you fix the small things yourself and comment on the rest in one pass, locally, with any agent. Outside the agent world, <a href="https://vercel.com/blog/introducing-commenting-on-preview-deployments">Vercel Preview Comments</a> and tools like <a href="https://usepastel.com/">Pastel</a> prove in-place commenting is how people want to review web content.</p>
       <ul class="goals">
         <li><strong>300 weekly npm downloads within 8 weeks of launch</strong> — the output metric that proves an agent-agnostic review tool is wanted.</li>
-        <li><strong>≥5 artifacts per week reviewed in edit-html by Peter</strong> — dogfooding across docs, newsletters, and landing pages drives quality and credible launch content.</li>
-        <li><strong>Median full loop under 3 minutes</strong> — from <code>edit-html &lt;file&gt;</code> to feedback sent, agent fix applied, and page reloaded; loop speed is the reason to adopt.</li>
+        <li><strong>≥5 artifacts per week reviewed in human-review by Peter</strong> — dogfooding across docs, newsletters, and landing pages drives quality and credible launch content.</li>
+        <li><strong>Median full loop under 3 minutes</strong> — from <code>human-review &lt;file&gt;</code> to feedback sent, agent fix applied, and page reloaded; loop speed is the reason to adopt.</li>
       </ul>
 
       <h2>Solution</h2>
       <p>A CLI that opens any HTML file as an editable page in a local browser: fix small things by typing, comment on everything else by selecting it, then send the whole batch — comments and the list of your edits — to whatever agent you use.</p>
-      <p class="subtle"><strong>Core loop:</strong> Agent writes HTML → <code>edit-html &lt;file&gt;</code> opens it → human edits directly (autosaved) and comments in the rail → Send N to agent → agent applies fixes → page hot-reloads → repeat.</p>
-      <p class="subtle"><strong>Scope:</strong> Local single-user review, one page at a time. No modes, no accounts, no hosting, no multiplayer, no agent chat. Distributed as an npm CLI named <code>edit-html</code> (verified available July 26, 2026), plus a small skill that teaches agents when to run it.</p>
+      <p class="subtle"><strong>Core loop:</strong> Agent writes HTML → <code>human-review &lt;file&gt;</code> opens it → human edits directly (autosaved) and comments in the rail → Send N to agent → agent applies fixes → page hot-reloads → repeat.</p>
+      <p class="subtle"><strong>Scope:</strong> Local single-user review, one page at a time. No modes, no accounts, no hosting, no multiplayer, no agent chat. Distributed as an npm CLI named <code>human-review</code> (verified available July 26, 2026), plus a small skill that teaches agents when to run it.</p>
 
       <h2>Requirements</h2>
 
@@ -342,8 +342,8 @@
         <table>
           <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
           <tbody>
-            <tr><td>Open</td><td><code>edit-html &lt;file.html&gt;</code> starts a local server on a free port (reusing a running instance if one exists), registers a session keyed by <code>sha256(realpath(file))</code>, and opens the default browser. Exits 1 with <code>File not found: &lt;path&gt;</code> if the file doesn't exist.</td></tr>
-            <tr><td>Untouched artifact</td><td>The artifact loads in an iframe with exactly one injected <code>&lt;script&gt;</code> tag before <code>&lt;/body&gt;</code>. Opening the saved file directly in a browser renders identically to opening it in edit-html — edit-html never writes its own markup, highlights, or attributes into the file.</td></tr>
+            <tr><td>Open</td><td><code>human-review &lt;file.html&gt;</code> starts a local server on a free port (reusing a running instance if one exists), registers a session keyed by <code>sha256(realpath(file))</code>, and opens the default browser. Exits 1 with <code>File not found: &lt;path&gt;</code> if the file doesn't exist.</td></tr>
+            <tr><td>Untouched artifact</td><td>The artifact loads in an iframe with exactly one injected <code>&lt;script&gt;</code> tag before <code>&lt;/body&gt;</code>. Opening the saved file directly in a browser renders identically to opening it in human-review — human-review never writes its own markup, highlights, or attributes into the file.</td></tr>
           </tbody>
         </table>
       </div>
@@ -353,15 +353,15 @@
         <table>
           <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
           <tbody>
-            <tr><td>Full-bleed rendering</td><td>The artifact fills the area left of the rail and renders exactly as it would standalone — its own background, width, type, and layout. edit-html imposes no page frame, max-width, or paper background, so a document artifact that centres itself still looks like a document and a landing page still runs edge to edge.</td></tr>
+            <tr><td>Full-bleed rendering</td><td>The artifact fills the area left of the rail and renders exactly as it would standalone — its own background, width, type, and layout. human-review imposes no page frame, max-width, or paper background, so a document artifact that centres itself still looks like a document and a landing page still runs edge to edge.</td></tr>
             <tr><td>Always editable</td><td>The document is <code>contenteditable</code> at all times — there is no editing mode and no mode toggle. Clicking places a cursor and typing changes the page immediately. A text selection anchors a comment rather than switching any mode.</td></tr>
             <tr><td>Element delete</td><td>Hovering a target element outlines it and shows a floating <code>✕</code> chip at its top-right corner. Clicking the chip removes the element and logs it to Your edits as <code>deleted</code>.</td></tr>
-            <tr><td>Target resolution</td><td>Commentable and deletable targets are resolved from <code>data-container</code> / <code>data-block</code> attributes when the artifact has them, using their value as the display label. Otherwise edit-html falls back to the nearest block-level ancestor with visible content, labelled from its nearest preceding heading plus tag (for example <code>Problem · p</code>), truncated at 40 characters.</td></tr>
+            <tr><td>Target resolution</td><td>Commentable and deletable targets are resolved from <code>data-container</code> / <code>data-block</code> attributes when the artifact has them, using their value as the display label. Otherwise human-review falls back to the nearest block-level ancestor with visible content, labelled from its nearest preceding heading plus tag (for example <code>Problem · p</code>), truncated at 40 characters.</td></tr>
             <tr><td>Autosave</td><td>Edits write to the original file continuously, debounced ~800ms after the last keystroke. No Save button exists. Status appears in the rail as <code>Saving to &lt;filename&gt;…</code> (amber dot) then <code>Saved to &lt;filename&gt; · 2:41 PM</code> (green dot). Write failures replace the line with <code>Couldn't save — retrying…</code> in the danger color and retry every 2s.</td></tr>
             <tr><td>⌘S</td><td>Intercepted and swallowed so the browser's Save dialog never appears. If unsaved keystrokes exist it flushes them immediately; otherwise it re-shows the saved status line. It is reassurance only, never a state change.</td></tr>
             <tr><td>Revert all</td><td><code>Revert all</code> in the Your edits header restores the current page — and its file on disk — to exactly how the agent last left it, then clears that page's edit list. Confirm dialog: "Discard all N of your edits?" Comments are not affected.</td></tr>
             <tr><td>⌘-click to interact</td><td>A plain click always edits or comments; <code>⌘</code>-click (<code>Ctrl</code> on Windows and Linux) activates the artifact's own behavior — following a link, switching a tab, opening an accordion. Hovering a link or button shows the hint <code>⌘-click to open</code>. Without the modifier, links never navigate and buttons never fire.</td></tr>
-            <tr><td>External links</td><td>A <code>⌘</code>-clicked link to a non-local URL opens in a new browser tab and leaves the review untouched, since edit-html can only edit local files.</td></tr>
+            <tr><td>External links</td><td>A <code>⌘</code>-clicked link to a non-local URL opens in a new browser tab and leaves the review untouched, since human-review can only edit local files.</td></tr>
           </tbody>
         </table>
       </div>
@@ -418,9 +418,9 @@
         <table>
           <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
           <tbody>
-            <tr><td>Poll</td><td><code>edit-html poll &lt;file.html&gt;</code> long-polls the browser session that file opened — not the file itself — so one command keeps listening even after you navigate to another page. It prints one JSON object to stdout when a batch arrives: <code>{ status, file, comments, edits, overall_note, dom_snapshot }</code>, where <code>file</code> is the absolute path of the page the feedback is about. Whitespace heartbeats keep the connection alive through proxies and CLI timeouts; wait narration goes to stderr only.</td></tr>
+            <tr><td>Poll</td><td><code>human-review poll &lt;file.html&gt;</code> long-polls the browser session that file opened — not the file itself — so one command keeps listening even after you navigate to another page. It prints one JSON object to stdout when a batch arrives: <code>{ status, file, comments, edits, overall_note, dom_snapshot }</code>, where <code>file</code> is the absolute path of the page the feedback is about. Whitespace heartbeats keep the connection alive through proxies and CLI timeouts; wait narration goes to stderr only.</td></tr>
             <tr><td>Payload</td><td>Each comment carries <code>id</code>, <code>kind</code> (<code>selection</code> or <code>element</code>), <code>quote</code>, <code>anchor</code>, and <code>feedback</code>. Each edit carries <code>label</code> and <code>kind</code> (<code>edited</code> or <code>deleted</code>) so the agent knows which parts the human already changed and must not revert.</td></tr>
-            <tr><td>Delivery</td><td>At-least-once: a batch stays pending until the agent acknowledges with <code>edit-html poll &lt;file&gt; --ack</code>, so a crashed agent can re-poll without losing feedback. Sent comments disappear from the rail on acknowledgement.</td></tr>
+            <tr><td>Delivery</td><td>At-least-once: a batch stays pending until the agent acknowledges with <code>human-review poll &lt;file&gt; --ack</code>, so a crashed agent can re-poll without losing feedback. Sent comments disappear from the rail on acknowledgement.</td></tr>
           </tbody>
         </table>
       </div>
@@ -430,8 +430,8 @@
         <table>
           <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
           <tbody>
-            <tr><td>Hot reload</td><td>A file watcher reloads the page when the agent edits the file on screen, preserving scroll position and re-anchoring remaining highlights. edit-html's own autosaves are echo-suppressed so typing never triggers a reload. Edits to a file you are not currently viewing reload nothing and are picked up when you next visit it.</td></tr>
-            <tr><td>Edit conflict</td><td>If the agent's write lands while unflushed keystrokes exist, edit-html flushes first, then reloads and takes the agent's version. The affected rows leave Your edits and the line <code>Agent rewrote 2 blocks you had edited</code> appears in their place.</td></tr>
+            <tr><td>Hot reload</td><td>A file watcher reloads the page when the agent edits the file on screen, preserving scroll position and re-anchoring remaining highlights. human-review's own autosaves are echo-suppressed so typing never triggers a reload. Edits to a file you are not currently viewing reload nothing and are picked up when you next visit it.</td></tr>
+            <tr><td>Edit conflict</td><td>If the agent's write lands while unflushed keystrokes exist, human-review flushes first, then reloads and takes the agent's version. The affected rows leave Your edits and the line <code>Agent rewrote 2 blocks you had edited</code> appears in their place.</td></tr>
             <tr><td>Orphaned anchors</td><td>A comment whose anchor can no longer be found after an edit or reload keeps its card, drops its highlight, and shows an <code>orphaned</code> badge; the quoted text still ships to the agent.</td></tr>
           </tbody>
         </table>
@@ -444,8 +444,8 @@
         <table>
           <thead><tr><th>Label</th><th>Behavior</th></tr></thead>
           <tbody>
-            <tr><td>npm</td><td>Published as <code>edit-html</code> so <code>npx -y edit-html &lt;file.html&gt;</code> works with zero install. Node ≥20; macOS, Linux, Windows.</td></tr>
-            <tr><td>Agent setup</td><td><code>edit-html setup</code> installs a skill or instructions file for detected agents (Claude Code <code>.claude/skills/</code>, Codex <code>AGENTS.md</code> snippet) teaching the loop: write HTML, open it with <code>edit-html &lt;file&gt;</code>, then <code>edit-html poll &lt;file&gt;</code> and apply feedback. It also documents the optional <code>data-block</code> convention for better edit labels. Any other agent is supported through the JSON contract — no per-agent code in core.</td></tr>
+            <tr><td>npm</td><td>Published as <code>human-review</code> so <code>npx -y human-review &lt;file.html&gt;</code> works with zero install. Node ≥20; macOS, Linux, Windows.</td></tr>
+            <tr><td>Agent setup</td><td><code>human-review setup</code> installs a skill or instructions file for detected agents (Claude Code <code>.claude/skills/</code>, Codex <code>AGENTS.md</code> snippet) teaching the loop: write HTML, open it with <code>human-review &lt;file&gt;</code>, then <code>human-review poll &lt;file&gt;</code> and apply feedback. It also documents the optional <code>data-block</code> convention for better edit labels. Any other agent is supported through the JSON contract — no per-agent code in core.</td></tr>
             <tr><td>Docs</td><td>README covers quick start, a demo GIF of the full loop, and the JSON contract. Free and open source; distribution through Peter's channels and a skills.sh listing.</td></tr>
           </tbody>
         </table>
@@ -468,18 +468,18 @@
       <p>The artifact renders as itself, edge to edge, and the rail sits beside it. There is no top bar and no toolbar: the only persistent chrome is the rail, and everything it holds is either something you wrote or something about to be sent. Status that used to justify a top bar — filename, save state, agent activity — is demoted to one line of text each, in the rail, and only while it is true.</p>
       <div class="cards three">
         <article class="card"><h3>No modes</h3><p>The document is always editable. A selection is a comment anchor, never a mode change — so nothing has to be switched before you act.</p></article>
-        <article class="card"><h3>The artifact is sacred</h3><p>Chrome theming and chrome layout both stop at the rail. The artifact keeps its own width, background, and type, and nothing edit-html draws is ever written to the file.</p></article>
+        <article class="card"><h3>The artifact is sacred</h3><p>Chrome theming and chrome layout both stop at the rail. The artifact keeps its own width, background, and type, and nothing human-review draws is ever written to the file.</p></article>
         <article class="card"><h3>One primary action</h3><p>Send is the only button that commits anything outward. Saving is ambient and continuous, so it needs a status line, not a control.</p></article>
       </div>
 
       <h2>Representative designs</h2>
       <div class="mock-grid stack">
         <figure class="mock">
-          <img src="spec-assets/main-value-screen.png" alt="edit-html reviewing a product spec: an editable document with two amber-highlighted passages, and a right rail headed FEEDBACK 2 holding two comment cards, each showing author, relative time, Jump to, ✕, the quoted text, and the feedback. An Overall note field and a dark Send 2 to agent button sit at the rail footer.">
-          <figcaption><strong>Main value screen — reviewing</strong>Shows the always-editable document with anchored highlights, the comment card contract (author · time · <code>Jump to</code> · <code>✕</code>, no resolve and no status chip), the panel-collapse handle on the rail edge, and the single primary action <code>Send 2 to agent</code>. The centred sheet and warm margin come from this artifact's own styling — edit-html imposes no frame.</figcaption>
+          <img src="spec-assets/main-value-screen.png" alt="human-review reviewing a product spec: an editable document with two amber-highlighted passages, and a right rail headed FEEDBACK 2 holding two comment cards, each showing author, relative time, Jump to, ✕, the quoted text, and the feedback. An Overall note field and a dark Send 2 to agent button sit at the rail footer.">
+          <figcaption><strong>Main value screen — reviewing</strong>Shows the always-editable document with anchored highlights, the comment card contract (author · time · <code>Jump to</code> · <code>✕</code>, no resolve and no status chip), the panel-collapse handle on the rail edge, and the single primary action <code>Send 2 to agent</code>. The centred sheet and warm margin come from this artifact's own styling — human-review imposes no frame.</figcaption>
         </figure>
         <figure class="mock">
-          <img src="spec-assets/main-action-screen.png" alt="edit-html mid-edit: the metrics callout has been deleted from the document and the M1 milestone row is outlined. The rail shows a compose card tagged Element for M1 Review core with a focused What should change? textarea and Add comment / Cancel, above the two existing comments, then a YOUR EDITS 2 section with Revert all, the line Saving to redline-spec.html…, rows for Problem body edited and Metrics callout deleted, and a Send 4 to agent button.">
+          <img src="spec-assets/main-action-screen.png" alt="human-review mid-edit: the metrics callout has been deleted from the document and the M1 milestone row is outlined. The rail shows a compose card tagged Element for M1 Review core with a focused What should change? textarea and Add comment / Cancel, above the two existing comments, then a YOUR EDITS 2 section with Revert all, the line Saving to redline-spec.html…, rows for Problem body edited and Metrics callout deleted, and a Send 4 to agent button.">
           <figcaption><strong>Main action screen — composing and editing</strong>Shows compose-in-the-rail on an element target (chip <code>Element</code>, <code>Esc to dismiss</code>), the Your edits list with <code>Revert all</code> and the autosave status line, and how N in <code>Send 4 to agent</code> counts this page's comments plus edits.</figcaption>
         </figure>
       </div>
@@ -489,7 +489,7 @@
         <table>
           <thead><tr><th>Dimension</th><th>Rule</th></tr></thead>
           <tbody>
-            <tr><td>Color</td><td>Two independent palettes. <strong>Chrome</strong> (themed) light: canvas <code>#eceae4</code>, rail <code>#fbfaf7</code>, card <code>#ffffff</code>, hairline <code>#e4e2db</code>, text <code>#26241e</code>, muted <code>#8b877d</code>, faint <code>#b6b2a8</code>, button <code>#1b1a16</code>; dark: <code>#171614</code> / <code>#1f1e1b</code> / <code>#262420</code> / <code>#2f2d29</code> / <code>#eae7e0</code> / <code>#9c968a</code> / <code>#6e6961</code> / <code>#f0ede6</code>. <strong>Artifact</strong>: no palette — it keeps its own. Signals: amber <code>#c99500</code> saving, green <code>#7d9370</code> saved, danger <code>#b23b2e</code> delete. Highlight <code>rgba(245,196,0,.32)</code>, hover <code>rgba(243,176,0,.5)</code>, selection <code>rgba(245,196,0,.42)</code> — the only colors edit-html paints onto the artifact, and all translucent so they read over any background.</td></tr>
+            <tr><td>Color</td><td>Two independent palettes. <strong>Chrome</strong> (themed) light: canvas <code>#eceae4</code>, rail <code>#fbfaf7</code>, card <code>#ffffff</code>, hairline <code>#e4e2db</code>, text <code>#26241e</code>, muted <code>#8b877d</code>, faint <code>#b6b2a8</code>, button <code>#1b1a16</code>; dark: <code>#171614</code> / <code>#1f1e1b</code> / <code>#262420</code> / <code>#2f2d29</code> / <code>#eae7e0</code> / <code>#9c968a</code> / <code>#6e6961</code> / <code>#f0ede6</code>. <strong>Artifact</strong>: no palette — it keeps its own. Signals: amber <code>#c99500</code> saving, green <code>#7d9370</code> saved, danger <code>#b23b2e</code> delete. Highlight <code>rgba(245,196,0,.32)</code>, hover <code>rgba(243,176,0,.5)</code>, selection <code>rgba(245,196,0,.42)</code> — the only colors human-review paints onto the artifact, and all translucent so they read over any background.</td></tr>
             <tr><td>Typography</td><td>System sans throughout the chrome: 13px/1.5 base, comment body 13px, quotes 12px italic, rail section labels 11px/600 uppercase 0.08em tracking. The artifact's own type is never overridden.</td></tr>
             <tr><td>Spacing and shape</td><td>Rail is a fixed 352px column; the artifact takes all remaining width. Radii: cards and inputs 6–8px, chips 999px, edge handle 7px 0 0 7px. One shadow, on the compose card (<code>0 4px 14px -8px</code>); everything else is hairlines.</td></tr>
             <tr><td>Icons and motion</td><td>Glyphs only — <code>✕</code> delete, <code>›</code>/<code>‹</code> collapse, <code>☾</code>/<code>☀</code> theme, plus 5–6px status dots. No icon set. Compose and Your edits enter with a 130–140ms ease-out rise; the delete chip pops in 120ms; scroll-to-anchor is smooth. All animation is suppressed under <code>prefers-reduced-motion</code>.</td></tr>
@@ -516,7 +516,7 @@
 
     <section class="panel wrap" id="panel-tech" role="tabpanel" aria-labelledby="tab-tech" data-panel="tech" hidden>
       <h2>Architecture</h2>
-      <p class="subtle">Nothing is built yet. Research is complete: a full teardown of MIT-licensed lavish-axi, whose SDK injection, long-poll, and file-path session identity edit-html adopts — its gaps (direct editing, persistent comments) are exactly edit-html's additions. The interaction model is settled in the Claude Design file <code>Redline.dc.html</code>, mirrored locally under <code>design-ref/</code>.</p>
+      <p class="subtle">Nothing is built yet. Research is complete: a full teardown of MIT-licensed lavish-axi, whose SDK injection, long-poll, and file-path session identity human-review adopts — its gaps (direct editing, persistent comments) are exactly human-review's additions. The interaction model is settled in the Claude Design file <code>Redline.dc.html</code>, mirrored locally under <code>design-ref/</code>.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Layer</th><th>Choice + status</th><th>Why</th><th>Cost or risk</th></tr></thead>
@@ -529,7 +529,7 @@
             <tr><td>Highlights</td><td><code>&lt;mark data-anchor&gt;</code> in the live DOM · not started</td><td>Survives <code>contenteditable</code> reflow far better than the Custom Highlight API, which loses ranges on edit</td><td>Pollutes the DOM, so serialization must unwrap them — covered by a test</td></tr>
             <tr><td>Navigation</td><td>Intercepted in the iframe SDK · not started</td><td>Plain clicks stay inert so editing is unambiguous; <code>⌘</code>-click resolves the target, and a local file becomes the new active page in the same browser session</td><td><code>⌘</code>-click is not discoverable without the hover hint</td></tr>
             <tr><td>File watching</td><td>chokidar with echo suppression · not started</td><td>Agent writes hot-reload; own writes don't</td><td>Suppression window must survive rapid autosaves</td></tr>
-            <tr><td>State</td><td>JSON at <code>~/.edit-html/state.json</code> · not started</td><td>No DB; survives restarts; comments and edits keyed by file-path hash so pages are independent</td><td>Whole-file rewrite per mutation (fine at this scale)</td></tr>
+            <tr><td>State</td><td>JSON at <code>~/.human-review/state.json</code> · not started</td><td>No DB; survives restarts; comments and edits keyed by file-path hash so pages are independent</td><td>Whole-file rewrite per mutation (fine at this scale)</td></tr>
             <tr><td>Agent transport</td><td>Long-poll HTTP + stdout JSON, subscribed per browser session · not started</td><td>Any agent with a shell works with zero setup; session-scoped polling means one command survives navigation</td><td>No native MCP integration; wrapper possible later</td></tr>
           </tbody>
         </table>
@@ -541,11 +541,11 @@
         <table>
           <thead><tr><th>Entity</th><th>Purpose</th><th>Important fields + relationships</th><th>Access</th></tr></thead>
           <tbody>
-            <tr><td>Browser session</td><td>One open edit-html window and the agent listening to it</td><td><code>id</code>, <code>entry_file</code>, <code>active_file</code>, <code>poll_state</code>. Owns nothing durable — it only routes a sent batch to the waiting poll</td><td>Discarded when the window closes; the agent subscribes by entry file</td></tr>
-            <tr><td>Page</td><td>Everything known about one HTML file</td><td><code>key</code> (sha256 of realpath), <code>file</code>, <code>pristine</code> (agent's last version, for Revert all), <code>pending_batch</code>, <code>updated_at</code>; owns its Comments and Edits. Pages are fully independent — no page references another</td><td>Local user only, in <code>~/.edit-html/state.json</code></td></tr>
+            <tr><td>Browser session</td><td>One open human-review window and the agent listening to it</td><td><code>id</code>, <code>entry_file</code>, <code>active_file</code>, <code>poll_state</code>. Owns nothing durable — it only routes a sent batch to the waiting poll</td><td>Discarded when the window closes; the agent subscribes by entry file</td></tr>
+            <tr><td>Page</td><td>Everything known about one HTML file</td><td><code>key</code> (sha256 of realpath), <code>file</code>, <code>pristine</code> (agent's last version, for Revert all), <code>pending_batch</code>, <code>updated_at</code>; owns its Comments and Edits. Pages are fully independent — no page references another</td><td>Local user only, in <code>~/.human-review/state.json</code></td></tr>
             <tr><td>Comment</td><td>One piece of anchored feedback</td><td><code>id</code>, <code>kind</code> (<code>selection</code>/<code>element</code>), <code>quote</code>, <code>anchor</code> (selector + node path + offsets + quote context), <code>feedback</code>, <code>created_at</code>; no resolve or status field by design</td><td>Read by the agent on poll; removed on acknowledgement or ✕</td></tr>
             <tr><td>Edit</td><td>Account for one direct change</td><td><code>label</code> (authored or heuristic), <code>kind</code> (<code>edited</code>/<code>deleted</code>), <code>at</code>; unique on label+kind. Ships with the batch so the agent won't undo human work</td><td>Cleared by Revert all, by acknowledgement, or when the agent rewrites that target</td></tr>
-            <tr><td>Artifact file</td><td>The reviewed HTML itself</td><td>At the user's original path; written by autosave and by the agent, never by anything else. Serialization strips the injected script and all <code>&lt;mark data-anchor&gt;</code> wrappers</td><td>File-system permissions; edit-html stores no metadata inside it</td></tr>
+            <tr><td>Artifact file</td><td>The reviewed HTML itself</td><td>At the user's original path; written by autosave and by the agent, never by anything else. Serialization strips the injected script and all <code>&lt;mark data-anchor&gt;</code> wrappers</td><td>File-system permissions; human-review stores no metadata inside it</td></tr>
           </tbody>
         </table>
       </div>
@@ -570,8 +570,8 @@
           <thead><tr><th>Milestone</th><th>Ships</th><th>Done when</th></tr></thead>
           <tbody>
             <tr><td>M1: Review core</td><td>CLI open, server, SDK injection, full-bleed always-editable artifact, target resolution, element delete, autosave and Revert all, ⌘-click navigation, compose-in-rail, comment cards, Your edits, panel collapse, chrome theming</td><td>On a sample artifact: comment on two selections and one element, edit two blocks and delete one, and the file on disk contains exactly those changes with no <code>&lt;mark&gt;</code> or injected script; <code>Revert all</code> restores the agent's version byte-for-byte; reopening restores every comment and highlight; ⌘-clicking to a second local page and back preserves both pages' feedback independently</td></tr>
-            <tr><td>M2: Agent loop</td><td><code>Send N to agent</code>, session-scoped <code>edit-html poll</code> with <code>--ack</code>, hot reload with echo suppression, edit-conflict and orphaned-anchor handling</td><td>A full loop runs with both Claude Code and Codex: send comments plus edits, the agent applies fixes without reverting human edits, the page hot-reloads with scroll preserved, and a single poll command survives navigating between two pages</td></tr>
-            <tr><td>M3: Public release</td><td>npm publish as <code>edit-html</code>, <code>edit-html setup</code> for Claude Code and Codex, README and demo GIF, launch content</td><td><code>npx -y edit-html file.html</code> works on a clean machine and a stranger can complete the core loop from the README alone</td></tr>
+            <tr><td>M2: Agent loop</td><td><code>Send N to agent</code>, session-scoped <code>human-review poll</code> with <code>--ack</code>, hot reload with echo suppression, edit-conflict and orphaned-anchor handling</td><td>A full loop runs with both Claude Code and Codex: send comments plus edits, the agent applies fixes without reverting human edits, the page hot-reloads with scroll preserved, and a single poll command survives navigating between two pages</td></tr>
+            <tr><td>M3: Public release</td><td>npm publish as <code>human-review</code>, <code>human-review setup</code> for Claude Code and Codex, README and demo GIF, launch content</td><td><code>npx -y human-review file.html</code> works on a clean machine and a stranger can complete the core loop from the README alone</td></tr>
           </tbody>
         </table>
       </div>

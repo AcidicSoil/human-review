@@ -4,8 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edit-html-concurrent-"));
-process.env.EDIT_HTML_STATE_DIR = path.join(tmp, "state");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-concurrent-"));
+process.env.HUMAN_REVIEW_STATE_DIR = path.join(tmp, "state");
 
 const { Store } = await import("../src/state.js");
 

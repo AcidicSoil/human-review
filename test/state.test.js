@@ -4,8 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edit-html-test-"));
-process.env.EDIT_HTML_STATE_DIR = path.join(tmp, "state");
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-test-"));
+process.env.HUMAN_REVIEW_STATE_DIR = path.join(tmp, "state");
 
 const { Store, resolveAsset } = await import("../src/state.js");
 
@@ -93,7 +93,7 @@ test("stale pages and pages whose file vanished are pruned on load", () => {
 });
 
 function statePathFor() {
-  return path.join(process.env.EDIT_HTML_STATE_DIR, "state.json");
+  return path.join(process.env.HUMAN_REVIEW_STATE_DIR, "state.json");
 }
 
 test("sent batches persist across a restart, and an ack stays acked", () => {
