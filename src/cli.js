@@ -295,3 +295,7 @@ try {
   console.error(err.message || String(err));
   process.exit(1);
 }
+
+// A finished command must never linger on stray handles (keep-alive sockets
+// from health checks, for one) — on Windows that hangs the calling shell.
+process.exit(0);

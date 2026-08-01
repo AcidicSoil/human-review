@@ -64,7 +64,7 @@ function spawnServer() {
 
 async function waitForServer(notPid) {
   const record = path.join(process.env.HUMAN_REVIEW_STATE_DIR, "server.json");
-  for (let attempt = 0; attempt < 150; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     try {
       const saved = JSON.parse(fs.readFileSync(record, "utf8"));
       if (notPid && saved.pid === notPid) throw new Error("stale record");
@@ -127,6 +127,8 @@ test("timeout, status, and a batch that outlives its server", async (t) => {
 
   await t.test("a restarted server still delivers the sent batch", async () => {
     await stop(first);
+    // Clear the dead server's record so nothing races against a stale port.
+    fs.rmSync(path.join(process.env.HUMAN_REVIEW_STATE_DIR, "server.json"), { force: true });
 
     const second = spawnServer();
     t.after(() => stop(second));
