@@ -1,10 +1,27 @@
 # edit-html
 
-**Review and edit agent-generated HTML in the browser, then send the whole batch back to your agent.**
+Review agent-generated HTML and Markdown in your browser, then send every edit and comment back to your agent in one batch. Your agent writes a spec, a plan, a newsletter draft, a landing page — you open it, fix the small stuff by typing, comment on everything else by selecting it, and hit Send. No modes, no save button, no account, no database.
 
-Your agent writes a spec, a plan, a newsletter draft, a landing page. You open it,
-fix the small stuff by typing, comment on everything else by selecting it, and send
-it all back in one go. No modes, no save button, no account, no database.
+```
+agent writes a file  →  edit-html <file>  →  you edit + comment  →  Send N to agent
+        ↑                                                               │
+        └────────────  page hot-reloads  ←  agent applies fixes  ←──────┘
+```
+
+## What it does
+
+| You do | edit-html does |
+|--------|----------------|
+| Type over any text | Autosaves straight to the real file — `⌘S` is just reassurance |
+| Select a phrase | Opens a comment card anchored to that exact quote |
+| Click an image, chart, or block | Attaches feedback to the whole element |
+| Hover and click `✕` | Deletes the block, records it as feedback |
+| `⌘`-click a link | Walks a multi-page site; every page keeps its own feedback |
+| Open a `.md` file | Renders it for review; edits go back as feedback, the source is never touched |
+| Hit `Revert all` | Restores the file to exactly how the agent left it |
+| Hit Send | Delivers one JSON batch covering every page you visited |
+
+Two special cases it handles for you: pages whose own scripts rewrite the DOM (a self-rendering chart, say) are detected automatically and switched to feedback-only mode so the file is never corrupted, and feedback you send survives timeouts, dead polls, and server restarts.
 
 ## Install
 
@@ -22,51 +39,26 @@ Then teach your agent when to reach for it:
 edit-html setup --global
 ```
 
-That writes a skill to `~/.claude/skills/edit-html/` so Claude Code offers a review
-in every project. Drop `--global` to set up only the current repo (that also adds an
-`AGENTS.md` section for Codex).
+That writes a skill to `~/.claude/skills/edit-html/` so Claude Code offers a review in every project. Drop `--global` to set up only the current repo (that also adds an `AGENTS.md` section for Codex).
 
-## The loop
+## Use
 
-```
-agent writes HTML  →  edit-html <file>  →  you edit + comment  →  Send N to agent
-        ↑                                                              │
-        └────────────  page hot-reloads  ←  agent applies fixes  ←─────┘
-```
-
-## What you can do
-
-- **Edit anything.** The page is always editable. Type, delete, rewrite. Changes
-  autosave to the real file — there is no Save button, and `⌘S` is just reassurance.
-- **Comment on a selection.** Select text and a card opens in the right rail. The
-  selection stays live, so you can also just type over it or delete it instead.
-- **Comment on an element.** Click an image, a chart, or a container to attach
-  feedback to the whole block.
-- **Delete a block.** Hover anything and click the `✕`.
-- **Undo everything.** `Revert all` restores the file to exactly how the agent left it.
-- **Walk a multi-page site.** `⌘`-click a link to follow it. Each page keeps its own
-  comments and edits; nothing is lost by navigating away and coming back.
-
-## For agents
-
-Point your agent at these two commands. Anything that can run a shell works.
+**1. Review a file.** Open it, edit and comment in the browser, hit Send:
 
 ```sh
-edit-html <file.html>            # open it for the human
-edit-html poll <file.html>       # block until they hit Send, then print JSON
-edit-html poll <file.html> --ack # acknowledge the last batch and keep waiting
+edit-html spec.html
 ```
 
-`edit-html setup` writes a Claude Code skill and an `AGENTS.md` section for Codex,
-so you don't have to explain the loop yourself.
+**2. Wire up an agent.** Anything that can run a shell works. The agent opens the file, then blocks on `poll` until you hit Send:
 
-Run `poll` in the foreground and keep the agent turn open. If a harness returns a
-process or session handle, the agent must keep waiting on that handle until `poll`
-exits. If the harness times out, run the same command again; feedback is saved.
+```sh
+edit-html <file>                          # open it for the human
+edit-html poll <file> --timeout 600       # wait for feedback, print it as JSON
+edit-html poll <file> --ack --timeout 600 # acknowledge the batch, keep waiting
+edit-html status <file>                   # is feedback waiting? answers instantly
+```
 
-### The JSON contract
-
-`poll` prints one object to stdout and nothing else. Progress goes to stderr.
+A timed-out poll exits 0 with `{"status":"timeout"}` so agents can loop deliberately instead of hanging. `poll` prints one object to stdout and nothing else:
 
 ```json
 {
@@ -93,45 +85,40 @@ exits. If the harness times out, run the same command again; feedback is saved.
 }
 ```
 
-One batch covers every page you visited, so you can walk a whole site with
-`⌘`-click, leave feedback as you go, and send it all at once.
-
 Two rules for the agent:
 
-1. **`edits` are changes you already made.** `after` carries your exact wording, so
-   an agent can apply it to the real source — useful when the HTML was generated
-   from MDX or Markdown and would otherwise be overwritten on the next build.
-2. **There is no reply channel.** The user sees your work when the page reloads,
-   which happens automatically once you save the file.
+1. **`edits` are changes the human already made.** `after` carries their exact wording — apply it verbatim, and if the file was generated from MDX or Markdown, apply it to the source too.
+2. **There is no reply channel.** The human sees your work when the page reloads, which happens automatically once you save the file.
 
-### Nicer edit labels (optional)
-
-edit-html names each edit from the DOM (`Problem · p`). Add `data-block` to the
-sections you author and it uses your name instead:
+**3. Name your sections (optional).** Add `data-block` to the regions you author and the edit list uses your names instead of guessing from the DOM; `data-container` also makes a block clickable as a comment target:
 
 ```html
 <p data-block="Problem body">…</p>
-```
-
-Add `data-container` to make a block clickable as a comment target:
-
-```html
 <div data-container="Metrics callout">…</div>
 ```
 
 ## Local only
 
-There is no database and no server beyond a `127.0.0.1` process that exits when idle.
-Comments live in a single JSON file at `~/.edit-html/state.json`; delete it any time.
-The only thing that ever touches the network is npm fetching this package.
+There is no database and no server beyond a `127.0.0.1` process that exits when idle. Comments live in a single JSON file at `~/.edit-html/state.json`; delete it any time. The only thing that ever touches the network is npm fetching this package.
 
-Your artifact is never modified beyond your own edits: the one injected `<script>`
-tag and every highlight are stripped before anything is written to disk, so the saved
-file renders exactly as it does standalone.
+The local server requires a per-run secret token on every API call and rejects requests whose `Host` header is not localhost, so neither another local process nor a malicious web page doing DNS rebinding can read or write your files through edit-html. Saved files are stripped of everything edit-html injects, so they render exactly as they do standalone.
+
+## Files
+
+1. `src/cli.js`: The `edit-html`, `poll`, `status`, and `setup` commands.
+2. `src/server.js`: The localhost server — sessions, batches, file watching, auth.
+3. `src/sdk.js`: Runs inside the reviewed page — editing, highlights, serialization.
+4. `src/chrome-client.js`: The review UI around the page — comments, edits, Send.
+5. `src/markdown.js`: Renders `.md` files for review.
+6. `src/skill.md`: The skill `setup` installs for Claude Code and Codex.
 
 ## Requirements
 
 Node 20+. macOS, Linux, Windows.
+
+## Who made this
+
+This is one tool from my personal AI operating system. The full library, including my courses and workflows, lives at [Behind the Craft](https://behindthecraft.com).
 
 ## License
 

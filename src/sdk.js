@@ -6,10 +6,10 @@
  * talks to the server — everything crosses to the chrome page by postMessage.
  */
 import { buildContext, findQuote } from "./anchor-text.js";
+import { serializeDocument, UI_ATTR, MARK_ATTR } from "./serialize.js";
 
-const UI_ATTR = "data-eh-ui";
-const MARK_ATTR = "data-eh-mark";
 const SAVE_DEBOUNCE_MS = 700;
+const EDIT_FLUSH_MS = 500;
 const MEDIA = /^(img|svg|canvas|video|picture|iframe|hr|figure)$/i;
 
 const post = (type, payload) => parent.postMessage({ ...payload, type }, "*");
@@ -18,6 +18,8 @@ let pending = null; // { id, marks } for an uncommitted highlight
 let hoverTarget = null;
 let saveTimer = null;
 let composeOpen = false;
+/** True when the page's own scripts rewrote the DOM before any user edit. */
+let dynamic = false;
 
 // ------------------------------------------------------------------ overlay
 
@@ -274,33 +276,39 @@ function targetFor(node) {
 
 // ------------------------------------------------------------ serialization
 
-function serialize() {
-  const clone = document.documentElement.cloneNode(true);
-  clone.querySelectorAll(`[${UI_ATTR}]`).forEach((n) => n.remove());
-  clone.querySelectorAll("script[data-eh-sdk], style[data-eh-sdk]").forEach((n) => n.remove());
-  clone.querySelectorAll(`mark[${MARK_ATTR}]`).forEach((mark) => {
-    const parent = mark.parentNode;
-    if (!parent) return;
-    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-    parent.removeChild(mark);
-  });
-  const body = clone.querySelector("body");
-  if (body) {
-    body.removeAttribute("contenteditable");
-    body.removeAttribute("spellcheck");
-  }
-  clone.normalize();
-  const doctype = document.doctype ? `<!DOCTYPE ${document.doctype.name}>\n` : "";
-  return `${doctype}${clone.outerHTML}\n`;
-}
+const serialize = () => serializeDocument(document);
 
 /**
  * Serialization is lossy about formatting, so a save that would not change the
  * document is skipped outright. Opening a file must never rewrite it.
  */
 let baseline = null;
+/** What the document looked like at boot, before any user edit. */
+let bootSnapshot = null;
+
+/**
+ * Compare the live document against the file on disk (parsed the same way,
+ * without running its scripts). A mismatch means the page renders itself —
+ * writing the live DOM back would bake that output into the file, so saves
+ * are disabled and edits travel to the agent as feedback only.
+ */
+function checkDynamic(diskHtml) {
+  try {
+    const parsed = new DOMParser().parseFromString(diskHtml, "text/html");
+    if (serializeDocument(parsed) !== bootSnapshot) {
+      dynamic = true;
+      post("eh:dynamic", {});
+    }
+  } catch {
+    // If the comparison itself fails, keep saving as normal.
+  }
+}
 
 function emitSave() {
+  if (dynamic) {
+    post("eh:dynamic", {});
+    return;
+  }
   const html = serialize();
   if (html === baseline) {
     post("eh:clean", {});
@@ -312,13 +320,37 @@ function emitSave() {
 
 function scheduleSave() {
   clearTimeout(saveTimer);
-  post("eh:saving", {});
+  if (!dynamic) post("eh:saving", {});
   saveTimer = setTimeout(emitSave, SAVE_DEBOUNCE_MS);
 }
 
 function flushSave() {
   clearTimeout(saveTimer);
+  flushEdits();
   emitSave();
+}
+
+// ------------------------------------------------------------- edit tracking
+
+/**
+ * One POST per keystroke would hammer the server (each save rewrites the whole
+ * state file), so edits queue up and flush together. The store dedupes on
+ * label+kind and only the latest `after` matters, so coalescing loses nothing.
+ */
+const editQueue = new Map();
+let editTimer = null;
+
+function flushEdits() {
+  clearTimeout(editTimer);
+  editTimer = null;
+  for (const payload of editQueue.values()) post("eh:edit", payload);
+  editQueue.clear();
+}
+
+function queueEdit(payload) {
+  editQueue.set(`${payload.label}\u0000${payload.kind}`, payload);
+  clearTimeout(editTimer);
+  editTimer = setTimeout(flushEdits, EDIT_FLUSH_MS);
 }
 
 // ------------------------------------------------------------- interactions
@@ -464,6 +496,7 @@ function boot() {
   document.body.contentEditable = "true";
   document.body.spellcheck = false;
   baseline = serialize();
+  bootSnapshot = baseline;
 
   document.addEventListener("mouseup", (event) => {
     if (isOurs(event.target)) return;
@@ -539,7 +572,7 @@ function boot() {
     hoverTarget = null;
     place(els.outline, null);
     showChip(null);
-    post("eh:edit", { label, kind: "deleted", before, after: "" });
+    queueEdit({ label, kind: "deleted", before, after: "" });
     flushSave();
   });
 
@@ -566,7 +599,7 @@ function boot() {
     const sel = document.getSelection();
     const node = sel && sel.anchorNode ? sel.anchorNode : event.target;
     const target = targetFor(node);
-    post("eh:edit", {
+    queueEdit({
       label: target ? target.label : "Document body",
       kind: "edited",
       before: target ? originalText.get(target.el) : undefined,
@@ -623,6 +656,14 @@ function boot() {
         break;
       case "eh:flush":
         flushSave();
+        break;
+      case "eh:raw":
+        checkDynamic(String(msg.html || ""));
+        break;
+      case "eh:feedbackOnly":
+        // The chrome already knows saves must not happen (e.g. a Markdown
+        // source rendered for review); no comparison needed.
+        dynamic = true;
         break;
       case "eh:restoreScroll":
         window.scrollTo(msg.x || 0, msg.y || 0);

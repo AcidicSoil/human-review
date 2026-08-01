@@ -10,6 +10,7 @@ const frame = $("frame");
 
 const state = {
   sessionId: document.body.dataset.session,
+  token: document.body.dataset.token,
   key: null,
   page: null,
   compose: null,
@@ -24,6 +25,7 @@ const state = {
   others: [],
   scroll: { x: 0, y: 0 },
   reloading: false,
+  dynamic: false,
 };
 
 // ------------------------------------------------------------------- server
@@ -31,7 +33,7 @@ const state = {
 async function api(path, options) {
   const res = await fetch(path, {
     ...options,
-    headers: { "content-type": "application/json", ...(options && options.headers) },
+    headers: { "content-type": "application/json", "x-edit-html-token": state.token, ...(options && options.headers) },
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
@@ -50,6 +52,7 @@ async function loadPage(key, { reload = true } = {}) {
   state.compose = null;
   state.active = null;
   state.sent = false;
+  state.dynamic = false;
   if (reload) {
     state.reloading = true;
     frame.src = `/artifact/${key}/index.html`;
@@ -264,6 +267,18 @@ function render() {
 
 function renderSave() {
   const line = $("saveLine");
+  if (state.page && state.page.markdown) {
+    line.className = "save-line dynamic";
+    $("saveText").textContent = "Markdown source — edits go to the agent as feedback";
+    return;
+  }
+  if (state.dynamic) {
+    // The page's own scripts render it, so writing the live DOM back would
+    // corrupt the file. Edits still reach the agent as feedback.
+    line.className = "save-line dynamic";
+    $("saveText").textContent = "Live page — edits go to the agent, the file is left alone";
+    return;
+  }
   line.className = `save-line ${state.save === "saving" ? "saving" : state.save === "failed" ? "failed" : ""}`;
   const name = state.page ? state.page.filename : "";
   if (state.save === "saving") $("saveText").textContent = `Saving to ${name}…`;
@@ -356,6 +371,15 @@ window.addEventListener("message", async (event) => {
         toFrame({ type: "eh:restoreScroll", x: state.scroll.x, y: state.scroll.y });
         state.reloading = false;
       }
+      if (state.page && state.page.markdown) {
+        // Rendered markdown: the file on disk is source, never to be saved over.
+        toFrame({ type: "eh:feedbackOnly" });
+      } else {
+        // Hand the SDK the on-disk HTML so it can spot self-rendering pages.
+        api(`/api/page/${state.key}/raw`)
+          .then((raw) => toFrame({ type: "eh:raw", html: raw.html }))
+          .catch(() => {});
+      }
       break;
     }
     case "eh:compose":
@@ -392,6 +416,10 @@ window.addEventListener("message", async (event) => {
     case "eh:clean":
       // Serialization matched what is already on disk; nothing to write.
       state.save = state.savedAt ? "saved" : "idle";
+      renderSave();
+      break;
+    case "eh:dynamic":
+      state.dynamic = true;
       renderSave();
       break;
     case "eh:scroll":
@@ -537,6 +565,7 @@ function connect() {
   source.addEventListener("reload", () => {
     const hadEdits = state.page ? state.page.edits.length : 0;
     state.reloading = true;
+    state.dynamic = false;
     frame.src = `/artifact/${state.key}/index.html?t=${Date.now()}`;
     api(`/api/page/${state.key}`).then((page) => {
       state.page = page;

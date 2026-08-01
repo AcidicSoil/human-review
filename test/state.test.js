@@ -73,6 +73,43 @@ test("pages are independent of one another", () => {
   assert.equal(store.page(b.key).comments.length, 0);
 });
 
+test("stale pages and pages whose file vanished are pruned on load", () => {
+  const store = new Store();
+  const keepFile = page("keep.html", "<p>keep</p>");
+  const staleFile = page("stale.html", "<p>stale</p>");
+  const goneFile = page("gone.html", "<p>gone</p>");
+  const keep = store.openPage(keepFile, "<p>keep</p>");
+  const stale = store.openPage(staleFile, "<p>stale</p>");
+  const gone = store.openPage(goneFile, "<p>gone</p>");
+
+  store.data.pages[stale.key].updatedAt = Date.now() - 40 * 24 * 60 * 60 * 1000;
+  fs.writeFileSync(statePathFor(), JSON.stringify(store.data, null, 2));
+  fs.rmSync(goneFile);
+
+  const reloaded = new Store();
+  assert.ok(reloaded.page(keep.key), "recent page with a live file survives");
+  assert.equal(reloaded.page(stale.key), null, "month-old page is pruned");
+  assert.equal(reloaded.page(gone.key), null, "page whose file vanished is pruned");
+});
+
+function statePathFor() {
+  return path.join(process.env.EDIT_HTML_STATE_DIR, "state.json");
+}
+
+test("sent batches persist across a restart, and an ack stays acked", () => {
+  const store = new Store();
+  const { key } = store.openPage(page("batch.html", "<p>x</p>"), "<p>x</p>");
+  store.setBatch(key, { batch: { status: "feedback", pages: [] }, cleanup: [] });
+
+  const restarted = new Store();
+  assert.ok(restarted.batch(key), "an unacked batch survives a restart");
+
+  restarted.clearBatch(key);
+  restarted.save();
+  const again = new Store();
+  assert.equal(again.batch(key), null, "an acked batch is not resurrected by a later save");
+});
+
 test("resolveAsset refuses to escape the artifact's directory", () => {
   const file = path.join(tmp, "dir", "index.html");
   fs.mkdirSync(path.dirname(file), { recursive: true });

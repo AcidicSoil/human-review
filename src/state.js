@@ -2,17 +2,29 @@ import fs from "node:fs";
 import path from "node:path";
 import { ensureStateDir, pageKey, realFile, statePath } from "./paths.js";
 
+/** Anything untouched this long is review debris, not work in progress. */
+const PRUNE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+const fresh = (entry, now) => !!entry && now - (entry.updatedAt || 0) < PRUNE_AGE_MS;
+
 /**
  * All durable state lives in one JSON file. No database, no network.
  *
  * Shape:
- *   { pages: { <key>: { key, file, pristine, comments[], edits[], updatedAt } } }
+ *   {
+ *     pages:   { <key>: { key, file, pristine, comments[], edits[], updatedAt } },
+ *     batches: { <entryKey>: { batch, cleanup, updatedAt } },
+ *   }
  *
- * Pages are fully independent: no page ever references another.
+ * Pages are fully independent: no page ever references another. Batches are
+ * feedback the user sent that no agent has acknowledged yet; persisting them
+ * means "your feedback is safe" stays true across server restarts.
  */
 export class Store {
   constructor() {
-    this.data = { pages: {} };
+    this.data = { pages: {}, batches: {} };
+    /** Batches this process acked; save() must not resurrect them from disk. */
+    this.clearedBatches = new Set();
     this.load();
   }
 
@@ -20,11 +32,28 @@ export class Store {
     try {
       const raw = fs.readFileSync(statePath(), "utf8");
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && parsed.pages) this.data = parsed;
+      if (parsed && typeof parsed === "object" && parsed.pages) {
+        this.data = { pages: parsed.pages, batches: parsed.batches || {} };
+      }
     } catch {
       // Missing or unreadable state is not an error; start empty.
     }
+    this.prune();
     return this.data;
+  }
+
+  /** Drop pages whose file is gone or that nobody has touched in a month. */
+  prune() {
+    const now = Date.now();
+    for (const [key, page] of Object.entries(this.data.pages)) {
+      if (!fresh(page, now) || !fs.existsSync(page.file)) {
+        delete this.data.pages[key];
+        delete this.data.batches[key];
+      }
+    }
+    for (const [key, batch] of Object.entries(this.data.batches)) {
+      if (!fresh(batch, now)) delete this.data.batches[key];
+    }
   }
 
   /**
@@ -35,14 +64,26 @@ export class Store {
   save() {
     ensureStateDir();
     const target = statePath();
-    let onDisk = { pages: {} };
+    let onDisk = { pages: {}, batches: {} };
     try {
       const parsed = JSON.parse(fs.readFileSync(target, "utf8"));
-      if (parsed && parsed.pages) onDisk = parsed;
+      if (parsed && parsed.pages) onDisk = { pages: parsed.pages, batches: parsed.batches || {} };
     } catch {
       // No readable state yet; ours becomes the file.
     }
-    const merged = { ...onDisk, pages: { ...onDisk.pages, ...this.data.pages } };
+    const merged = {
+      pages: { ...onDisk.pages, ...this.data.pages },
+      batches: { ...onDisk.batches, ...this.data.batches },
+    };
+    for (const key of this.clearedBatches) delete merged.batches[key];
+    // Age-prune the merged result too, so the file cannot grow without bound.
+    const now = Date.now();
+    for (const [key, page] of Object.entries(merged.pages)) {
+      if (!fresh(page, now)) delete merged.pages[key];
+    }
+    for (const [key, batch] of Object.entries(merged.batches)) {
+      if (!fresh(batch, now)) delete merged.batches[key];
+    }
     const tmp = `${target}.${process.pid}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(merged, null, 2));
     fs.renameSync(tmp, target);
@@ -134,6 +175,28 @@ export class Store {
       page.comments = page.comments.filter((c) => !drop.has(c.id));
       page.edits = [];
     });
+  }
+
+  // Sent-but-unacked feedback, keyed by the entry page the agent polls.
+
+  batch(entryKey) {
+    return this.data.batches[entryKey] || null;
+  }
+
+  allBatches() {
+    return this.data.batches;
+  }
+
+  setBatch(entryKey, { batch, cleanup }) {
+    this.clearedBatches.delete(entryKey);
+    this.data.batches[entryKey] = { batch, cleanup, updatedAt: Date.now() };
+    this.save();
+  }
+
+  clearBatch(entryKey) {
+    delete this.data.batches[entryKey];
+    this.clearedBatches.add(entryKey);
+    this.save();
   }
 }
 

@@ -12,7 +12,8 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "edit-html-poll-"));
 process.env.EDIT_HTML_STATE_DIR = path.join(tmp, "state");
 const project = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function request(port, method, route, body) {
+function request(server, method, route, body) {
+  const { port, token } = typeof server === "number" ? { port: server, token: "" } : server;
   return new Promise((resolve, reject) => {
     const req = http.request(
       {
@@ -20,7 +21,10 @@ function request(port, method, route, body) {
         port,
         method,
         path: route,
-        headers: body ? { "content-type": "application/json" } : undefined,
+        headers: {
+          ...(token ? { "x-edit-html-token": token } : {}),
+          ...(body ? { "content-type": "application/json" } : {}),
+        },
       },
       (res) => {
         let raw = "";
@@ -56,9 +60,9 @@ async function waitForServer() {
   const record = path.join(process.env.EDIT_HTML_STATE_DIR, "server.json");
   for (let attempt = 0; attempt < 100; attempt += 1) {
     try {
-      const { port } = JSON.parse(fs.readFileSync(record, "utf8"));
-      const health = await request(port, "GET", "/health");
-      if (health.status === 200) return port;
+      const saved = JSON.parse(fs.readFileSync(record, "utf8"));
+      const health = await request(saved.port, "GET", "/health");
+      if (health.status === 200) return saved;
     } catch {
       // The child has not announced its port yet.
     }
@@ -85,11 +89,11 @@ test("poll exits with the feedback batch when the user sends", async (t) => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  const port = await waitForServer();
-  const opened = await request(port, "POST", "/api/session", { file });
+  const server = await waitForServer();
+  const opened = await request(server, "POST", "/api/session", { file });
   assert.equal(opened.status, 200);
 
-  const commented = await request(port, "POST", `/api/page/${opened.body.key}/comment`, {
+  const commented = await request(server, "POST", `/api/page/${opened.body.key}/comment`, {
     kind: "selection",
     quote: "Original",
     feedback: "Make this clearer.",
@@ -103,7 +107,7 @@ test("poll exits with the feedback batch when the user sends", async (t) => {
   });
   const resultPromise = collect(child);
 
-  const sent = await request(port, "POST", `/api/page/${opened.body.key}/send`, {
+  const sent = await request(server, "POST", `/api/page/${opened.body.key}/send`, {
     sessionId: opened.body.sessionId,
     note: "",
   });

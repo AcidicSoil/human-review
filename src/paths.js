@@ -17,7 +17,8 @@ export function serverPath() {
 }
 
 export function ensureStateDir() {
-  fs.mkdirSync(stateDir(), { recursive: true });
+  // Comments and the server token live here; keep it private to the user.
+  fs.mkdirSync(stateDir(), { recursive: true, mode: 0o700 });
 }
 
 /** Canonical identity for a page: the real path of the file on disk. */

@@ -296,6 +296,8 @@ body.collapsed .handle { right: 0; }
 .save-line { display: flex; align-items: center; gap: 7px; padding: 0 4px 9px; color: var(--faint-2); font-size: 11px; }
 .save-line.saving { color: var(--mute); }
 .save-line.failed { color: var(--danger); }
+.save-line.dynamic { color: var(--mute); }
+.save-line.dynamic .dot { background: var(--amber); }
 .dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--green); }
 .save-line.saving .dot { background: var(--amber); }
 .save-line.failed .dot { background: var(--danger); }

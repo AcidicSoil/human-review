@@ -1,4 +1,6 @@
-const SDK_TAG_RE = /\s*<script[^>]*\bdata-eh-sdk\b[^>]*><\/script>/gi;
+// Match only the tag itself: injection adds no whitespace, so stripping must
+// not eat any either, or open→save would not round-trip byte-identically.
+const SDK_TAG_RE = /<script[^>]*\bdata-eh-sdk\b[^>]*><\/script>/gi;
 
 /**
  * Add the one script tag edit-html injects. Everything else about the artifact
@@ -7,13 +9,15 @@ const SDK_TAG_RE = /\s*<script[^>]*\bdata-eh-sdk\b[^>]*><\/script>/gi;
 export function injectSdk(html, key) {
   const clean = stripSdk(html);
   const tag = `<script data-eh-sdk type="module" src="/sdk.js?key=${encodeURIComponent(key)}"></script>`;
+  // No added whitespace: the SDK compares the live DOM against the on-disk file
+  // to detect self-rendering pages, and a stray newline would read as an edit.
   if (/<\/body\s*>/i.test(clean)) {
-    return clean.replace(/<\/body\s*>/i, `${tag}\n</body>`);
+    return clean.replace(/<\/body\s*>/i, `${tag}</body>`);
   }
   if (/<\/html\s*>/i.test(clean)) {
-    return clean.replace(/<\/html\s*>/i, `${tag}\n</html>`);
+    return clean.replace(/<\/html\s*>/i, `${tag}</html>`);
   }
-  return `${clean}\n${tag}\n`;
+  return `${clean}${tag}`;
 }
 
 /** Remove any injected tag, so a file saved with one never keeps it. */

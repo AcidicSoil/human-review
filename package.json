@@ -1,7 +1,7 @@
 {
   "name": "edit-html",
   "version": "0.2.0",
-  "description": "Review and edit agent-generated HTML in the browser, then send the whole batch back to your agent.",
+  "description": "Review and edit agent-generated HTML and Markdown in the browser, then send the whole batch back to your agent.",
   "author": "Peter Yang",
   "type": "module",
   "bin": {
@@ -21,6 +21,7 @@
   },
   "keywords": [
     "html",
+    "markdown",
     "review",
     "comments",
     "agent",
@@ -28,5 +29,11 @@
     "codex",
     "cli"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  },
+  "dependencies": {
+    "marked": "^18.0.7"
+  }
 }

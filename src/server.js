@@ -5,8 +5,9 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Store, resolveAsset } from "./state.js";
 import { injectSdk, stripSdk } from "./html-transform.js";
+import { isMarkdown, renderMarkdownPage } from "./markdown.js";
 import { ensureStateDir, pageKey, realFile, serverPath } from "./paths.js";
-import { invocation } from "./setup.js";
+import { invocation, shellQuote } from "./setup.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +37,8 @@ const MAX_BODY = 24 * 1024 * 1024;
 const POLL_HEARTBEAT_MS = 15000;
 const WATCH_INTERVAL_MS = 400;
 const IDLE_SHUTDOWN_MS = Number(process.env.EDIT_HTML_IDLE_MS || 45 * 60 * 1000);
+/** A window with no live connection this long is treated as closed for good. */
+const SESSION_TTL_MS = 30 * 60 * 1000;
 
 const hash = (text) => crypto.createHash("sha1").update(text).digest("hex");
 const uid = (prefix) => `${prefix}_${crypto.randomBytes(6).toString("hex")}`;
@@ -43,17 +46,30 @@ const uid = (prefix) => `${prefix}_${crypto.randomBytes(6).toString("hex")}`;
 export function createServer() {
   const store = new Store();
 
+  /**
+   * Random per-run secret. Every /api route requires it, so a malicious web
+   * page firing blind cross-origin POSTs at 127.0.0.1 cannot write files.
+   * The CLI reads it from server.json; the chrome page gets it injected.
+   */
+  const token = crypto.randomBytes(16).toString("hex");
+
   /** Browser windows. Ephemeral — nothing durable lives here. */
-  const sessions = new Map(); // sessionId -> { id, entryKey, activeKey, clients:Set<res> }
+  const sessions = new Map(); // sessionId -> { id, entryKey, activeKey, visited, clients:Set<res>, lastSeen }
   /** Agent long-polls, keyed by the entry page they were started on. */
   const pollers = new Map(); // entryKey -> Set<{ res, timer }>
-  const batches = new Map(); // entryKey -> pending batch awaiting --ack
+  /** Pending batches awaiting --ack; mirrored to the store so they survive restarts. */
+  const batches = new Map(
+    Object.entries(store.allBatches()).map(([key, record]) => [key, { batch: record.batch, cleanup: record.cleanup, delivered: false }])
+  );
   const watched = new Map(); // key -> { file }
   const lastWritten = new Map(); // key -> content hash edit-html itself wrote
 
   let lastActivity = Date.now();
   const touch = () => {
     lastActivity = Date.now();
+  };
+  const seen = (session) => {
+    if (session) session.lastSeen = Date.now();
   };
 
   // ---------------------------------------------------------------- helpers
@@ -174,6 +190,7 @@ export function createServer() {
     const pages = collectPages(session);
     if (!pages.length && !note) return { error: "nothing to send" };
 
+    const hasMarkdown = pages.some((p) => isMarkdown(p.file));
     const batch = {
       status: "feedback",
       pages: pages.map(({ file, comments, edits }) => ({ file, comments, edits })),
@@ -182,7 +199,12 @@ export function createServer() {
       next_step:
         "Apply this feedback. Each entry in `pages` names the file it belongs to. Items under `edits` are " +
         "changes the human already made: `after` is their exact new wording, so carry it across verbatim, and " +
-        "never revert it. When every page is updated, run the same poll command again with --ack to clear this " +
+        "never revert it. " +
+        (hasMarkdown
+          ? "Markdown pages were reviewed rendered, so quotes and `after` wording use the rendered text — apply " +
+            "the change to the Markdown source, keeping its formatting syntax. "
+          : "") +
+        "When every page is updated, run the same poll command again with --ack to clear this " +
         "batch and wait for more.",
     };
 
@@ -192,6 +214,7 @@ export function createServer() {
       cleanup: pages.map((p) => ({ key: p.key, ids: p.comments.map((c) => c.id) })),
     };
     batches.set(session.entryKey, record);
+    store.setBatch(session.entryKey, record);
     record.delivered = deliver(session.entryKey, batch);
     broadcastAgent(session.entryKey);
     return { ok: true };
@@ -201,6 +224,7 @@ export function createServer() {
     const pending = batches.get(entryKey);
     if (!pending) return false;
     batches.delete(entryKey);
+    store.clearBatch(entryKey);
     for (const { key, ids } of pending.cleanup) store.clearSent(key, ids);
     for (const session of sessionsForEntry(entryKey)) emit(session, "refresh", {});
     broadcastAgent(entryKey);
@@ -250,6 +274,7 @@ export function createServer() {
       res.writeHead(200, {
         "content-type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream",
         "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
         ...(extraHeaders || {}),
       });
       res.end(buf);
@@ -270,10 +295,11 @@ export function createServer() {
       key: page.key,
       file: page.file,
       filename: path.basename(page.file),
+      markdown: isMarkdown(page.file),
       comments: page.comments,
       edits: page.edits,
       canRevert: typeof page.pristine === "string" && page.pristine.length > 0,
-      pollCommand: `${invocation()} poll ${JSON.stringify(pollFile)}`,
+      pollCommand: `${invocation()} poll ${shellQuote(pollFile)}`,
     };
   }
 
@@ -283,13 +309,31 @@ export function createServer() {
     const route = url.pathname;
 
     try {
+      // A request that arrived via a DNS-rebound hostname carries that hostname
+      // in Host. Refusing it means a malicious page can never speak to us as if
+      // it were same-origin.
+      const host = String(req.headers.host || "");
+      const port = req.socket.localPort;
+      if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) {
+        res.writeHead(403, { "content-type": "text/plain" });
+        return res.end("Forbidden");
+      }
+
       if (route === "/health") return json(res, 200, { ok: true, pid: process.pid });
+
+      // Every API route needs the per-run token; static assets and the
+      // unguessable /s/<id> chrome page do not.
+      if (route.startsWith("/api/")) {
+        const provided = req.headers["x-edit-html-token"] || url.searchParams.get("token") || "";
+        if (provided !== token) return json(res, 401, { error: "missing or invalid token" });
+      }
 
       // --- static chrome assets
       if (route === "/chrome.css") return serveFile(res, path.join(here, "chrome.css"));
       if (route === "/chrome.js") return serveFile(res, path.join(here, "chrome-client.js"), CORS);
       if (route === "/sdk.js") return serveFile(res, path.join(here, "sdk.js"), CORS);
       if (route === "/anchor-text.js") return serveFile(res, path.join(here, "anchor-text.js"), CORS);
+      if (route === "/serialize.js") return serveFile(res, path.join(here, "serialize.js"), CORS);
 
       // --- open a browser session for a file
       if (route === "/api/session" && req.method === "POST") {
@@ -301,7 +345,7 @@ export function createServer() {
         lastWritten.set(page.key, hash(stripSdk(html)));
         watchPage(page.key);
         const id = uid("s");
-        sessions.set(id, { id, entryKey: page.key, activeKey: page.key, visited: new Set([page.key]), clients: new Set() });
+        sessions.set(id, { id, entryKey: page.key, activeKey: page.key, visited: new Set([page.key]), clients: new Set(), lastSeen: Date.now() });
         return json(res, 200, { sessionId: id, key: page.key, path: `/s/${id}` });
       }
 
@@ -312,9 +356,10 @@ export function createServer() {
           res.writeHead(404, { "content-type": "text/plain" });
           return res.end("This review session has ended. Run edit-html <file> again.");
         }
+        seen(sessions.get(id));
         const shell = fs.readFileSync(path.join(here, "chrome.html"), "utf8");
         res.writeHead(200, { "content-type": MIME[".html"], "cache-control": "no-store" });
-        return res.end(shell.replace("__SESSION_ID__", id));
+        return res.end(shell.replace("__SESSION_ID__", id).replace("__TOKEN__", token));
       }
 
       // --- the artifact itself, plus its sibling assets
@@ -336,6 +381,8 @@ export function createServer() {
             res.writeHead(404, { "content-type": "text/plain" });
             return res.end("File is gone");
           }
+          // Markdown reviews render on the fly; the source file stays untouched.
+          if (isMarkdown(page.file)) html = renderMarkdownPage(html, page.file);
           res.writeHead(200, { "content-type": MIME[".html"], "cache-control": "no-store" });
           return res.end(injectSdk(html, key));
         }
@@ -347,6 +394,34 @@ export function createServer() {
         return serveFile(res, target);
       }
 
+      // --- agent status probe: is feedback waiting? is anyone listening?
+      if (route === "/api/status" && req.method === "GET") {
+        const entryKey = pageKey(url.searchParams.get("file") || "");
+        const pending = batches.get(entryKey);
+        const listening = (pollers.get(entryKey) || new Set()).size > 0;
+        // Unsent feedback lives on every page reachable from this entry.
+        const keys = new Set([entryKey]);
+        for (const session of sessions.values()) {
+          if (session.entryKey !== entryKey) continue;
+          for (const k of session.visited) keys.add(k);
+        }
+        let comments = 0;
+        let edits = 0;
+        for (const k of keys) {
+          const page = store.page(k);
+          if (!page) continue;
+          comments += page.comments.length;
+          edits += page.edits.length;
+        }
+        return json(res, 200, {
+          status: pending ? "feedback-waiting" : "idle",
+          feedback_waiting: !!pending,
+          agent_listening: listening,
+          server_running: true,
+          unsent: { comments, edits },
+        });
+      }
+
       // --- page data
       const pageMatch = route.match(/^\/api\/page\/([a-f0-9]+)(?:\/(\w+))?(?:\/(.+))?$/);
       if (pageMatch) {
@@ -356,9 +431,22 @@ export function createServer() {
         if (!action && req.method === "GET") {
           const sid = url.searchParams.get("session");
           const session = sid ? sessions.get(sid) : null;
+          seen(session);
           const body = pageState(key, session);
           if (session) body.others = otherPages(session);
           return json(res, 200, body);
+        }
+
+        // The file as it sits on disk, so the SDK can tell whether the page's
+        // own scripts have already rewritten the live DOM.
+        if (action === "raw" && req.method === "GET") {
+          let html = "";
+          try {
+            html = fs.readFileSync(store.page(key).file, "utf8");
+          } catch {
+            return json(res, 404, { error: "file is gone" });
+          }
+          return json(res, 200, { html: stripSdk(html) });
         }
 
         if (action === "comment" && req.method === "POST") {
@@ -391,6 +479,10 @@ export function createServer() {
         }
 
         if (action === "save" && req.method === "POST") {
+          // A markdown file must never be overwritten with serialized HTML.
+          if (isMarkdown(store.page(key).file)) {
+            return json(res, 400, { error: "markdown pages are feedback-only" });
+          }
           const body = await readBody(req);
           if (typeof body.html !== "string" || !body.html.trim()) {
             return json(res, 400, { error: "empty html" });
@@ -425,6 +517,7 @@ export function createServer() {
       if (bootMatch && req.method === "GET") {
         const session = sessions.get(bootMatch[1]);
         if (!session) return json(res, 404, { error: "unknown session" });
+        seen(session);
         return json(res, 200, {
           key: session.activeKey,
           page: pageState(session.activeKey, session),
@@ -437,6 +530,7 @@ export function createServer() {
       if (gotoMatch && req.method === "POST") {
         const session = sessions.get(gotoMatch[1]);
         if (!session) return json(res, 404, { error: "unknown session" });
+        seen(session);
         const body = await readBody(req);
         if (!store.page(body.key)) return json(res, 404, { error: "unknown page" });
         session.activeKey = body.key;
@@ -449,12 +543,13 @@ export function createServer() {
       if (navMatch && req.method === "POST") {
         const session = sessions.get(navMatch[1]);
         if (!session) return json(res, 404, { error: "unknown session" });
+        seen(session);
         const body = await readBody(req);
         const from = store.page(session.activeKey);
         if (!from) return json(res, 404, { error: "unknown page" });
         const target = resolveAsset(from.file, String(body.href || "").split(/[?#]/)[0]);
-        if (!target || !fs.existsSync(target) || !/\.x?html?$/i.test(target)) {
-          return json(res, 400, { error: "not a local html page" });
+        if (!target || !fs.existsSync(target) || !/\.(x?html?|md|markdown)$/i.test(target)) {
+          return json(res, 400, { error: "not a local html or markdown page" });
         }
         const html = fs.readFileSync(target, "utf8");
         const page = store.openPage(target, stripSdk(html));
@@ -479,11 +574,13 @@ export function createServer() {
         });
         res.write(": open\n\n");
         session.clients.add(res);
+        seen(session);
         emit(session, "agent", { state: agentState(session.entryKey) });
         const beat = setInterval(() => res.write(": beat\n\n"), POLL_HEARTBEAT_MS);
         req.on("close", () => {
           clearInterval(beat);
           session.clients.delete(res);
+          seen(session);
         });
         return undefined;
       }
@@ -526,22 +623,54 @@ export function createServer() {
     }
   });
 
-  setInterval(() => {
-    const busy = sessions.size > 0 || [...pollers.values()].some((s) => s.size > 0);
-    if (!busy && Date.now() - lastActivity > IDLE_SHUTDOWN_MS) process.exit(0);
-  }, 60000).unref();
+  const sweep = setInterval(() => {
+    const now = Date.now();
 
-  return { server, store };
+    // A window with no SSE client for a while is closed; forget its session.
+    for (const [id, session] of sessions) {
+      if (session.clients.size === 0 && now - session.lastSeen > SESSION_TTL_MS) sessions.delete(id);
+    }
+
+    // Stop watching files no remaining session can see.
+    for (const [key, entry] of watched) {
+      const referenced = [...sessions.values()].some((s) => s.visited.has(key));
+      if (!referenced) {
+        fs.unwatchFile(entry.file);
+        watched.delete(key);
+        lastWritten.delete(key);
+      }
+    }
+
+    // Busy means a connected browser or a listening agent — a session record
+    // alone must not keep the process alive forever.
+    const busy = [...sessions.values()].some((s) => s.clients.size > 0) || [...pollers.values()].some((s) => s.size > 0);
+    if (!busy && now - lastActivity > IDLE_SHUTDOWN_MS) process.exit(0);
+  }, 60000);
+  sweep.unref();
+
+  const dispose = () => {
+    clearInterval(sweep);
+    for (const entry of watched.values()) fs.unwatchFile(entry.file);
+    watched.clear();
+    server.close();
+  };
+
+  return { server, store, token, dispose };
 }
 
 export function start(port = 0) {
-  const { server } = createServer();
+  const { server, store, token, dispose } = createServer();
   return new Promise((resolve) => {
     server.listen(port, "127.0.0.1", () => {
       const actual = server.address().port;
       ensureStateDir();
-      fs.writeFileSync(serverPath(), JSON.stringify({ port: actual, pid: process.pid }));
-      resolve({ server, port: actual });
+      fs.writeFileSync(serverPath(), JSON.stringify({ port: actual, pid: process.pid, token }));
+      try {
+        fs.chmodSync(serverPath(), 0o600);
+      } catch {
+        // Windows has no meaningful chmod; the state dir mode covers it.
+      }
+      resolve({ server, store, port: actual, token, dispose });
     });
   });
 }

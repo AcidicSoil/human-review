@@ -1,40 +1,55 @@
 ---
 name: edit-html
-description: Open an HTML file in the browser so the user can edit the text directly and leave comments on specific parts, then send all their edits and comments back to you. Use after writing or updating any HTML file the user will read — specs, plans, reports, newsletter drafts, landing pages, slide decks.
+description: Open an HTML or Markdown file in the browser so the user can edit the text directly and leave comments on specific parts, then send all their edits and comments back to you. Use after writing or updating any HTML or Markdown file the user will read — specs, plans, reports, newsletter drafts, landing pages, slide decks.
 ---
 
 # edit-html
 
-The user reviews your HTML in a real browser: they fix small things by typing,
-select anything to comment on it, and send you the whole batch at once.
+The user reviews your HTML or Markdown in a real browser: they fix small things
+by typing, select anything to comment on it, and send you the whole batch at once.
+
+Markdown files open rendered. Their quotes and edits reference the rendered text,
+and the file itself is never touched — apply every change to the Markdown source,
+keeping its formatting syntax.
 
 ## The loop
 
-1. Write or update the HTML file.
+1. Write or update the HTML or Markdown file.
 2. Open it for the user:
 
    ```sh
    npx -y edit-html path/to/file.html
    ```
 
-3. Wait for feedback. This blocks until they hit Send:
+3. Wait for feedback. This blocks until they hit Send, or the timeout passes:
 
    ```sh
-   npx -y edit-html poll path/to/file.html
+   npx -y edit-html poll path/to/file.html --timeout 600
    ```
 
    Keep this command in the foreground. Do not end your turn while it is waiting.
    If your shell returns a process or session handle, keep waiting on that handle
-   until the command exits. If the harness times out, run the same poll command
-   again; the feedback is saved.
+   until the command exits. If it prints `{"status":"timeout"}`, no feedback has
+   arrived yet — run the same poll command again to keep waiting. Feedback is
+   saved even if a poll dies, so nothing is ever lost.
 
 4. Apply what comes back, then wait again. `--ack` clears the batch you just handled:
 
    ```sh
-   npx -y edit-html poll path/to/file.html --ack
+   npx -y edit-html poll path/to/file.html --ack --timeout 600
    ```
 
 Repeat 3–4 until the user says they are done.
+
+Not sure whether feedback is already waiting — say, at the start of a new turn?
+This answers instantly without blocking:
+
+```sh
+npx -y edit-html status path/to/file.html
+```
+
+It prints `{"status": "feedback-waiting"}` when a batch is ready for a poll,
+plus counts of unsent comments and edits still in the browser.
 
 ## What you get
 

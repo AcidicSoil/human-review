@@ -17,29 +17,43 @@ export function invocation() {
   return found.status === 0 && found.stdout.trim() ? "edit-html" : "npx -y edit-html";
 }
 
+/**
+ * Quote a path for copy-paste into any shell. JSON.stringify would double
+ * Windows backslashes; plain double quotes work in bash, zsh, cmd and
+ * PowerShell alike, and paths cannot legally contain a double quote on Windows.
+ */
+export function shellQuote(arg) {
+  const text = String(arg);
+  return /^[\w@%+=:,./-]+$/.test(text) ? text : `"${text.replaceAll('"', '\\"')}"`;
+}
+
 /** The skill lives in its own markdown file so nothing needs escaping. */
 export const readSkill = () => fs.readFileSync(path.join(here, "skill.md"), "utf8");
 
 export const skillFor = (cmd) => readSkill().replaceAll("npx -y edit-html", cmd);
 
 const CODEX_BLOCK = `
-## Reviewing HTML with edit-html
+## Reviewing HTML and Markdown with edit-html
 
-After writing an HTML file the user will read, open it for them with
-\`npx -y edit-html <file.html>\`, then block on \`npx -y edit-html poll <file.html>\`
-until they send feedback. Apply the JSON that comes back and poll again with
-\`--ack\`.
+After writing an HTML or Markdown file the user will read, open it for them with
+\`npx -y edit-html <file.html>\`, then block on
+\`npx -y edit-html poll <file.html> --timeout 600\` until they send feedback.
+If it prints \`{"status":"timeout"}\`, no feedback arrived yet — run the same
+poll command again to keep waiting. When a \`{"status":"feedback"}\` batch
+arrives, apply it, then poll again with \`--ack\`.
 
 Keep the poll command in the foreground and do not end the turn while it waits.
 If the shell returns a process or session handle, keep waiting on that handle until
-the command exits. If the harness times out, run the same poll command again;
-feedback is saved.
+the command exits. \`npx -y edit-html status <file.html>\` reports instantly
+whether feedback is already waiting, without blocking.
 
 The batch groups feedback by page under \`pages\`, so fix every page listed. Items
 under \`edits\` are changes the user already made: \`after\` is their exact wording,
 so carry it across verbatim and never revert it — and if the HTML was generated
-from MDX or Markdown, apply it to the source too. There is no reply channel; the
-user sees your work when the page reloads.
+from MDX or Markdown, apply it to the source too. Markdown files open rendered
+and are never written by edit-html: apply their comments and edits to the
+Markdown source, keeping its syntax. There is no reply channel; the user sees
+your work when the page reloads.
 `;
 
 export function installSkills(cwd, { global: isGlobal = false } = {}) {
