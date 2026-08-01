@@ -85,63 +85,65 @@ async function stop(child) {
   }
 }
 
-test("timeout, status, and a batch that outlives its server", async (t) => {
-  const file = path.join(tmp, "review.html");
-  fs.writeFileSync(file, "<p>Original</p>");
+// Flat, sequential top-level tests (no nested subtests): the nested form
+// trips node:test's parent-cancellation accounting on Windows even when
+// every subtest passes. Module-scope state carries between them; node runs
+// a file's top-level tests in order.
+const file = path.join(tmp, "review.html");
+fs.writeFileSync(file, "<p>Original</p>");
+const first = spawnServer();
+let server;
 
-  const first = spawnServer();
-  t.after(async () => {
-    await stop(first);
-    fs.rmSync(tmp, { recursive: true, force: true });
+test("poll --timeout exits cleanly with a timeout status", async () => {
+  server = await waitForServer();
+  const result = await collect(cli("poll", file, "--timeout", "1"));
+  assert.equal(result.code, 0, result.stderr);
+  const out = JSON.parse(result.stdout);
+  assert.equal(out.status, "timeout");
+  assert.equal(out.waited_seconds, 1);
+});
+
+test("status is idle before feedback, waiting after", async () => {
+  const before = await collect(cli("status", file));
+  assert.equal(before.code, 0, before.stderr);
+  assert.equal(JSON.parse(before.stdout).status, "idle");
+
+  const opened = await request(server, "POST", "/api/session", { file });
+  await request(server, "POST", `/api/page/${opened.body.key}/comment`, {
+    kind: "selection",
+    quote: "Original",
+    feedback: "Sharper, please.",
   });
+  await request(server, "POST", `/api/page/${opened.body.key}/send`, { sessionId: opened.body.sessionId, note: "" });
 
-  const server = await waitForServer();
+  const after = await collect(cli("status", file));
+  assert.equal(after.code, 0, after.stderr);
+  const parsed = JSON.parse(after.stdout);
+  assert.equal(parsed.status, "feedback-waiting");
+  assert.equal(parsed.feedback_waiting, true);
+});
 
-  await t.test("poll --timeout exits cleanly with a timeout status", async () => {
-    const result = await collect(cli("poll", file, "--timeout", "1"));
+test("a restarted server still delivers the sent batch", async () => {
+  await stop(first);
+  // Clear the dead server's record so nothing races against a stale port.
+  fs.rmSync(path.join(process.env.HUMAN_REVIEW_STATE_DIR, "server.json"), { force: true });
+
+  const second = spawnServer();
+  try {
+    await waitForServer(server.pid);
+    const result = await collect(cli("poll", file, "--timeout", "10"));
     assert.equal(result.code, 0, result.stderr);
-    const out = JSON.parse(result.stdout);
-    assert.equal(out.status, "timeout");
-    assert.equal(out.waited_seconds, 1);
-  });
+    const batch = JSON.parse(result.stdout);
+    assert.equal(batch.status, "feedback");
+    assert.equal(batch.pages[0].comments[0].feedback, "Sharper, please.");
+  } finally {
+    // Kill the server before cleanup deletes its state dir — Windows cannot
+    // remove files a live process still holds open.
+    await stop(second);
+  }
+});
 
-  await t.test("status is idle before feedback, waiting after", async () => {
-    const before = await collect(cli("status", file));
-    assert.equal(before.code, 0, before.stderr);
-    assert.equal(JSON.parse(before.stdout).status, "idle");
-
-    const opened = await request(server, "POST", "/api/session", { file });
-    await request(server, "POST", `/api/page/${opened.body.key}/comment`, {
-      kind: "selection",
-      quote: "Original",
-      feedback: "Sharper, please.",
-    });
-    await request(server, "POST", `/api/page/${opened.body.key}/send`, { sessionId: opened.body.sessionId, note: "" });
-
-    const after = await collect(cli("status", file));
-    assert.equal(after.code, 0, after.stderr);
-    const parsed = JSON.parse(after.stdout);
-    assert.equal(parsed.status, "feedback-waiting");
-    assert.equal(parsed.feedback_waiting, true);
-  });
-
-  await t.test("a restarted server still delivers the sent batch", async () => {
-    await stop(first);
-    // Clear the dead server's record so nothing races against a stale port.
-    fs.rmSync(path.join(process.env.HUMAN_REVIEW_STATE_DIR, "server.json"), { force: true });
-
-    const second = spawnServer();
-    try {
-      await waitForServer(server.pid);
-      const result = await collect(cli("poll", file, "--timeout", "10"));
-      assert.equal(result.code, 0, result.stderr);
-      const batch = JSON.parse(result.stdout);
-      assert.equal(batch.status, "feedback");
-      assert.equal(batch.pages[0].comments[0].feedback, "Sharper, please.");
-    } finally {
-      // Kill the server before the outer cleanup deletes its state dir —
-      // Windows cannot remove files a live process still holds open.
-      await stop(second);
-    }
-  });
+test.after(async () => {
+  await stop(first);
+  fs.rmSync(tmp, { recursive: true, force: true });
 });
