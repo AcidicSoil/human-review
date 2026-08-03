@@ -1,139 +1,76 @@
-# human-review
+# Human Review
 
-Review your AI agent's drafts the way you'd review a Google Doc — not by typing paragraphs into chat.
+Edit HTML and Markdown files directly, leave comments like a Google Doc, and send all your feedback to your AI agent at once.
 
-Your agent writes a spec, a plan, a newsletter draft, a landing page. Instead of describing every change in chat ("in the third paragraph, change X to Y…"), you open the file in your browser, fix the small stuff by typing directly into the page, select anything bigger and leave a comment, then hit Send. Your agent gets all of it at once, makes the changes, and the page refreshes so you can see them. Repeat until it's right.
+https://github.com/user-attachments/assets/6a23c45e-62f0-494f-8ce1-7fa8005cd88f
 
-```
-agent provides a target  →  human-review <target>  →  you edit + comment  →  Send to agent
-        ↑                                                                  │
-        └────────────  page refreshes  ←  agent applies your feedback  ←───┘
-```
+## Problem
 
-Works with HTML files, Markdown files, and pages served from localhost.
+Giving AI feedback on files in chat is painful.
 
-## What you can do
+Sometimes you want to change one sentence yourself. Instead, you end up typing:
 
-| You do | What happens |
-|--------|--------------|
-| Type over any text | Static HTML saves directly; generated pages send the exact edit to the agent |
-| Select a phrase | A comment box opens, anchored to that exact text |
-| Click an image, chart, or section | Your comment covers that whole block |
-| Hover and click `✕` | Deletes the block and tells the agent you did |
-| `⌘`-click a link | Review a multi-page site; every page keeps its own feedback |
-| Click `Revert all` | Puts the file back exactly how the agent left it |
-| Hit Send | Everything — edits and comments from every page — goes to the agent in one batch |
+> In the third paragraph, change X to Y. Cut the third card because it repeats the first one. Also rewrite the CTA.
 
-For a localhost page, typing and deleting work the same way in the review UI.
-The agent applies those exact changes to the app's MDX, TSX, templates, or
-components; human-review never writes the rendered response over source code.
+Then the agent changes the file and you have to check whether it understood every instruction. This gets even harder when you’re reviewing a long plan, Markdown document, landing page, or multi-page website.
 
-It also handles the tricky cases for you: Markdown files and pages that draw themselves with JavaScript can't be corrupted by your edits (your changes go to the agent as feedback instead of touching the file), and feedback you've sent is never lost, even if the agent or your computer restarts.
+## How to install Human Review
 
-## Install
+The easiest way to install the skill is to paste this into ChatGPT, Claude Code, Codex, or your favorite coding agent:
 
-You can skip installing entirely — `npx` fetches and runs it on demand, which is also how your agent will call it:
-
-```sh
-npx -y human-review path/to/file.html
-npx -y human-review http://localhost:3000/wiki
+```text
+Install the /human-review skill globally from https://github.com/petergyang/human-review
 ```
 
-Or install it once so the shorter command works everywhere:
-
-```sh
-npm install -g human-review
-```
-
-Either way, run setup once to teach your agent when to reach for it:
+You can also install it with `npx`:
 
 ```sh
 npx -y human-review setup --global
 ```
 
-That installs the skill in the standard global locations for Claude Code, Codex,
-and agents that use `~/.agents/skills`. Drop `--global` to set up only the
-current project; that also adds instructions to `AGENTS.md` for Codex and other
-compatible agents.
+## How to use Human Review
 
-## How the agent side works
+Open an HTML or Markdown file:
 
-Any agent that can run a shell command can use this — no SDK, no API keys. The agent opens the file or localhost route for you, then waits for your feedback:
-
-```sh
-human-review <file-or-localhost-url>     # open it in the human's browser
-human-review poll <target> --timeout 600 # wait for feedback (up to 10 min)
-human-review status <target>             # check for feedback without waiting
+```text
+/human-review (your file)
 ```
 
-When you hit Send, the waiting `poll` command prints your feedback as JSON and the agent takes it from there:
+Review a page running on localhost:
 
-```json
-{
-  "status": "feedback",
-  "pages": [
-    {
-      "file": "/path/to/page.html",
-      "comments": [
-        { "quote": "the text you selected",
-          "feedback": "what you want changed" }
-      ],
-      "edits": [
-        { "label": "Lede", "before": "the original wording",
-          "after": "your exact new wording" }
-      ]
-    }
-  ],
-  "overall_note": "anything you typed in the note box"
-}
+```text
+/human-review (localhost URL)
 ```
 
-Two rules the agent is told to follow:
+Human Review opens the file in your browser. Make direct edits, leave comments, and click Send. Your agent receives all your feedback in one batch, updates the source, and refreshes the page for another review.
 
-1. **Your direct edits are final.** The agent carries your exact wording across and never rewrites it — and if the file was generated from another source (like Markdown or MDX), it applies your edit there too.
-2. **No replies in chat.** The agent answers by fixing the file; you see the result when the page refreshes.
+## What this skill lets you do
 
-### Review a running localhost page
+- **Edit text directly** in an HTML or Markdown file.
+- **Select a phrase and leave a comment** anchored to the exact text.
+- **Comment on an image, chart, or section** by clicking the element.
+- **Remove elements** without explaining the deletion in chat.
+- **Command-click links** to review multiple pages without losing your feedback.
+- **Send every edit and comment at once** instead of writing a long chat message.
 
-Pass the real development route instead of recreating it as a separate HTML file:
+I use Human Review to edit AI-generated plans, update landing pages, review localhost apps, and remove the extra copy AI likes to add to UX.
 
-```sh
-human-review http://localhost:3000/wiki
-human-review poll http://localhost:3000/wiki --timeout 600
-```
+## What’s inside
 
-You can rewrite copy and delete elements directly in the review UI. Those edits
-are sent to the agent, which finds and updates the underlying project source.
-Acknowledging the finished batch reloads the route with the rebuilt page.
+- [`cli.js`](src/cli.js) contains the `human-review`, `poll`, `status`, and `setup` commands.
+- [`server.js`](src/server.js) runs the local review session.
+- [`sdk.js`](src/sdk.js) handles editing, comments, highlights, and feedback.
+- [`chrome-client.js`](src/chrome-client.js) contains the visual review interface.
+- [`markdown.js`](src/markdown.js) renders Markdown files for review.
+- [`skill.md`](src/skill.md) teaches Claude Code, Codex, and other agents how to use Human Review.
 
-URL review is limited to `localhost`, `127.0.0.1`, and `[::1]`. It loads the
-rendered page and its assets, but it does not carry over an authenticated browser
-session or guarantee every client-side interaction.
+Everything runs on your computer. Human Review doesn’t require an account, cloud service, database, or API key.
 
-Authoring tip: add `data-block="Section name"` to parts of your HTML and the feedback list uses your names instead of guessing from the page structure.
+## Want more great AI skills?
 
-## Private by design
+Check out [Behind the Craft](https://behindthecraft.com), my personal AI system with over a dozen other quality skills and courses.
 
-Everything runs on your machine. No account, no cloud, no database — your comments live in one local file (`~/.human-review/state.json`) that you can delete any time. The only network traffic is npm downloading the package.
-
-The local server only answers its own browser page and CLI — every request needs a secret token created fresh each run, so no other website or program can read or change your files through it. And saved files come out clean: nothing human-review adds to the page ever ends up on disk.
-
-## Files
-
-1. `src/cli.js`: The `human-review`, `poll`, `status`, and `setup` commands.
-2. `src/server.js`: The localhost server — sessions, batches, file watching, auth.
-3. `src/sdk.js`: Runs inside the reviewed page — editing, highlights, serialization.
-4. `src/chrome-client.js`: The review UI around the page — comments, edits, Send.
-5. `src/markdown.js`: Renders `.md` files for review.
-6. `src/skill.md`: The skill `setup` installs for Claude Code and Codex.
-
-## Requirements
-
-Node 20+. macOS, Linux, Windows.
-
-## Who made this
-
-This is one tool from my personal AI operating system. The full library, including my courses and workflows, lives at [Behind the Craft](https://behindthecraft.com).
+Subscribe to my [YouTube channel](https://www.youtube.com/@PeterYangYT?sub_confirmation=1) and [newsletter](https://creatoreconomy.so) for practical AI tutorials and interviews.
 
 ## License
 
