@@ -22,6 +22,9 @@ const post = (type, payload) => parent.postMessage({ ...payload, type }, CHROME_
 
 let pending = null; // { id, marks } for an uncommitted highlight
 let hoverTarget = null;
+let hoverMedia = null; // the img/video under the cursor, resizable via the grip
+let resizing = null; // live drag state while the grip is held
+let suppressUntil = 0; // ignore the mouseup/click that ends a resize drag
 let saveTimer = null;
 let composeOpen = false;
 /** True when the page's own scripts rewrote the DOM before any user edit. */
@@ -52,6 +55,12 @@ shadow.innerHTML = `
     .chip:hover { background: #1b1a16; color: #fff; border-color: #1b1a16; }
     .chip.danger { color: #b23b2e; }
     .chip.danger:hover { background: #b23b2e; color: #fff; border-color: #b23b2e; }
+    .grip {
+      position: fixed; z-index: 2147483647; width: 13px; height: 13px;
+      display: none; border: 1px solid #1b1a16; border-radius: 3px;
+      background: #fff; cursor: nwse-resize; pointer-events: auto;
+      box-shadow: 0 1px 4px rgba(27,26,22,.2);
+    }
     .hint {
       position: fixed; z-index: 2147483647; display: none; padding: 3px 7px;
       border-radius: 5px; background: #1b1a16; color: #fbfaf7; white-space: nowrap;
@@ -64,6 +73,7 @@ shadow.innerHTML = `
   <div class="chips" id="chips">
     <button class="chip danger" id="chipDelete" title="Delete this block" aria-label="Delete this block">&#10005;</button>
   </div>
+  <div class="grip" id="grip" title="Drag to resize"></div>
   <div class="hint" id="hint"></div>
 `;
 
@@ -74,6 +84,7 @@ const mountOverlay = () => {
   els.activeBox = shadow.getElementById("activeBox");
   els.chips = shadow.getElementById("chips");
   els.chipDelete = shadow.getElementById("chipDelete");
+  els.grip = shadow.getElementById("grip");
   els.hint = shadow.getElementById("hint");
 };
 
@@ -108,6 +119,21 @@ function showChip(el) {
   els.chips.style.display = "flex";
   els.chips.style.left = `${Math.max(4, r.right - 11)}px`;
   els.chips.style.top = `${Math.max(4, r.top - 11)}px`;
+}
+
+function showGrip(el) {
+  if (!el || !el.isConnected) {
+    els.grip.style.display = "none";
+    return;
+  }
+  const r = el.getBoundingClientRect();
+  if (!r.width && !r.height) {
+    els.grip.style.display = "none";
+    return;
+  }
+  els.grip.style.display = "block";
+  els.grip.style.left = `${r.right - 7}px`;
+  els.grip.style.top = `${r.bottom - 7}px`;
 }
 
 function showHint(text, x, y) {
@@ -294,7 +320,11 @@ function targetFor(node) {
 
 const serialize = () => serializeDocument(document);
 
-/** A single block's HTML with every review artifact removed. */
+/**
+ * A single block's HTML with every review artifact removed. outerHTML, not
+ * innerHTML: changes to the block's own attributes (an image's new width, for
+ * one) live on the element itself, and a void element has no inner markup.
+ */
 function blockHtml(el) {
   const clone = el.cloneNode(true);
   clone.querySelectorAll(`[${UI_ATTR}]`).forEach((n) => n.remove());
@@ -307,7 +337,7 @@ function blockHtml(el) {
   clone.querySelectorAll("[data-eh-el]").forEach((n) => n.removeAttribute("data-eh-el"));
   clone.removeAttribute("data-eh-el");
   clone.normalize();
-  return clone.innerHTML;
+  return clone.outerHTML;
 }
 
 /**
@@ -566,7 +596,7 @@ function boot() {
   watchSelfRendering();
 
   document.addEventListener("mouseup", (event) => {
-    if (isOurs(event.target)) return;
+    if (isOurs(event.target) || resizing || Date.now() < suppressUntil) return;
     setTimeout(() => {
       if (settleSelection()) return;
       const target = targetFor(event.target);
@@ -618,20 +648,73 @@ function boot() {
   }, true);
 
   document.addEventListener("mouseover", (event) => {
-    if (isOurs(event.target)) return;
+    if (isOurs(event.target) || resizing) return;
     const target = targetFor(event.target);
     hoverTarget = target ? target.el : null;
+    hoverMedia = event.target.closest ? event.target.closest("img, video") : null;
     place(els.outline, hoverTarget);
     showChip(hoverTarget);
+    showGrip(hoverMedia);
     const interactive = event.target.closest && event.target.closest("a[href], [data-href], button, [role='button']");
     showHint(interactive ? "⌘-click to open" : "", event.clientX, event.clientY);
   });
 
   document.addEventListener("mouseleave", () => {
+    if (resizing) return;
     hoverTarget = null;
+    hoverMedia = null;
     place(els.outline, null);
     showChip(null);
+    showGrip(null);
     showHint("");
+  });
+
+  // ------------------------------------------------------------ image resize
+
+  els.grip.addEventListener("pointerdown", (event) => {
+    if (!hoverMedia || !hoverMedia.isConnected) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // From here on, DOM changes are the human resizing, not the page rendering.
+    userEdited = true;
+    const target = targetFor(hoverMedia);
+    const blockEl = target ? target.el : hoverMedia;
+    resizing = {
+      el: hoverMedia,
+      startX: event.clientX,
+      startWidth: hoverMedia.getBoundingClientRect().width,
+      label: target ? target.label : "Image",
+      blockEl,
+      beforeText: blockEl.textContent,
+      beforeHtml: blockHtml(blockEl),
+    };
+    if (els.grip.setPointerCapture) els.grip.setPointerCapture(event.pointerId);
+  });
+
+  window.addEventListener("pointermove", (event) => {
+    if (!resizing) return;
+    event.preventDefault();
+    const width = Math.max(24, Math.round(resizing.startWidth + (event.clientX - resizing.startX)));
+    resizing.el.style.width = `${width}px`;
+    resizing.el.style.height = "auto";
+    place(els.outline, hoverTarget);
+    showGrip(resizing.el);
+  });
+
+  window.addEventListener("pointerup", () => {
+    if (!resizing) return;
+    const { blockEl, label, beforeText, beforeHtml } = resizing;
+    resizing = null;
+    suppressUntil = Date.now() + 250;
+    queueEdit({
+      label,
+      kind: "edited",
+      before: beforeText,
+      after: blockEl.textContent,
+      before_html: beforeHtml,
+      after_html: blockHtml(blockEl),
+    });
+    scheduleSave();
   });
 
   els.chipDelete.addEventListener("click", (event) => {
@@ -695,6 +778,7 @@ function boot() {
   const reposition = () => {
     place(els.outline, hoverTarget);
     showChip(hoverTarget);
+    showGrip(resizing ? resizing.el : hoverMedia);
   };
   window.addEventListener("scroll", reposition, true);
   window.addEventListener("resize", reposition);
