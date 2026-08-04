@@ -198,9 +198,10 @@ export class Store {
       const row = page.edits.find((e) => e.label === label && e.kind === kind);
       if (row) {
         if (after !== undefined) row.after = after;
+        row.updatedAt = Date.now();
         return;
       }
-      page.edits.push({ label, kind, before, after, at: Date.now() });
+      page.edits.push({ label, kind, before, after, at: Date.now(), updatedAt: Date.now() });
     });
   }
 
@@ -218,11 +219,16 @@ export class Store {
     });
   }
 
-  clearSent(key, ids) {
+  /**
+   * Drop exactly what the acknowledged batch carried. Comments made after
+   * Send have unknown ids; edits made (or retyped) after Send have a newer
+   * timestamp than the batch. Both must survive for the next batch.
+   */
+  clearSent(key, ids, sentAt) {
     return this.update(key, (page) => {
       const drop = new Set(ids);
       page.comments = page.comments.filter((c) => !drop.has(c.id));
-      page.edits = [];
+      page.edits = typeof sentAt === "number" ? page.edits.filter((e) => (e.updatedAt || e.at || 0) > sentAt) : [];
     });
   }
 

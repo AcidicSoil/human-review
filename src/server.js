@@ -242,7 +242,7 @@ export function createServer() {
     const record = {
       batch,
       delivered: false,
-      cleanup: pages.map((p) => ({ key: p.key, ids: p.comments.map((c) => c.id) })),
+      cleanup: pages.map((p) => ({ key: p.key, ids: p.comments.map((c) => c.id), sentAt: Date.now() })),
     };
     batches.set(session.entryKey, record);
     store.setBatch(session.entryKey, record);
@@ -253,10 +253,13 @@ export function createServer() {
 
   function ack(entryKey) {
     const pending = batches.get(entryKey);
-    if (!pending) return false;
+    // Only a delivered batch can be acknowledged. An agent whose previous poll
+    // timed out re-runs `poll --ack`; if feedback arrived in between, that ack
+    // refers to an older batch and must not destroy the one it never saw.
+    if (!pending || !pending.delivered) return false;
     batches.delete(entryKey);
     store.clearBatch(entryKey);
-    for (const { key, ids } of pending.cleanup) store.clearSent(key, ids);
+    for (const { key, ids, sentAt } of pending.cleanup) store.clearSent(key, ids, sentAt);
     for (const session of sessionsForEntry(entryKey)) emit(session, "refresh", {});
     // File targets reload through fs.watch. URL targets have no source file to
     // watch, so acknowledgement is the signal to fetch the rebuilt route.
