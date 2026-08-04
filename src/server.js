@@ -768,7 +768,12 @@ export function createServer() {
 
 export function start(port = 0) {
   const { server, store, token, dispose } = createServer();
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    // Without this, a busy HUMAN_REVIEW_PORT dies as an uncaught exception.
+    server.once("error", (err) => {
+      console.error(`human-review server could not listen on port ${port}: ${err.message}`);
+      reject(err);
+    });
     server.listen(port, "127.0.0.1", () => {
       const actual = server.address().port;
       ensureStateDir();

@@ -83,7 +83,9 @@ async function ensureServer() {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     await new Promise((r) => setTimeout(r, 100));
     const record = readServerRecord();
-    if (record && record.port && (await alive(record.port))) return record;
+    // Same protocol gate as above: a still-running server from an older
+    // version answers /health too, and must not be adopted here.
+    if (record?.protocol === SERVER_PROTOCOL && record.port && (await alive(record.port))) return record;
   }
   throw new Error("Could not start the local human-review server.");
 }
@@ -91,12 +93,11 @@ async function ensureServer() {
 function openBrowser(url) {
   const command =
     process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
-  try {
-    const child = spawn(command[0], command[1], { detached: true, stdio: "ignore" });
-    child.unref();
-  } catch {
-    // Printing the URL below is the fallback.
-  }
+  const child = spawn(command[0], command[1], { detached: true, stdio: "ignore" });
+  // A missing opener (headless Linux without xdg-open) surfaces as an async
+  // 'error' event, not a throw. Printing the URL below is the fallback.
+  child.on("error", () => {});
+  child.unref();
 }
 
 // ------------------------------------------------------------------ commands
@@ -163,6 +164,15 @@ function pollOnce(server, target, ack, timeoutMs) {
   });
 }
 
+/**
+ * The consumer is an agent reading a pipe. process.exit() does not wait for
+ * pending stdout writes, so a large payload could arrive truncated — always
+ * wait for the write to hand off before returning.
+ */
+function writeStdout(text) {
+  return new Promise((resolve) => process.stdout.write(text, resolve));
+}
+
 function printTimeout(waitedSecs) {
   const payload = {
     status: "timeout",
@@ -170,7 +180,7 @@ function printTimeout(waitedSecs) {
     next_step:
       "No feedback yet. Run the same poll command again to keep waiting, or `human-review status <target>` to check without blocking.",
   };
-  process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+  return writeStdout(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
 async function pollCommand(input, { ack = false, timeoutSecs = 0 } = {}) {
@@ -195,7 +205,7 @@ async function pollCommand(input, { ack = false, timeoutSecs = 0 } = {}) {
     if (!result.raw) continue;
     try {
       const batch = JSON.parse(result.raw);
-      process.stdout.write(`${JSON.stringify(batch, null, 2)}\n`);
+      await writeStdout(`${JSON.stringify(batch, null, 2)}\n`);
       return;
     } catch {
       process.stderr.write("Unexpected response from the human-review server; retrying.\n");
@@ -264,14 +274,21 @@ process.on("SIGINT", () => {
 
 function parsePollArgs(rest) {
   const parsed = { file: "", ack: false, timeoutSecs: 0 };
+  let sawTimeout = false;
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
     if (arg === "--ack") parsed.ack = true;
-    else if (arg === "--timeout") parsed.timeoutSecs = Number(rest[(i += 1)]);
-    else if (arg.startsWith("--timeout=")) parsed.timeoutSecs = Number(arg.slice("--timeout=".length));
-    else if (!arg.startsWith("-") && !parsed.file) parsed.file = arg;
+    else if (arg === "--timeout") {
+      sawTimeout = true;
+      parsed.timeoutSecs = Number(rest[(i += 1)]);
+    } else if (arg.startsWith("--timeout=")) {
+      sawTimeout = true;
+      parsed.timeoutSecs = Number(arg.slice("--timeout=".length));
+    } else if (!arg.startsWith("-") && !parsed.file) parsed.file = arg;
   }
-  if (parsed.timeoutSecs && (!Number.isFinite(parsed.timeoutSecs) || parsed.timeoutSecs <= 0)) {
+  // A malformed value must fail loudly — NaN or 0 silently waiting forever is
+  // the exact hang the flag exists to prevent.
+  if (sawTimeout && (!Number.isFinite(parsed.timeoutSecs) || parsed.timeoutSecs <= 0)) {
     throw new Error("--timeout wants a number of seconds, e.g. --timeout 300");
   }
   return parsed;
