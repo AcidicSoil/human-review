@@ -38,7 +38,9 @@ async function api(path, options) {
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    throw new Error(detail.error || `Request failed (${res.status})`);
+    const error = new Error(detail.error || `Request failed (${res.status})`);
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }
@@ -66,6 +68,8 @@ async function loadPage(key, { reload = true } = {}) {
   state.active = null;
   state.sent = false;
   state.dynamic = false;
+  state.baseHash = null;
+  clearTimeout(retryTimer);
   if (reload) {
     state.reloading = true;
     frame.src = artifactUrl(key);
@@ -359,19 +363,48 @@ async function commitCompose() {
 // -------------------------------------------------------------------- saving
 
 let retryTimer = null;
-let lastHtml = null;
+let saveAttempts = 0;
 
-async function saveHtml(html) {
-  lastHtml = html;
+/** A fresh serialization from the SDK always starts a fresh attempt budget. */
+function saveNow(html) {
+  saveAttempts = 0;
+  return saveHtml(html, state.key);
+}
+
+async function saveHtml(html, key) {
+  clearTimeout(retryTimer);
+  // A retry that outlived a page switch must never write into the new page.
+  if (key !== state.key) return;
+  if (!state.baseHash) {
+    // The on-disk baseline hasn't arrived yet; wait for it rather than write blind.
+    saveAttempts += 1;
+    if (saveAttempts <= 20) retryTimer = setTimeout(() => saveHtml(html, key), 500);
+    else {
+      state.save = "failed";
+      renderSave();
+    }
+    return;
+  }
   try {
-    await api(`/api/page/${state.key}/save`, { method: "POST", body: JSON.stringify({ html }) });
+    const result = await api(`/api/page/${key}/save`, { method: "POST", body: JSON.stringify({ html, baseHash: state.baseHash }) });
+    state.baseHash = result.hash || null;
     state.save = "saved";
     state.savedAt = clock();
-    clearTimeout(retryTimer);
-  } catch {
+    saveAttempts = 0;
+  } catch (err) {
+    if (err.status === 409) {
+      // Someone else — usually the agent — wrote the file first. Their version
+      // arrives via the reload event; this save is abandoned, not retried.
+      state.baseHash = null;
+      state.save = "idle";
+      saveAttempts = 0;
+      renderSave();
+      return;
+    }
+    saveAttempts += 1;
     state.save = "failed";
-    clearTimeout(retryTimer);
-    retryTimer = setTimeout(() => saveHtml(lastHtml), 2000);
+    if (saveAttempts < 5) retryTimer = setTimeout(() => saveHtml(html, key), 2000);
+    else toast("Couldn't save — your edits still reach the agent as feedback");
   }
   renderSave();
 }
@@ -396,7 +429,10 @@ window.addEventListener("message", async (event) => {
       } else {
         // Hand the SDK the on-disk HTML so it can spot self-rendering pages.
         api(`/api/page/${state.key}/raw`)
-          .then((raw) => toFrame({ type: "eh:raw", html: raw.html }))
+          .then((raw) => {
+            state.baseHash = raw.hash || null;
+            toFrame({ type: "eh:raw", html: raw.html });
+          })
           .catch(() => {});
       }
       break;
@@ -430,7 +466,7 @@ window.addEventListener("message", async (event) => {
       renderSave();
       break;
     case "eh:html":
-      await saveHtml(msg.html);
+      await saveNow(msg.html);
       break;
     case "eh:clean":
       // Serialization matched what is already on disk; nothing to write.
@@ -504,6 +540,11 @@ $("send").addEventListener("click", async () => {
 $("revert").addEventListener("click", async () => {
   const count = state.page.edits.length;
   if (!window.confirm(`Discard all ${count} of your edits?`)) return;
+  // Stop the SDK's debounced save and our own retries first, so a queued save
+  // can't land after the revert and write the edits straight back.
+  toFrame({ type: "eh:abortSave" });
+  clearTimeout(retryTimer);
+  state.baseHash = null;
   try {
     state.page = (await api(`/api/page/${state.key}/revert`, { method: "POST" })).page;
     state.save = "idle";
@@ -585,6 +626,9 @@ function connect() {
     const hadEdits = state.page ? state.page.edits.length : 0;
     state.reloading = true;
     state.dynamic = false;
+    // The file on disk changed: queued saves are based on the old version.
+    state.baseHash = null;
+    clearTimeout(retryTimer);
     frame.src = artifactUrl(state.key, true);
     api(`/api/page/${state.key}`).then((page) => {
       state.page = page;

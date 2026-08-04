@@ -525,7 +525,10 @@ export function createServer() {
           } catch {
             return json(res, 404, { error: "file is gone" });
           }
-          return json(res, 200, { html: stripSdk(html) });
+          const clean = stripSdk(html);
+          // The hash is the save precondition: a later save must name the
+          // version it was based on, or it loses to a concurrent rewrite.
+          return json(res, 200, { html: clean, hash: hash(clean) });
         }
 
         if (action === "comment" && req.method === "POST") {
@@ -567,12 +570,26 @@ export function createServer() {
           if (typeof body.html !== "string" || !body.html.trim()) {
             return json(res, 400, { error: "empty html" });
           }
+          // A save based on an older version of the file must lose, not win:
+          // otherwise a debounced autosave that lands just after an agent
+          // rewrite silently overwrites the agent's work.
+          if (typeof body.baseHash === "string") {
+            let current = "";
+            try {
+              current = fs.readFileSync(page.file, "utf8");
+            } catch {
+              return json(res, 404, { error: "file is gone" });
+            }
+            if (hash(stripSdk(current)) !== body.baseHash) {
+              return json(res, 409, { error: "the file changed on disk since this edit began" });
+            }
+          }
           try {
-            writePage(key, body.html);
+            const clean = writePage(key, body.html);
+            return json(res, 200, { savedAt: Date.now(), hash: hash(clean) });
           } catch (err) {
             return json(res, 500, { error: String(err.message || err) });
           }
-          return json(res, 200, { savedAt: Date.now() });
         }
 
         if (action === "revert" && req.method === "POST") {

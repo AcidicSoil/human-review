@@ -301,13 +301,40 @@ let bootSnapshot = null;
 function checkDynamic(diskHtml) {
   try {
     const parsed = new DOMParser().parseFromString(diskHtml, "text/html");
-    if (serializeDocument(parsed) !== bootSnapshot) {
-      dynamic = true;
-      post("eh:dynamic", {});
-    }
+    if (serializeDocument(parsed) !== bootSnapshot) markDynamic();
   } catch {
     // If the comparison itself fails, keep saving as normal.
   }
+}
+
+function markDynamic() {
+  if (dynamic) return;
+  dynamic = true;
+  clearTimeout(saveTimer);
+  post("eh:dynamic", {});
+}
+
+/** True once the user has actually edited, as opposed to the page's own scripts. */
+let userEdited = false;
+
+/**
+ * The boot comparison only catches scripts that rewrote the DOM before this
+ * module ran. Pages that render on load or after a fetch (charts, mermaid,
+ * client-rendered apps) mutate later — watch for any serialization drift that
+ * happens before the first real user edit and treat it the same way.
+ */
+function watchSelfRendering() {
+  const observer = new MutationObserver(() => {
+    if (dynamic || userEdited) {
+      observer.disconnect();
+      return;
+    }
+    if (serialize() !== bootSnapshot) {
+      observer.disconnect();
+      markDynamic();
+    }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true });
 }
 
 function emitSave() {
@@ -506,6 +533,7 @@ function boot() {
   document.body.spellcheck = false;
   baseline = serialize();
   bootSnapshot = baseline;
+  watchSelfRendering();
 
   document.addEventListener("mouseup", (event) => {
     if (isOurs(event.target)) return;
@@ -574,6 +602,7 @@ function boot() {
     event.preventDefault();
     event.stopPropagation();
     if (!hoverTarget) return;
+    userEdited = true;
     const target = targetFor(hoverTarget);
     const label = target ? target.label : "Element";
     const before = hoverTarget.textContent;
@@ -591,6 +620,8 @@ function boot() {
     "beforeinput",
     (event) => {
       if (isOurs(event.target)) return;
+      // From here on, DOM drift is the human typing, not the page rendering.
+      userEdited = true;
       const sel = document.getSelection();
       const target = targetFor(sel && sel.anchorNode ? sel.anchorNode : event.target);
       if (target && !originalText.has(target.el)) originalText.set(target.el, target.el.textContent);
@@ -668,6 +699,12 @@ function boot() {
         break;
       case "eh:flush":
         flushSave();
+        break;
+      case "eh:abortSave":
+        // A revert is in flight: anything queued would re-write the edits.
+        clearTimeout(saveTimer);
+        clearTimeout(editTimer);
+        editQueue.clear();
         break;
       case "eh:raw":
         checkDynamic(String(msg.html || ""));
