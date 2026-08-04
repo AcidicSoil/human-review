@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { Store, resolveAsset } from "./state.js";
+import { atomicWrite, Store, resolveAsset } from "./state.js";
 import { injectSdk, stripSdk } from "./html-transform.js";
 import { isMarkdown, renderMarkdownPage } from "./markdown.js";
 import { canonicalTarget, ensureStateDir, localUrl, SERVER_PROTOCOL, serverPath, targetKey } from "./paths.js";
@@ -155,9 +155,7 @@ export function createServer() {
     if (!page) throw new Error("unknown page");
     if (page.kind === "url") throw new Error("localhost pages are applied through their source files");
     const clean = stripSdk(html);
-    const tmp = `${page.file}.human-review.tmp`;
-    fs.writeFileSync(tmp, clean);
-    fs.renameSync(tmp, page.file);
+    atomicWrite(page.file, clean);
     lastWritten.set(key, hash(clean));
     return clean;
   }

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { canonicalTarget, ensureStateDir, pageKey, realFile, statePath, targetKey } from "./paths.js";
@@ -6,6 +7,24 @@ import { canonicalTarget, ensureStateDir, pageKey, realFile, statePath, targetKe
 const PRUNE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 const fresh = (entry, now) => !!entry && now - (entry.updatedAt || 0) < PRUNE_AGE_MS;
+
+/**
+ * Atomic write via a unique sibling tmp file. The name is unguessable and the
+ * create is exclusive, so a pre-planted symlink can never redirect the write,
+ * and a failed rename never leaves a predictable orphan behind.
+ */
+export function atomicWrite(file, data) {
+  const tmp = `${file}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.human-review.tmp`;
+  fs.writeFileSync(tmp, data, { flag: "wx" });
+  try {
+    fs.renameSync(tmp, file);
+  } catch (err) {
+    try {
+      fs.unlinkSync(tmp);
+    } catch {}
+    throw err;
+  }
+}
 
 /**
  * All durable state lives in one JSON file. No database, no network.
@@ -85,9 +104,7 @@ export class Store {
     for (const [key, batch] of Object.entries(merged.batches)) {
       if (!fresh(batch, now)) delete merged.batches[key];
     }
-    const tmp = `${target}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(merged, null, 2));
-    fs.renameSync(tmp, target);
+    atomicWrite(target, JSON.stringify(merged, null, 2));
   }
 
   /** Register a file as a reviewable page, capturing the agent's version. */
@@ -234,9 +251,33 @@ export class Store {
 
 /** Resolve a sibling asset request without escaping the artifact's directory. */
 export function resolveAsset(pageFile, relative) {
+  let decoded;
+  try {
+    decoded = decodeURIComponent(relative);
+  } catch {
+    return null;
+  }
   const base = path.dirname(pageFile);
-  const target = path.resolve(base, decodeURIComponent(relative));
-  const rel = path.relative(base, target);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
-  return target;
+  const target = path.resolve(base, decoded);
+  const contained = (candidate, root) => {
+    const rel = path.relative(root, candidate);
+    return !rel.startsWith("..") && !path.isAbsolute(rel);
+  };
+  if (!contained(target, base)) return null;
+  // The lexical check alone would follow a symlink out of the directory, so
+  // the resolved filesystem path must land inside it too.
+  let real;
+  try {
+    real = fs.realpathSync(target);
+  } catch {
+    // Nothing readable at that path — anything a symlink could point to would
+    // have resolved. The caller's read fails with a plain 404.
+    return target;
+  }
+  let realBase = base;
+  try {
+    realBase = fs.realpathSync(base);
+  } catch {}
+  if (!contained(real, realBase)) return null;
+  return real;
 }
