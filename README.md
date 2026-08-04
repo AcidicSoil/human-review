@@ -2,7 +2,11 @@
 
 Edit HTML and Markdown files directly, leave comments like a Google Doc, and send all your feedback to your AI agent at once.
 
-https://github.com/user-attachments/assets/6a23c45e-62f0-494f-8ce1-7fa8005cd88f
+[Read the full launch post](https://creatoreconomy.so/p/use-my-human-review-skill-to-edit-html-markdown-visually)
+
+![Human Review visual editor](assets/human-review.png)
+
+https://github.com/user-attachments/assets/7cab09c9-eaa0-4e8b-984d-2925e810b5c2
 
 ## Problem
 
