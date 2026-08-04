@@ -36,9 +36,19 @@ const STYLE = `
   hr { border: none; border-top: 1px solid #eceae3; margin: 2.2em 0; }
 `;
 
+/**
+ * Markdown is a document format: raw HTML passes through for layout, but
+ * script has no legitimate use in a reviewed document, so it never executes.
+ */
+function stripActiveContent(html) {
+  return String(html)
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
+    .replace(/<script\b[^>]*\/?>/gi, "");
+}
+
 /** Render a Markdown file into a standalone review page. */
 export function renderMarkdownPage(mdText, file) {
-  const body = marked.parse(mdText, { gfm: true, async: false });
+  const body = stripActiveContent(marked.parse(mdText, { gfm: true, async: false }));
   const title = path.basename(file);
   return `<!DOCTYPE html>
 <html lang="en">

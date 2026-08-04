@@ -367,9 +367,13 @@ export function createServer() {
 
       // Every API route needs the per-run token; static assets and the
       // unguessable /s/<id> chrome page do not.
+      // Header only — a token in a query string would leak into logs and
+      // history. Constant-time compare, so timing can't narrow the secret.
       if (route.startsWith("/api/")) {
-        const provided = req.headers["x-human-review-token"] || url.searchParams.get("token") || "";
-        if (provided !== token) return json(res, 401, { error: "missing or invalid token" });
+        const provided = Buffer.from(String(req.headers["x-human-review-token"] || ""));
+        const expected = Buffer.from(token);
+        const ok = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+        if (!ok) return json(res, 401, { error: "missing or invalid token" });
       }
 
       // --- static chrome assets

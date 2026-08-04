@@ -13,7 +13,12 @@ const SAVE_DEBOUNCE_MS = 700;
 const EDIT_FLUSH_MS = 500;
 const MEDIA = /^(img|svg|canvas|video|picture|iframe|hr|figure)$/i;
 
-const post = (type, payload) => parent.postMessage({ ...payload, type }, "*");
+// The chrome page lives on the other loopback hostname (a separate origin, so
+// the reviewed document can never touch it directly). Address it explicitly so
+// nothing we post can be read by any other embedder.
+const CHROME_ORIGIN = `${location.protocol}//${location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1"}:${location.port}`;
+
+const post = (type, payload) => parent.postMessage({ ...payload, type }, CHROME_ORIGIN);
 
 let pending = null; // { id, marks } for an uncommitted highlight
 let hoverTarget = null;
@@ -634,6 +639,9 @@ function boot() {
   );
 
   window.addEventListener("message", (event) => {
+    // Only the chrome page may drive the SDK — not popups the artifact opened,
+    // and not the artifact's own scripts.
+    if (event.source !== window.parent || event.origin !== CHROME_ORIGIN) return;
     const msg = event.data || {};
     switch (msg.type) {
       case "eh:anchors":

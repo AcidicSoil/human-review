@@ -1,7 +1,8 @@
 /**
  * human-review chrome. Owns the rail UI and every call to the local server.
  * It never touches the artifact DOM directly — the SDK does that, over
- * postMessage, because the artifact iframe is sandboxed to a null origin.
+ * postMessage, because the artifact iframe lives on the other loopback
+ * hostname: a separate origin that can never reach this page or its token.
  */
 import { tidy } from "./anchor-text.js";
 
@@ -42,14 +43,18 @@ async function api(path, options) {
   return res.json();
 }
 
-const toFrame = (message) => frame.contentWindow && frame.contentWindow.postMessage(message, "*");
-
 // Keep the reviewed app on a different loopback origin from the review shell.
 // This gives route-aware frameworks a real origin without exposing the parent UI.
+const ARTIFACT_HOST = location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
+const ARTIFACT_ORIGIN = `${location.protocol}//${ARTIFACT_HOST}:${location.port}`;
+
+// Target the artifact origin explicitly so comment text is never delivered to
+// a document the reviewed page navigated somewhere else.
+const toFrame = (message) => frame.contentWindow && frame.contentWindow.postMessage(message, ARTIFACT_ORIGIN);
+
 function artifactUrl(key, bust = false) {
-  const host = location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
   const query = bust ? `?t=${Date.now()}` : "";
-  return `${location.protocol}//${host}:${location.port}/artifact/${key}/index.html${query}`;
+  return `${ARTIFACT_ORIGIN}/artifact/${key}/index.html${query}`;
 }
 
 async function loadPage(key, { reload = true } = {}) {
@@ -375,6 +380,7 @@ async function saveHtml(html) {
 
 window.addEventListener("message", async (event) => {
   if (!frame.contentWindow || event.source !== frame.contentWindow) return;
+  if (event.origin !== ARTIFACT_ORIGIN) return;
   const msg = event.data || {};
 
   switch (msg.type) {
