@@ -138,6 +138,26 @@ test("resolveAsset refuses to escape the artifact's directory", () => {
   assert.equal(resolveAsset(file, "nested/app.js"), path.join(tmp, "dir", "nested", "app.js"));
   assert.equal(resolveAsset(file, "../secret.txt"), null);
   assert.equal(resolveAsset(file, "../../etc/passwd"), null);
+  assert.equal(resolveAsset(file, "%zz"), null, "malformed percent-encoding is a miss, not a crash");
 });
+
+test(
+  "resolveAsset refuses a symlink that points outside the directory",
+  { skip: process.platform === "win32" ? "symlink creation needs privileges on Windows" : false },
+  () => {
+    const dir = path.join(tmp, "symdir");
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "index.html");
+    fs.writeFileSync(file, "<p>x</p>");
+    const secret = path.join(tmp, "outside-secret.txt");
+    fs.writeFileSync(secret, "top secret");
+    fs.symlinkSync(secret, path.join(dir, "leak.txt"));
+    assert.equal(resolveAsset(file, "leak.txt"), null);
+
+    // A regular sibling still resolves (to its real path).
+    fs.writeFileSync(path.join(dir, "style.css"), "body{}");
+    assert.equal(resolveAsset(file, "style.css"), fs.realpathSync(path.join(dir, "style.css")));
+  }
+);
 
 test.after(() => fs.rmSync(tmp, { recursive: true, force: true }));

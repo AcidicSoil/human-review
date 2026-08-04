@@ -66,3 +66,11 @@ test("localhost pages get absolute assets, their real route, and one sdk", () =>
   assert.ok(twice.includes('src="http://127.0.0.1:4444/sdk.js?key=k"'));
   assert.ok(!stripSdk(twice).includes("data-eh-route"));
 });
+
+test("a script containing the literal '</body>' does not fool injection", () => {
+  const page = '<!DOCTYPE html><html><body><script>const tpl = "</body>";</script><p>x</p></body></html>';
+  const out = injectSdk(page, "k");
+  assert.ok(out.indexOf("data-eh-sdk") > out.indexOf('"</body>"'), "the tag lands after the script string");
+  assert.ok(out.indexOf("data-eh-sdk") < out.lastIndexOf("</body>"), "and before the real close");
+  assert.equal(stripSdk(out), page);
+});

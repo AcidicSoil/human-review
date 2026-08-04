@@ -55,3 +55,27 @@ test("tidy collapses whitespace and truncates", () => {
   assert.equal(tidy("abcdefghij", 5), "abcd…");
   assert.equal(tidy(null), "");
 });
+
+test("findQuote survives whitespace reflow inside the quote", () => {
+  const before = "Intro text. The quick brown fox jumps over things. Outro text.";
+  const at = before.indexOf("quick brown fox");
+  const ctx = buildContext(before, at, at + "quick brown fox".length);
+
+  // What a prettier run does: same words, reflowed whitespace.
+  const after = "Intro text. The quick\n    brown  fox jumps over things. Outro text.";
+  const hit = findQuote(after, ctx);
+  assert.ok(hit, "a reflowed quote still anchors");
+  assert.equal(hit.exact, false);
+  assert.equal(tidy(after.slice(hit.start, hit.end)), "quick brown fox");
+});
+
+test("whitespace-tolerant matching still disambiguates repeats", () => {
+  const before = "alpha shared words beta. gamma shared words delta.";
+  const second = before.indexOf("shared words", before.indexOf("shared words") + 1);
+  const ctx = buildContext(before, second, second + "shared words".length);
+
+  const after = "alpha shared\n words beta. gamma shared\n words delta.";
+  const hit = findQuote(after, ctx);
+  assert.ok(hit);
+  assert.ok(after.slice(0, hit.start).includes("gamma"), "context picks the second occurrence");
+});

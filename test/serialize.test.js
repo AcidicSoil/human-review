@@ -38,6 +38,9 @@ test("serialization strips everything human-review added to the live page", { sk
   doc.body.setAttribute("contenteditable", "true");
   doc.body.setAttribute("spellcheck", "false");
 
+  // An element comment stamps its target with data-eh-el.
+  doc.querySelector("p").setAttribute("data-eh-el", "c_2");
+
   const html = serializeDocument(doc);
   assert.ok(html.startsWith("<!DOCTYPE html>"), "doctype survives");
   assert.match(html, /<strong>review loop<\/strong>/, "marked text is unwrapped in place");

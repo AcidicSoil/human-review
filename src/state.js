@@ -228,7 +228,9 @@ export class Store {
     return this.update(key, (page) => {
       const drop = new Set(ids);
       page.comments = page.comments.filter((c) => !drop.has(c.id));
-      page.edits = typeof sentAt === "number" ? page.edits.filter((e) => (e.updatedAt || e.at || 0) > sentAt) : [];
+      // >= not >: an edit stamped the same millisecond as the send may not
+      // have shipped — resending it is harmless, dropping it loses work.
+      page.edits = typeof sentAt === "number" ? page.edits.filter((e) => (e.updatedAt || e.at || 0) >= sentAt) : [];
     });
   }
 

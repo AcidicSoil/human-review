@@ -56,6 +56,15 @@ test("renderMarkdownPage produces a full document from gfm source", () => {
   assert.match(html, /<title>plan\.md<\/title>/);
 });
 
+test("script in markdown never reaches the rendered page", () => {
+  const html = renderMarkdownPage(
+    "# Hi\n\n<script>alert(1)</script>\n\n<div><script src=\"https://evil.example/x.js\"></script>Kept text</div>\n",
+    "/x/notes.md"
+  );
+  assert.doesNotMatch(html, /<script/i, "no script element survives rendering");
+  assert.match(html, /Kept text/, "surrounding HTML still renders");
+});
+
 test("a markdown review is rendered, flagged, and never writable", async (t) => {
   const { port, token, dispose } = await start();
   t.after(() => dispose());
