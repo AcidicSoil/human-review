@@ -4,8 +4,6 @@ Edit HTML and Markdown files directly, leave comments like a Google Doc, and sen
 
 [Read the full launch post](https://creatoreconomy.so/p/use-my-human-review-skill-to-edit-html-markdown-visually)
 
-![Human Review visual editor](assets/human-review.png)
-
 https://github.com/user-attachments/assets/7cab09c9-eaa0-4e8b-984d-2925e810b5c2
 
 ## Problem
@@ -18,7 +16,7 @@ Sometimes you want to change one sentence yourself. Instead, you end up typing:
 
 Then the agent changes the file and you have to check whether it understood every instruction. This gets even harder when you’re reviewing a long plan, Markdown document, landing page, or multi-page website.
 
-## How to install Human Review
+## How to install /human-review
 
 The easiest way to install the skill is to paste this into ChatGPT, Claude Code, Codex, or your favorite coding agent:
 
@@ -32,7 +30,9 @@ You can also install it with `npx`:
 npx -y human-review setup --global
 ```
 
-## How to use Human Review
+## How to use /human-review
+
+![Human Review visual editor](assets/human-review.png)
 
 Open an HTML or Markdown file:
 
