@@ -193,15 +193,16 @@ export class Store {
    * Edits are deduped by label+kind so retyping one block stays one row, but
    * the text is refreshed every time so `after` is always the latest wording.
    */
-  addEdit(key, label, kind, before, after) {
+  addEdit(key, label, kind, before, after, beforeHtml, afterHtml) {
     return this.update(key, (page) => {
       const row = page.edits.find((e) => e.label === label && e.kind === kind);
       if (row) {
         if (after !== undefined) row.after = after;
+        if (afterHtml !== undefined) row.after_html = afterHtml;
         row.updatedAt = Date.now();
         return;
       }
-      page.edits.push({ label, kind, before, after, at: Date.now(), updatedAt: Date.now() });
+      page.edits.push({ label, kind, before, after, before_html: beforeHtml, after_html: afterHtml, at: Date.now(), updatedAt: Date.now() });
     });
   }
 

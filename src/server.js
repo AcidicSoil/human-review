@@ -222,7 +222,14 @@ export function createServer() {
           anchor: c.anchor,
           feedback: c.feedback,
         })),
-        edits: page.edits.map((e) => ({ label: e.label, kind: e.kind, before: e.before, after: e.after })),
+        edits: page.edits.map((e) => ({
+          label: e.label,
+          kind: e.kind,
+          before: e.before,
+          after: e.after,
+          ...(e.before_html !== undefined && e.before_html !== e.before ? { before_html: e.before_html } : {}),
+          ...(e.after_html !== undefined && e.after_html !== e.after ? { after_html: e.after_html } : {}),
+        })),
       });
     }
     return out;
@@ -256,7 +263,8 @@ export function createServer() {
       next_step:
         "Apply this feedback. Each entry in `pages` names the reviewed file or localhost URL. Items under `edits` are " +
         "changes the human already made: `after` is their exact new wording, so carry it across verbatim, and " +
-        "never revert it. " +
+        "never revert it. When an edit carries `after_html`, the human changed formatting (bold, italic, links) — " +
+        "use the HTML version, translated into the source's own syntax. " +
         (hasMarkdown
           ? "Markdown pages were reviewed rendered, so quotes and `after` wording use the rendered text — apply " +
             "the change to the Markdown source, keeping its formatting syntax. "
@@ -412,6 +420,7 @@ export function createServer() {
       if (route === "/chrome.js") return serveFile(res, path.join(here, "chrome-client.js"), CORS);
       if (route === "/sdk.js") return serveFile(res, path.join(here, "sdk.js"), CORS);
       if (route === "/anchor-text.js") return serveFile(res, path.join(here, "anchor-text.js"), CORS);
+      if (route === "/frame-policy.js") return serveFile(res, path.join(here, "frame-policy.js"), CORS);
       if (route === "/click-target.js") return serveFile(res, path.join(here, "click-target.js"), CORS);
       if (route === "/serialize.js") return serveFile(res, path.join(here, "serialize.js"), CORS);
 
@@ -586,7 +595,7 @@ export function createServer() {
           const label = String(body.label || "Document");
           const kind = body.kind === "deleted" ? "deleted" : "edited";
           const cap = (s) => (typeof s === "string" ? s.slice(0, 4000) : undefined);
-          store.addEdit(key, label, kind, cap(body.before), cap(body.after));
+          store.addEdit(key, label, kind, cap(body.before), cap(body.after), cap(body.before_html), cap(body.after_html));
           return json(res, 200, { page: pageState(key) });
         }
 

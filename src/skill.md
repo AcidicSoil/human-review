@@ -76,7 +76,8 @@ One batch covers every page the user visited, grouped by file or localhost URL.
       "edits": [
         { "label": "Problem body", "kind": "edited",
           "before": "the original wording",
-          "after": "their exact new wording" }
+          "after": "their exact new wording",
+          "after_html": "their exact new wording with <strong>formatting</strong>" }
       ]
     }
   ],
@@ -90,6 +91,10 @@ One batch covers every page the user visited, grouped by file or localhost URL.
   carry it across verbatim and never revert it. If the HTML was generated from
   something else (MDX, Markdown, a template), apply `after` to the **source** too,
   or their fix disappears on the next build.
+- When `before_html`/`after_html` are present, the user changed formatting, not
+  just words — bold, italic, underline, links. Use the HTML version to carry the
+  formatting into the source, translated to its syntax (e.g. `<strong>` → `**`
+  in Markdown/MDX).
 - A page with `kind: "url"` was edited directly in the review UI. Its `file`
   and `url` fields name the localhost route, not a writable file. Find the
   matching project source (such as MDX, TSX, or a template), apply every edit

@@ -294,6 +294,22 @@ function targetFor(node) {
 
 const serialize = () => serializeDocument(document);
 
+/** A single block's HTML with every review artifact removed. */
+function blockHtml(el) {
+  const clone = el.cloneNode(true);
+  clone.querySelectorAll(`[${UI_ATTR}]`).forEach((n) => n.remove());
+  clone.querySelectorAll(`mark[${MARK_ATTR}]`).forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+    parent.removeChild(mark);
+  });
+  clone.querySelectorAll("[data-eh-el]").forEach((n) => n.removeAttribute("data-eh-el"));
+  clone.removeAttribute("data-eh-el");
+  clone.normalize();
+  return clone.innerHTML;
+}
+
 /**
  * Serialization is lossy about formatting, so a save that would not change the
  * document is skipped outright. Opening a file must never rewrite it.
@@ -575,7 +591,13 @@ function boot() {
           event.stopPropagation();
           if (/^(https?:)?\/\//i.test(href) || /^mailto:/i.test(href)) post("eh:external", { href: new URL(href, document.baseURI).href });
           else if (href.startsWith("#")) document.querySelector(href)?.scrollIntoView({ behavior: "smooth" });
-          else post("eh:navigate", { href });
+          else {
+            // This document is about to be torn down: anything still sitting in
+            // the debounce windows must ship first or it is lost. Message order
+            // is guaranteed, so the edits land before the navigation does.
+            flushSave();
+            post("eh:navigate", { href });
+          }
         }
         return; // let the artifact's own handlers run
       }
@@ -630,6 +652,7 @@ function boot() {
 
   // beforeinput still sees the untouched wording, so capture it once per block.
   const originalText = new WeakMap();
+  const originalHtml = new WeakMap();
   document.addEventListener(
     "beforeinput",
     (event) => {
@@ -638,7 +661,10 @@ function boot() {
       userEdited = true;
       const sel = document.getSelection();
       const target = targetFor(sel && sel.anchorNode ? sel.anchorNode : event.target);
-      if (target && !originalText.has(target.el)) originalText.set(target.el, target.el.textContent);
+      if (target && !originalText.has(target.el)) {
+        originalText.set(target.el, target.el.textContent);
+        originalHtml.set(target.el, blockHtml(target.el));
+      }
     },
     true
   );
@@ -653,11 +679,15 @@ function boot() {
     const sel = document.getSelection();
     const node = sel && sel.anchorNode ? sel.anchorNode : event.target;
     const target = targetFor(node);
+    // Text alone loses formatting-only edits (bold, italic, underline change
+    // markup, not textContent), so the block's cleaned HTML travels too.
     queueEdit({
       label: target ? target.label : "Document body",
       kind: "edited",
       before: target ? originalText.get(target.el) : undefined,
       after: target ? target.el.textContent : undefined,
+      before_html: target ? originalHtml.get(target.el) : undefined,
+      after_html: target ? blockHtml(target.el) : undefined,
     });
     scheduleSave();
   });
@@ -713,6 +743,9 @@ function boot() {
         break;
       case "eh:flush":
         flushSave();
+        // Posted after the flushed eh:edit/eh:html messages, so when the
+        // chrome sees it, everything pending has already been handed over.
+        post("eh:flushed", {});
         break;
       case "eh:abortSave":
         // A revert is in flight: anything queued would re-write the edits.

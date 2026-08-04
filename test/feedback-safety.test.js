@@ -105,7 +105,7 @@ test("ack after a timeout delivers a stranded batch instead of destroying it", a
   await request(port, token, {
     method: "POST",
     route: `/api/page/${key}/edit`,
-    body: { label: "h1", kind: "edited", before: "Head", after: "New head" },
+    body: { label: "h1", kind: "edited", before: "Head", after: "New head", before_html: "Head", after_html: "New <strong>head</strong>" },
   });
   await request(port, token, {
     method: "POST",
@@ -121,6 +121,14 @@ test("ack after a timeout delivers a stranded batch instead of destroying it", a
   const page = j(await request(port, token, { route: `/api/page/${key}` }));
   assert.deepEqual(page.comments.map((c) => c.feedback), ["Late comment."], "post-send comments survive the ack");
   assert.deepEqual(page.edits.map((e) => e.label), ["h1"], "post-send edits survive the ack");
+  assert.equal(page.edits[0].after_html, "New <strong>head</strong>", "formatting travels with the edit");
+
+  // The surviving edit ships in the next batch, formatting included.
+  await request(port, token, { method: "POST", route: `/api/page/${key}/send`, body: { sessionId: opened.sessionId, note: "" } });
+  const next = JSON.parse((await request(port, token, { route: `/api/poll?target=${encodeURIComponent(file)}` })).raw);
+  const shipped = next.pages[0].edits.find((e) => e.label === "h1");
+  assert.equal(shipped.after_html, "New <strong>head</strong>");
+  await ackAndAbandon(port, token, file);
 });
 
 test("a save based on a stale version of the file is refused", async (t) => {

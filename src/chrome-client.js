@@ -5,6 +5,7 @@
  * hostname: a separate origin that can never reach this page or its token.
  */
 import { tidy } from "./anchor-text.js";
+import { framePolicy } from "./frame-policy.js";
 
 const $ = (id) => document.getElementById(id);
 const frame = $("frame");
@@ -27,6 +28,7 @@ const state = {
   scroll: { x: 0, y: 0 },
   reloading: false,
   dynamic: false,
+  framePolicy: null,
 };
 
 // ------------------------------------------------------------------- server
@@ -50,18 +52,41 @@ async function api(path, options) {
 const ARTIFACT_HOST = location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
 const ARTIFACT_ORIGIN = `${location.protocol}//${ARTIFACT_HOST}:${location.port}`;
 
-// Target the artifact origin explicitly so comment text is never delivered to
-// a document the reviewed page navigated somewhere else.
-const toFrame = (message) => frame.contentWindow && frame.contentWindow.postMessage(message, ARTIFACT_ORIGIN);
+// URL reviews keep a real origin. File reviews use an opaque sandbox origin,
+// so postMessage requires "*" while the source-window check remains exact.
+const toFrame = (message) =>
+  frame.contentWindow && frame.contentWindow.postMessage(message, state.framePolicy?.targetOrigin || ARTIFACT_ORIGIN);
 
 function artifactUrl(key, bust = false) {
   const query = bust ? `?t=${Date.now()}` : "";
   return `${ARTIFACT_ORIGIN}/artifact/${key}/index.html${query}`;
 }
 
+/**
+ * Ask the SDK to ship anything still sitting in its debounce windows, and
+ * wait until it has. Navigating away without this drops the last moments of
+ * typing. The timeout covers a torn-down or never-booted frame.
+ */
+let flushWaiter = null;
+function flushFrame() {
+  return new Promise((resolve) => {
+    const settle = () => {
+      if (flushWaiter !== settle) return;
+      flushWaiter = null;
+      resolve();
+    };
+    flushWaiter = settle;
+    toFrame({ type: "eh:flush" });
+    setTimeout(settle, 400);
+  });
+}
+
 async function loadPage(key, { reload = true } = {}) {
+  const returning = state.page;
   state.key = key;
   state.page = await api(`/api/page/${key}?session=${state.sessionId}`);
+  state.framePolicy = framePolicy(state.page, ARTIFACT_ORIGIN);
+  frame.setAttribute("sandbox", state.framePolicy.sandbox);
   state.others = state.page.others || [];
   state.orphans = new Set();
   state.compose = null;
@@ -75,6 +100,12 @@ async function loadPage(key, { reload = true } = {}) {
     frame.src = artifactUrl(key);
   }
   render();
+  // Coming back to a dev-server page shows the app's own copy again, without
+  // the direct edits — which reads as data loss unless we say what happened.
+  const edits = state.page.edits ? state.page.edits.length : 0;
+  if (returning && state.page.feedbackOnly && edits > 0) {
+    toast(`This page renders from your dev server — ${edits} ${edits === 1 ? "edit is" : "edits are"} queued for the agent`);
+  }
 }
 
 // -------------------------------------------------------------------- clock
@@ -237,6 +268,7 @@ function render() {
       count.textContent = String(other.count);
       row.append(label, count);
       row.addEventListener("click", async () => {
+        await flushFrame();
         await api(`/api/session/${state.sessionId}/goto`, {
           method: "POST",
           body: JSON.stringify({ key: other.key }),
@@ -413,7 +445,7 @@ async function saveHtml(html, key) {
 
 window.addEventListener("message", async (event) => {
   if (!frame.contentWindow || event.source !== frame.contentWindow) return;
-  if (event.origin !== ARTIFACT_ORIGIN) return;
+  if (!state.framePolicy || event.origin !== state.framePolicy.incomingOrigin) return;
   const msg = event.data || {};
 
   switch (msg.type) {
@@ -456,7 +488,14 @@ window.addEventListener("message", async (event) => {
     case "eh:edit":
       state.page = (await api(`/api/page/${state.key}/edit`, {
         method: "POST",
-        body: JSON.stringify({ label: msg.label, kind: msg.kind, before: msg.before, after: msg.after }),
+        body: JSON.stringify({
+          label: msg.label,
+          kind: msg.kind,
+          before: msg.before,
+          after: msg.after,
+          before_html: msg.before_html,
+          after_html: msg.after_html,
+        }),
       })).page;
       state.sent = false;
       render();
@@ -476,6 +515,9 @@ window.addEventListener("message", async (event) => {
     case "eh:dynamic":
       state.dynamic = true;
       renderSave();
+      break;
+    case "eh:flushed":
+      if (flushWaiter) flushWaiter();
       break;
     case "eh:scroll":
       state.scroll = { x: msg.x, y: msg.y };
