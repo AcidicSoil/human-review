@@ -205,6 +205,11 @@ function render() {
     const body = document.createElement("p");
     body.className = "body";
     body.textContent = comment.feedback;
+    body.title = "Click to edit";
+    body.addEventListener("click", (event) => {
+      event.stopPropagation();
+      editComment(card, body, comment);
+    });
 
     card.append(head, quote, body);
     card.addEventListener("click", () => setActive(comment.id, false));
@@ -338,6 +343,52 @@ function renderSave() {
   if (state.save === "saving") $("saveText").textContent = `Saving to ${name}…`;
   else if (state.save === "failed") $("saveText").textContent = "Couldn't save — retrying…";
   else $("saveText").textContent = state.savedAt ? `Saved to ${name} · ${state.savedAt}` : `Saved to ${name}`;
+}
+
+/** Swap a comment's text for a textarea until the new wording is committed. */
+function editComment(card, body, comment) {
+  if (card.querySelector("textarea")) return;
+  const input = document.createElement("textarea");
+  input.className = "body-edit";
+  input.rows = 3;
+  input.value = comment.feedback;
+  let done = false;
+  const finish = () => {
+    done = true;
+    render();
+  };
+  const commit = async () => {
+    if (done) return;
+    done = true;
+    const feedback = input.value.trim();
+    if (!feedback || feedback === comment.feedback) return render();
+    try {
+      state.page = (await api(`/api/page/${state.key}/comment/${comment.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ feedback }),
+      })).page;
+      state.sent = false;
+    } catch (err) {
+      toast(err.message);
+    }
+    render();
+  };
+  input.addEventListener("keydown", (event) => {
+    event.stopPropagation();
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      commit();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      finish();
+    }
+  });
+  input.addEventListener("blur", commit);
+  input.addEventListener("click", (event) => event.stopPropagation());
+  body.replaceWith(input);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
 }
 
 function toast(message) {

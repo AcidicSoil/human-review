@@ -131,6 +131,40 @@ test("ack after a timeout delivers a stranded batch instead of destroying it", a
   await ackAndAbandon(port, token, file);
 });
 
+test("a comment can be reworded before it is sent", async (t) => {
+  const file = path.join(tmp, "reword.html");
+  fs.writeFileSync(file, "<!DOCTYPE html>\n<html><head></head><body><p>Draft</p></body></html>\n");
+  const { port, token, dispose } = await start(0);
+  t.after(() => dispose());
+
+  const opened = j(await request(port, token, { method: "POST", route: "/api/session", body: { file } }));
+  const key = opened.key;
+  const added = j(await request(port, token, {
+    method: "POST",
+    route: `/api/page/${key}/comment`,
+    body: { kind: "selection", quote: "Draft", feedback: "First thoughts" },
+  }));
+
+  const reworded = await request(port, token, {
+    method: "PATCH",
+    route: `/api/page/${key}/comment/${added.comment.id}`,
+    body: { feedback: "Sharper thoughts" },
+  });
+  assert.equal(reworded.status, 200);
+  assert.deepEqual(j(reworded).page.comments.map((c) => c.feedback), ["Sharper thoughts"]);
+
+  const missing = await request(port, token, { method: "PATCH", route: `/api/page/${key}/comment/c_nope`, body: { feedback: "x" } });
+  assert.equal(missing.status, 404);
+  const empty = await request(port, token, { method: "PATCH", route: `/api/page/${key}/comment/${added.comment.id}`, body: { feedback: "  " } });
+  assert.equal(empty.status, 400);
+
+  // The reworded text is what ships.
+  await request(port, token, { method: "POST", route: `/api/page/${key}/send`, body: { sessionId: opened.sessionId, note: "" } });
+  const batch = JSON.parse((await request(port, token, { route: `/api/poll?target=${encodeURIComponent(file)}` })).raw);
+  assert.deepEqual(batch.pages[0].comments.map((c) => c.feedback), ["Sharper thoughts"]);
+  await ackAndAbandon(port, token, file);
+});
+
 test("a save based on a stale version of the file is refused", async (t) => {
   const file = path.join(tmp, "save.html");
   const v1 = "<!DOCTYPE html>\n<html><head></head><body><p>One</p></body></html>\n";

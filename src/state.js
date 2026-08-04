@@ -189,6 +189,19 @@ export class Store {
     });
   }
 
+  /** Rewording feedback before it is sent. Returns null for an unknown id. */
+  updateComment(key, id, feedback) {
+    let found = false;
+    const page = this.update(key, (p) => {
+      const comment = p.comments.find((c) => c.id === id);
+      if (comment) {
+        comment.feedback = feedback;
+        found = true;
+      }
+    });
+    return found ? page : null;
+  }
+
   /**
    * Edits are deduped by label+kind so retyping one block stays one row, but
    * the text is refreshed every time so `after` is always the latest wording.

@@ -590,6 +590,14 @@ export function createServer() {
           return json(res, 200, { page: pageState(key) });
         }
 
+        if (action === "comment" && req.method === "PATCH" && tail) {
+          const body = await readBody(req);
+          const feedback = String(body.feedback || "").trim();
+          if (!feedback) return json(res, 400, { error: "empty feedback" });
+          if (!store.updateComment(key, tail, feedback)) return json(res, 404, { error: "unknown comment" });
+          return json(res, 200, { page: pageState(key) });
+        }
+
         if (action === "edit" && req.method === "POST") {
           const body = await readBody(req);
           const label = String(body.label || "Document");
