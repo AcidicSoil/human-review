@@ -194,6 +194,38 @@ test("a save based on a stale version of the file is refused", async (t) => {
   assert.equal(fs.readFileSync(file, "utf8"), v2);
 });
 
+test("ending a review releases the waiting agent and keeps unsent feedback", async (t) => {
+  const file = path.join(tmp, "ended.html");
+  fs.writeFileSync(file, "<!DOCTYPE html>\n<html><head></head><body><p>Alpha</p></body></html>\n");
+  const { port, token, dispose } = await start(0);
+  t.after(() => dispose());
+
+  const opened = j(await request(port, token, { method: "POST", route: "/api/session", body: { file } }));
+  const key = opened.key;
+  await request(port, token, {
+    method: "POST",
+    route: `/api/page/${key}/comment`,
+    body: { kind: "selection", quote: "Alpha", feedback: "Unsent thought" },
+  });
+
+  // An agent is mid-poll with nothing to deliver.
+  const polled = request(port, token, { route: `/api/poll?target=${encodeURIComponent(file)}` });
+  await sleep(100);
+
+  const ended = await request(port, token, { method: "POST", route: `/api/session/${opened.sessionId}/end` });
+  assert.equal(ended.status, 200);
+
+  const answer = JSON.parse((await polled).raw);
+  assert.equal(answer.status, "closed", "the poller is released, not left to time out");
+  assert.match(answer.next_step, /Stop polling/);
+
+  const gone = await request(port, token, { route: `/api/session/${opened.sessionId}/page` });
+  assert.equal(gone.status, 404, "the session is forgotten");
+
+  const page = j(await request(port, token, { route: `/api/page/${key}` }));
+  assert.deepEqual(page.comments.map((c) => c.feedback), ["Unsent thought"], "unsent feedback survives the end");
+});
+
 test("poll --timeout rejects malformed values instead of waiting forever", async () => {
   const env = { ...process.env, HUMAN_REVIEW_STATE_DIR: process.env.HUMAN_REVIEW_STATE_DIR };
   const run = (args) =>

@@ -40,6 +40,10 @@ keeping its formatting syntax.
    arrived yet — run the same poll command again to keep waiting. Feedback is
    saved even if a poll dies, so nothing is ever lost.
 
+   If it prints `{"status":"closed"}`, the user ended the review from the
+   browser — stop polling and do not run the poll command again. Unsent
+   feedback is kept and ships the next time this target is reviewed.
+
 4. Apply what comes back, then wait again. `--ack` clears the batch you just handled:
 
    ```sh

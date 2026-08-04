@@ -310,6 +310,36 @@ export function createServer() {
     return true;
   }
 
+  /**
+   * A deliberate stop, not a tab close: the browser forgets the session and
+   * any waiting agent is released with a clear "stop polling" answer instead
+   * of being left to burn its timeout. Unsent feedback stays in the store.
+   */
+  function endSession(session) {
+    sessions.delete(session.id);
+    for (const res of session.clients) {
+      res.write(`event: ended\ndata: {}\n\n`);
+      res.end();
+    }
+    session.clients.clear();
+    // Another window on the same target keeps its agent connection alive.
+    if (sessionsForEntry(session.entryKey).length > 0) return;
+    const set = pollers.get(session.entryKey);
+    if (!set) return;
+    for (const poller of [...set]) {
+      clearInterval(poller.timer);
+      set.delete(poller);
+      poller.res.end(
+        JSON.stringify({
+          status: "closed",
+          next_step:
+            "The user ended this review session. Stop polling — do not run the poll command again. " +
+            "Any unsent feedback is kept and will ship the next time this target is reviewed.",
+        })
+      );
+    }
+  }
+
   // ----------------------------------------------------------------- routes
 
   function readBody(req) {
@@ -655,6 +685,15 @@ export function createServer() {
           if (result.error) return json(res, 400, result);
           return json(res, 200, { ok: true, page: pageState(key) });
         }
+      }
+
+      // --- the user is done: stop the review, release the agent
+      const endMatch = route.match(/^\/api\/session\/(\w+)\/end$/);
+      if (endMatch && req.method === "POST") {
+        const session = sessions.get(endMatch[1]);
+        if (!session) return json(res, 404, { error: "unknown session" });
+        endSession(session);
+        return json(res, 200, { ok: true });
       }
 
       // --- which page a window is currently showing

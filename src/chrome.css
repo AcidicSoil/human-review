@@ -269,6 +269,34 @@ body.collapsed .handle { right: 0; }
   cursor: pointer;
 }
 .remove:hover { background: var(--danger-soft); color: var(--danger); }
+.end-review {
+  margin-top: 9px;
+  width: 100%;
+  padding: 6px;
+  background: none;
+  border: none;
+  color: var(--faint-2);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.end-review:hover { color: var(--danger); background: var(--danger-soft); }
+
+.ended {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--rail);
+  color: var(--txt);
+}
+.ended h2 { margin: 0; font-size: 17px; color: var(--strong-txt); }
+.ended p { margin: 0; font-size: 13px; color: var(--mute-2); }
+
 .comment .quote { -webkit-line-clamp: 2; margin-bottom: 8px; }
 .comment .body { margin: 0; font-size: 13px; line-height: 1.5; cursor: text; border-radius: 4px; }
 .comment .body:hover { background: var(--input-bg); box-shadow: 0 0 0 4px var(--input-bg); }

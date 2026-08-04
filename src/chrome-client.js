@@ -648,6 +648,39 @@ $("revert").addEventListener("click", async () => {
   }
 });
 
+/** The session is over: freeze the page and say so. Feedback is already safe. */
+function showEnded() {
+  if (document.querySelector(".ended")) return;
+  if (events) events.close();
+  clearTimeout(retryTimer);
+  const overlay = document.createElement("div");
+  overlay.className = "ended";
+  const title = document.createElement("h2");
+  title.textContent = "Review ended";
+  const line = document.createElement("p");
+  line.textContent = "Unsent feedback is saved and ships next time you review this page. You can close this tab.";
+  overlay.append(title, line);
+  document.body.append(overlay);
+}
+
+$("endReview").addEventListener("click", async () => {
+  const page = state.page;
+  const otherTotal = (state.others || []).reduce((sum, o) => sum + o.count, 0);
+  const unsent = page ? (page.comments || []).length + (page.edits || []).length + otherTotal : 0;
+  const message = unsent
+    ? `End this review? ${unsent} unsent ${unsent === 1 ? "item" : "items"} will be kept for next time.`
+    : "End this review? The waiting agent will be told to stop polling.";
+  if (!window.confirm(message)) return;
+  // Ship anything still sitting in the SDK's debounce windows first.
+  await flushFrame();
+  try {
+    await api(`/api/session/${state.sessionId}/end`, { method: "POST" });
+    showEnded();
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
 $("handoffCopy").addEventListener("click", async (event) => {
   const button = event.currentTarget;
   try {
@@ -713,8 +746,13 @@ document.addEventListener("keydown", (event) => {
 
 // ------------------------------------------------------------------ events
 
+let events = null;
+
 function connect() {
   const source = new EventSource(`/events/${state.sessionId}`);
+  events = source;
+  // Another window on this session hit End review.
+  source.addEventListener("ended", () => showEnded());
   source.addEventListener("reload", () => {
     const hadEdits = state.page ? state.page.edits.length : 0;
     state.reloading = true;
