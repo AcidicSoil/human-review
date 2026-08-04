@@ -518,7 +518,9 @@ function activate(id, scroll) {
       post("eh:notInView", { id });
       return;
     }
-    window.scrollTo({ top: window.scrollY + rect.top - window.innerHeight / 3, behavior: "smooth" });
+    // scrollIntoView walks every scrollable ancestor, so targets inside an
+    // app's inner scroll container are reached too, not just window-scrolled ones.
+    target.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 }
 

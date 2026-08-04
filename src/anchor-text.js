@@ -38,25 +38,9 @@ function occurrences(text, quote) {
   return found;
 }
 
-/**
- * Locate `ctx.quote` in `text`, using prefix/suffix to disambiguate repeats.
- * Returns `{ start, end, exact }` or null when the quote is gone entirely.
- */
-export function findQuote(text, ctx) {
-  const quote = ctx && ctx.quote;
-  if (!quote) return null;
-
-  const hits = occurrences(text, quote);
-  if (hits.length === 0) return null;
-  if (hits.length === 1) {
-    return { start: hits[0], end: hits[0] + quote.length, exact: true };
-  }
-
-  const prefix = ctx.prefix || "";
-  const suffix = ctx.suffix || "";
+function bestHit(text, hits, quote, prefix, suffix) {
   let best = hits[0];
   let bestScore = -1;
-
   for (const at of hits) {
     const before = text.slice(Math.max(0, at - prefix.length), at);
     const after = text.slice(at + quote.length, at + quote.length + suffix.length);
@@ -66,8 +50,59 @@ export function findQuote(text, ctx) {
       best = at;
     }
   }
+  return { at: best, score: bestScore };
+}
 
-  return { start: best, end: best + quote.length, exact: bestScore > 0 };
+const collapse = (s) => String(s || "").replace(/\s+/g, " ");
+
+/** Collapse whitespace runs, keeping a map from each kept char to its original index. */
+function collapseWithMap(text) {
+  let flat = "";
+  const map = [];
+  let pendingWs = -1;
+  for (let i = 0; i < text.length; i += 1) {
+    if (/\s/.test(text[i])) {
+      if (pendingWs === -1) pendingWs = i;
+      continue;
+    }
+    if (pendingWs !== -1 && flat) {
+      flat += " ";
+      map.push(pendingWs);
+    }
+    pendingWs = -1;
+    flat += text[i];
+    map.push(i);
+  }
+  return { flat, map };
+}
+
+/**
+ * Locate `ctx.quote` in `text`, using prefix/suffix to disambiguate repeats.
+ * Returns `{ start, end, exact }` or null when the quote is gone entirely.
+ */
+export function findQuote(text, ctx) {
+  const quote = ctx && ctx.quote;
+  if (!quote) return null;
+
+  const hits = occurrences(text, quote);
+  if (hits.length === 1) {
+    return { start: hits[0], end: hits[0] + quote.length, exact: true };
+  }
+  if (hits.length > 1) {
+    const { at, score } = bestHit(text, hits, quote, ctx.prefix || "", ctx.suffix || "");
+    return { start: at, end: at + quote.length, exact: score > 0 };
+  }
+
+  // Reformatting (a prettier run, an agent rewrite) reflows whitespace without
+  // changing any words. Match again on whitespace-collapsed text and map the
+  // hit back to real offsets, so those comments survive instead of orphaning.
+  const { flat, map } = collapseWithMap(text);
+  const flatQuote = collapse(quote).trim();
+  if (!flatQuote || !map.length) return null;
+  const flatHits = occurrences(flat, flatQuote);
+  if (!flatHits.length) return null;
+  const { at } = bestHit(flat, flatHits, flatQuote, collapse(ctx.prefix || ""), collapse(ctx.suffix || ""));
+  return { start: map[at], end: map[at + flatQuote.length - 1] + 1, exact: false };
 }
 
 /** Collapse runs of whitespace for display in a comment card. */

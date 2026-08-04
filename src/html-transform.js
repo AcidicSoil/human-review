@@ -36,13 +36,18 @@ export function injectSdk(html, key, { src = `/sdk.js?key=${encodeURIComponent(k
   }
   // No added whitespace: the SDK compares the live DOM against the on-disk file
   // to detect self-rendering pages, and a stray newline would read as an edit.
-  if (/<\/body\s*>/i.test(prepared)) {
-    return prepared.replace(/<\/body\s*>/i, `${tag}</body>`);
-  }
-  if (/<\/html\s*>/i.test(prepared)) {
-    return prepared.replace(/<\/html\s*>/i, `${tag}</html>`);
-  }
-  return `${prepared}${tag}`;
+  // Inject before the LAST closing tag — an inline script may legally contain
+  // the literal string "</body>", and only the final one closes the document.
+  const injected = injectBeforeLast(prepared, /<\/body\s*>/gi, tag) ?? injectBeforeLast(prepared, /<\/html\s*>/gi, tag);
+  return injected ?? `${prepared}${tag}`;
+}
+
+function injectBeforeLast(html, closeRe, tag) {
+  let last = -1;
+  let match;
+  while ((match = closeRe.exec(html))) last = match.index;
+  if (last === -1) return null;
+  return `${html.slice(0, last)}${tag}${html.slice(last)}`;
 }
 
 /** Remove any injected tag, so a file saved with one never keeps it. */
