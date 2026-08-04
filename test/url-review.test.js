@@ -87,7 +87,9 @@ test("a localhost route is visually editable and returns source-directed feedbac
   const artifact = await request(review.port, review.token, { route: `/artifact/${key}/index.html` });
   assert.equal(artifact.status, 200, artifact.raw);
   assert.match(artifact.raw, /<h1>Wiki<\/h1>/);
-  assert.match(artifact.raw, new RegExp(`<base data-eh-sdk href="http://localhost:${appPort}/wiki">`));
+  assert.doesNotMatch(artifact.raw, /<base/);
+  assert.match(artifact.raw, new RegExp(`href="http://localhost:${appPort}/_next/wiki\\.css"`));
+  assert.match(artifact.raw, /<script data-eh-route>history\.replaceState\(null,"",location\.origin\+"\/wiki"\)<\/script>/);
   assert.match(artifact.raw, new RegExp(`src="http://127\\.0\\.0\\.1:${review.port}/sdk\\.js\\?key=${key}"`));
 
   const save = await request(review.port, review.token, {

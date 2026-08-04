@@ -321,8 +321,8 @@ export function createServer() {
     });
   }
 
-  // The artifact iframe is sandboxed without allow-same-origin, so its module
-  // scripts are fetched from a null origin and need CORS to load at all.
+  // The artifact iframe uses the alternate loopback hostname to stay isolated
+  // from the review shell, so its SDK module needs CORS to load.
   const CORS = { "access-control-allow-origin": "*" };
 
   function pageState(key, session) {
@@ -377,6 +377,7 @@ export function createServer() {
       if (route === "/chrome.js") return serveFile(res, path.join(here, "chrome-client.js"), CORS);
       if (route === "/sdk.js") return serveFile(res, path.join(here, "sdk.js"), CORS);
       if (route === "/anchor-text.js") return serveFile(res, path.join(here, "anchor-text.js"), CORS);
+      if (route === "/click-target.js") return serveFile(res, path.join(here, "click-target.js"), CORS);
       if (route === "/serialize.js") return serveFile(res, path.join(here, "serialize.js"), CORS);
 
       // --- open a browser session for a file or localhost URL

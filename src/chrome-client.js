@@ -44,6 +44,14 @@ async function api(path, options) {
 
 const toFrame = (message) => frame.contentWindow && frame.contentWindow.postMessage(message, "*");
 
+// Keep the reviewed app on a different loopback origin from the review shell.
+// This gives route-aware frameworks a real origin without exposing the parent UI.
+function artifactUrl(key, bust = false) {
+  const host = location.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
+  const query = bust ? `?t=${Date.now()}` : "";
+  return `${location.protocol}//${host}:${location.port}/artifact/${key}/index.html${query}`;
+}
+
 async function loadPage(key, { reload = true } = {}) {
   state.key = key;
   state.page = await api(`/api/page/${key}?session=${state.sessionId}`);
@@ -55,7 +63,7 @@ async function loadPage(key, { reload = true } = {}) {
   state.dynamic = false;
   if (reload) {
     state.reloading = true;
-    frame.src = `/artifact/${key}/index.html`;
+    frame.src = artifactUrl(key);
   }
   render();
 }
@@ -571,7 +579,7 @@ function connect() {
     const hadEdits = state.page ? state.page.edits.length : 0;
     state.reloading = true;
     state.dynamic = false;
-    frame.src = `/artifact/${state.key}/index.html?t=${Date.now()}`;
+    frame.src = artifactUrl(state.key, true);
     api(`/api/page/${state.key}`).then((page) => {
       state.page = page;
       state.save = "idle";

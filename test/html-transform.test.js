@@ -8,6 +8,10 @@ const PAGE = `<!DOCTYPE html>
 <h1>Hello</h1>
 </body></html>`;
 
+const LOCALHOST_PAGE = `<!DOCTYPE html>
+<html><head><title>Spec</title><link rel="stylesheet" href="/_next/app.css"></head>
+<body><a href="/wiki/lesson">Lesson</a><img src="./hero.png"><script src="/_next/app.js"></script></body></html>`;
+
 test("injectSdk adds exactly one script before </body>", () => {
   const out = injectSdk(PAGE, "abc123");
   const tags = out.match(/<script[^>]*data-eh-sdk/g) || [];
@@ -43,13 +47,22 @@ test("a page with only </html> gets the script before it", () => {
   assert.ok(out.indexOf("data-eh-sdk") < out.indexOf("</html>"));
 });
 
-test("localhost pages get an absolute base and sdk URL without stacking either", () => {
-  const options = { src: "http://127.0.0.1:4444/sdk.js?key=k", baseHref: "http://localhost:3000/wiki" };
-  const once = injectSdk(PAGE, "k", options);
+test("localhost pages get absolute assets, their real route, and one sdk", () => {
+  const options = {
+    src: "http://127.0.0.1:4444/sdk.js?key=k",
+    baseHref: "http://localhost:3000/wiki?view=course#lesson",
+  };
+  const once = injectSdk(LOCALHOST_PAGE, "k", options);
   const twice = injectSdk(once, "k", options);
-  assert.equal((twice.match(/<base[^>]*data-eh-sdk/g) || []).length, 1);
+  assert.equal((twice.match(/<base[^>]*data-eh-sdk/g) || []).length, 0);
   assert.equal((twice.match(/<script[^>]*data-eh-sdk/g) || []).length, 1);
-  assert.ok(twice.includes('href="http://localhost:3000/wiki"'));
+  assert.equal((twice.match(/<script[^>]*data-eh-route/g) || []).length, 1);
+  assert.ok(twice.includes('history.replaceState(null,"",location.origin+"/wiki?view=course#lesson")'));
+  assert.ok(twice.indexOf("data-eh-route") < twice.indexOf("<title>"));
+  assert.ok(twice.includes('href="http://localhost:3000/_next/app.css"'));
+  assert.ok(twice.includes('src="http://localhost:3000/_next/app.js"'));
+  assert.ok(twice.includes('src="http://localhost:3000/hero.png"'));
+  assert.ok(twice.includes('<a href="/wiki/lesson">'));
   assert.ok(twice.includes('src="http://127.0.0.1:4444/sdk.js?key=k"'));
-  assert.equal(stripSdk(twice), PAGE);
+  assert.ok(!stripSdk(twice).includes("data-eh-route"));
 });

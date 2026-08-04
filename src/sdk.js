@@ -6,6 +6,7 @@
  * talks to the server — everything crosses to the chrome page by postMessage.
  */
 import { buildContext, findQuote } from "./anchor-text.js";
+import { navigationHref } from "./click-target.js";
 import { keepBodyEditable, serializeDocument, UI_ATTR, MARK_ATTR } from "./serialize.js";
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -519,13 +520,13 @@ function boot() {
     (event) => {
       if (isOurs(event.target)) return;
       const modified = event.metaKey || event.ctrlKey;
-      const link = event.target.closest && event.target.closest("a[href]");
+      const href = navigationHref(event.target);
 
       if (modified) {
-        if (link) {
+        if (href) {
           event.preventDefault();
-          const href = link.getAttribute("href") || "";
-          if (/^(https?:)?\/\//i.test(href) || /^mailto:/i.test(href)) post("eh:external", { href: link.href });
+          event.stopPropagation();
+          if (/^(https?:)?\/\//i.test(href) || /^mailto:/i.test(href)) post("eh:external", { href: new URL(href, document.baseURI).href });
           else if (href.startsWith("#")) document.querySelector(href)?.scrollIntoView({ behavior: "smooth" });
           else post("eh:navigate", { href });
         }
@@ -533,7 +534,7 @@ function boot() {
       }
 
       // Plain clicks belong to editing: never navigate, never fire artifact JS.
-      if (link || (event.target.closest && event.target.closest("button, [role='button'], summary"))) {
+      if (href || (event.target.closest && event.target.closest("button, [role='button'], summary"))) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -553,7 +554,7 @@ function boot() {
     hoverTarget = target ? target.el : null;
     place(els.outline, hoverTarget);
     showChip(hoverTarget);
-    const interactive = event.target.closest && event.target.closest("a[href], button, [role='button']");
+    const interactive = event.target.closest && event.target.closest("a[href], [data-href], button, [role='button']");
     showHint(interactive ? "⌘-click to open" : "", event.clientX, event.clientY);
   });
 
