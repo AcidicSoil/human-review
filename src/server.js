@@ -40,16 +40,46 @@ const IDLE_SHUTDOWN_MS = Number(process.env.HUMAN_REVIEW_IDLE_MS || 45 * 60 * 10
 /** A window with no live connection this long is treated as closed for good. */
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const MAX_LOCAL_REDIRECTS = 5;
+/** Generous enough for a dev server's cold compile, but a wedged one can't hang us forever. */
+const LOCAL_FETCH_TIMEOUT_MS = 30000;
+const MAX_LOCAL_PAGE_BYTES = 24 * 1024 * 1024;
 
 const hash = (text) => crypto.createHash("sha1").update(text).digest("hex");
 const uid = (prefix) => `${prefix}_${crypto.randomBytes(6).toString("hex")}`;
 
+/** Read an HTML response with a hard size cap, since text() is unbounded. */
+async function readCapped(response, url) {
+  const reader = response.body.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_LOCAL_PAGE_BYTES) {
+      await reader.cancel().catch(() => {});
+      throw new Error(`The page at ${url} is larger than ${MAX_LOCAL_PAGE_BYTES / (1024 * 1024)}MB.`);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 async function fetchLocalPage(target, redirects = 0) {
   const url = localUrl(target);
-  const response = await fetch(url, {
-    redirect: "manual",
-    headers: { accept: "text/html,application/xhtml+xml" },
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      redirect: "manual",
+      headers: { accept: "text/html,application/xhtml+xml" },
+      signal: AbortSignal.timeout(LOCAL_FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err.name === "TimeoutError") {
+      throw new Error(`Localhost did not answer within ${LOCAL_FETCH_TIMEOUT_MS / 1000}s for ${url}`);
+    }
+    throw err;
+  }
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get("location");
     if (!location) throw new Error(`Localhost returned redirect ${response.status} without a location.`);
@@ -61,7 +91,7 @@ async function fetchLocalPage(target, redirects = 0) {
   if (!/html|xhtml/i.test(contentType)) {
     throw new Error(`Expected an HTML page from localhost, but received ${contentType || "an unknown content type"}.`);
   }
-  return { html: await response.text(), resolvedUrl: response.url || url };
+  return { html: await readCapped(response, url), resolvedUrl: response.url || url };
 }
 
 export function createServer() {

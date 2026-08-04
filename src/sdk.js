@@ -252,6 +252,14 @@ const clip = (text, limit = 40) => {
   return flat.length > limit ? `${flat.slice(0, limit - 1).trimEnd()}…` : flat;
 };
 
+/**
+ * A block's label is pinned the first time it is computed. Labels derived
+ * from the block's own text or position would drift as the user types or
+ * deletes siblings, splitting one block's edit into several contradictory
+ * rows keyed on each intermediate wording.
+ */
+const pinnedLabels = new WeakMap();
+
 /** The block a hover/edit belongs to, plus a human label for the edit list. */
 function targetFor(node) {
   const el = node && node.nodeType === 1 ? node : node && node.parentElement;
@@ -270,14 +278,16 @@ function targetFor(node) {
     else return null;
   }
 
-  const heading = precedingHeading(block);
-  const tag = block.tagName.toLowerCase();
-  // Siblings of the same tag would otherwise share a label and collapse into
-  // one edit row, so number them.
-  const twins = block.parentElement ? [...block.parentElement.children].filter((c) => c.tagName === block.tagName) : [];
-  const ordinal = twins.length > 1 ? ` ${twins.indexOf(block) + 1}` : "";
-  const label = heading ? `${clip(heading, 26)} · ${tag}${ordinal}` : clip(block.textContent, 40) || tag;
-  return { el: block, label, authored: false };
+  if (!pinnedLabels.has(block)) {
+    const heading = precedingHeading(block);
+    const tag = block.tagName.toLowerCase();
+    // Siblings of the same tag would otherwise share a label and collapse into
+    // one edit row, so number them.
+    const twins = block.parentElement ? [...block.parentElement.children].filter((c) => c.tagName === block.tagName) : [];
+    const ordinal = twins.length > 1 ? ` ${twins.indexOf(block) + 1}` : "";
+    pinnedLabels.set(block, heading ? `${clip(heading, 26)} · ${tag}${ordinal}` : clip(block.textContent, 40) || tag);
+  }
+  return { el: block, label: pinnedLabels.get(block), authored: false };
 }
 
 // ------------------------------------------------------------ serialization
@@ -459,6 +469,8 @@ function reanchor(comments) {
     }
     if (comment.kind === "element") {
       const el = comment.anchor && comment.anchor.selector ? document.querySelector(comment.anchor.selector) : null;
+      // Re-stamp the marker, or "Jump to" has nothing to find after a reload.
+      if (el) el.setAttribute("data-eh-el", comment.id);
       (el ? resolved : orphaned).push(comment.id);
       continue;
     }
