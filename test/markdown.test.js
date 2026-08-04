@@ -4,6 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { JSDOM } from "jsdom";
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-markdown-"));
 process.env.HUMAN_REVIEW_STATE_DIR = path.join(tmp, "state");
@@ -56,13 +57,34 @@ test("renderMarkdownPage produces a full document from gfm source", () => {
   assert.match(html, /<title>plan\.md<\/title>/);
 });
 
-test("script in markdown never reaches the rendered page", () => {
+test("raw HTML in markdown is visible but never active", () => {
   const html = renderMarkdownPage(
-    "# Hi\n\n<script>alert(1)</script>\n\n<div><script src=\"https://evil.example/x.js\"></script>Kept text</div>\n",
+    "# Hi\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(2)>\n\n<iframe src=\"https://evil.example\"></iframe>\n\n<svg onload=alert(3)><circle /></svg>\n\n<div>Kept text</div>\n\n[Bad link](javascript:alert(4))\n\n![Bad image](data:text/html,bad)\n",
     "/x/notes.md"
   );
-  assert.doesNotMatch(html, /<script/i, "no script element survives rendering");
-  assert.match(html, /Kept text/, "surrounding HTML still renders");
+  const document = new JSDOM(html).window.document;
+  assert.equal(document.querySelectorAll("script, iframe, svg").length, 0, "active elements are rendered only as text");
+  assert.equal(
+    [...document.querySelectorAll("*")].some((element) => [...element.attributes].some((attr) => /^on/i.test(attr.name))),
+    false,
+    "event-handler attributes never become active"
+  );
+  assert.equal(document.querySelectorAll('[href^="javascript:"], [src^="javascript:"], [src^="data:text/html"]').length, 0);
+  assert.match(document.body.textContent, /Kept text/, "the source remains readable");
+  assert.match(document.body.textContent, /Bad link/, "unsafe links retain their readable label");
+});
+
+test("normal Markdown links and images remain available", () => {
+  const html = renderMarkdownPage(
+    "[Relative](./spec.md) [Web](https://example.com) [Email](mailto:hi@example.com) ![Image](./image.png)",
+    "/x/notes.md"
+  );
+  const document = new JSDOM(html).window.document;
+  assert.deepEqual(
+    [...document.querySelectorAll("a")].map((element) => element.getAttribute("href")),
+    ["./spec.md", "https://example.com", "mailto:hi@example.com"]
+  );
+  assert.equal(document.querySelector("img").getAttribute("src"), "./image.png");
 });
 
 test("a markdown review is rendered, flagged, and never writable", async (t) => {

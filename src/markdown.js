@@ -1,5 +1,5 @@
 import path from "node:path";
-import { marked } from "marked";
+import { marked, Renderer } from "marked";
 
 export const isMarkdown = (file) => /\.(md|markdown)$/i.test(file);
 
@@ -36,19 +36,42 @@ const STYLE = `
   hr { border: none; border-top: 1px solid #eceae3; margin: 2.2em 0; }
 `;
 
-/**
- * Markdown is a document format: raw HTML passes through for layout, but
- * script has no legitimate use in a reviewed document, so it never executes.
- */
-function stripActiveContent(html) {
-  return String(html)
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
-    .replace(/<script\b[^>]*\/?>/gi, "");
+const escapeHtml = (value) =>
+  String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+function safeUrl(value, { image = false } = {}) {
+  const url = String(value || "").trim();
+  const probe = url.replace(/[\u0000-\u0020\u007f]+/g, "");
+  const match = /^([a-z][a-z0-9+.-]*):/i.exec(probe);
+  if (!match) return url;
+  const scheme = match[1].toLowerCase();
+  if (scheme === "http" || scheme === "https") return url;
+  if (!image && scheme === "mailto") return url;
+  if (image && /^data:image\/(?:avif|gif|jpe?g|png|webp);base64,/i.test(probe)) return url;
+  return null;
 }
+
+// Markdown can contain arbitrary HTML. Show that source as text so event
+// handlers, embeds, SVG, and future browser features can never become active.
+const INERT_RENDERER = new Renderer();
+INERT_RENDERER.html = ({ text }) => escapeHtml(text);
+INERT_RENDERER.link = function (token) {
+  const href = safeUrl(token.href);
+  if (!href) return this.parser.parseInline(token.tokens);
+  return Renderer.prototype.link.call(this, { ...token, href });
+};
+INERT_RENDERER.image = function (token) {
+  const href = safeUrl(token.href, { image: true });
+  if (!href) return escapeHtml(token.text || "");
+  return Renderer.prototype.image.call(this, { ...token, href });
+};
 
 /** Render a Markdown file into a standalone review page. */
 export function renderMarkdownPage(mdText, file) {
-  const body = stripActiveContent(marked.parse(mdText, { gfm: true, async: false }));
+  const body = marked.parse(mdText, { gfm: true, async: false, renderer: INERT_RENDERER });
   const title = path.basename(file);
   return `<!DOCTYPE html>
 <html lang="en">
