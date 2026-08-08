@@ -96,6 +96,7 @@ async function fetchLocalPage(target, redirects = 0) {
 
 export function createServer() {
   const store = new Store();
+  const cliInvocation = invocation();
 
   /**
    * Random per-run secret. Every /api route requires it, so a malicious web
@@ -431,7 +432,7 @@ export function createServer() {
       comments: page.comments,
       edits: page.edits,
       canRevert: page.kind !== "url" && typeof page.pristine === "string" && page.pristine.length > 0,
-      pollCommand: `${invocation()} poll ${shellQuote(pollTarget)}`,
+      pollCommand: `${cliInvocation} poll ${shellQuote(pollTarget)}`,
     };
   }
 
