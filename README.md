@@ -50,6 +50,22 @@ Human Review opens the file in your browser. Make direct edits, leave comments, 
 
 Note: For HTML files, direct edits and resizes save automatically. For Markdown and localhost pages, click Send so your agent can apply them to the source.
 
+## Review a large plan
+
+The skill can create a temporary single-file HTML review artifact even when the plan starts as Markdown, plain text, working notes, or chat content.
+
+Ask your agent to create a planning review artifact, then review it with the same `/human-review` loop. Each major section includes compact action checkboxes for:
+
+- **Revise** — substantively rewrite the section.
+- **Expand** — add missing depth or detail.
+- **Touch up** — make small clarity or organization improvements.
+- **Remove** — delete the section.
+- **Verify** — validate assumptions or technical claims and correct them.
+
+You can combine those markers with direct text edits and exact-text comments. When you click Send, the agent treats the three feedback types differently: your direct edits are preserved as exact wording, comments provide specific instructions, and section actions tell the agent what kind of follow-up work to perform.
+
+The generated `.review.html` remains a review surface. If the plan has a canonical Markdown, MDX, or other source file, the agent applies the approved changes back to that source and clears the action markers before the next review pass.
+
 ## What this skill lets you do
 
 - **Edit text directly and tweak basic formatting** (e.g., bold, italic).
@@ -60,6 +76,7 @@ Note: For HTML files, direct edits and resizes save automatically. For Markdown 
 - **Paste images** from your clipboard — file reviews save them beside the document; localhost reviews stage them for the agent to place in the app source.
 - **Select a phrase and leave a comment** anchored to the exact text.
 - **Comment on an image, chart, or section** by clicking the element.
+- **Mark planning sections** for revise, expand, touch-up, remove, or verify work in generated planning review artifacts.
 - **Remove elements** without explaining the deletion in chat.
 - **Command-click links** to review multiple pages without losing your feedback.
 - **Send every edit and comment at once** instead of writing a long chat message.
@@ -81,7 +98,7 @@ Everything runs on your computer. Human Review doesn’t require an account, clo
 
 Check out [Behind the Craft](https://behindthecraft.com), my personal AI system with over a dozen other quality skills and courses.
 
-Subscribe to my [YouTube channel](https://www.youtube.com/@PeterYangYT?sub_confirmation=1) and [newsletter](https://creatoreconomy.so) for practical AI tutorials and interviews.
+Subscribe to my [YouTube channel](https://youtube.com/@PeterYangYT?sub_confirmation=1) and [newsletter](https://creatoreconomy.so) for practical AI tutorials and interviews.
 
 ## License
 
