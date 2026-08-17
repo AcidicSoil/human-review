@@ -50,11 +50,17 @@ Human Review opens the file in your browser. Make direct edits, leave comments, 
 
 Note: For HTML files, direct edits and resizes save automatically. For Markdown and localhost pages, click Send so your agent can apply them to the source.
 
+## Inline block editing
+
+Hover a block and use the compact **Edit** control to focus it for inline changes. Type directly in the document, then click **Done** or press Escape when you are finished with that block.
+
+This uses the existing Human Review DOM editing pipeline rather than converting the page into a second editor document model. Arbitrary HTML remains intact, while the exact before/after text and formatting still flow back to the agent.
+
 ## Review a large plan
 
 The skill can create a temporary single-file HTML review artifact even when the plan starts as Markdown, plain text, working notes, or chat content.
 
-Ask your agent to create a planning review artifact, then review it with the same `/human-review` loop. Each major section includes compact action checkboxes for:
+Ask your agent to create a planning review artifact, then review it with the same `/human-review` loop. Major planning sections are marked with `data-review-section`, and Human Review adds section actions directly to the block toolbar:
 
 - **Revise** — substantively rewrite the section.
 - **Expand** — add missing depth or detail.
@@ -62,13 +68,22 @@ Ask your agent to create a planning review artifact, then review it with the sam
 - **Remove** — delete the section.
 - **Verify** — validate assumptions or technical claims and correct them.
 
+Revise, Expand, Touch up, and Verify can be combined. Remove is exclusive.
+
 You can combine those markers with direct text edits and exact-text comments. When you click Send, the agent treats the three feedback types differently: your direct edits are preserved as exact wording, comments provide specific instructions, and section actions tell the agent what kind of follow-up work to perform.
 
 The generated `.review.html` remains a review surface. If the plan has a canonical Markdown, MDX, or other source file, the agent applies the approved changes back to that source and clears the action markers before the next review pass.
 
+## Why the editor stays lightweight
+
+The interaction model follows mature rich-text editors: focused block editing, contextual controls, block-level actions, and anchored discussions. Plate is the closest reference for the review workflow because it exposes block selection, floating toolbars, comments, suggestions, and block discussions as separate editor capabilities.
+
+Human Review keeps those interaction patterns without embedding Plate, TipTap, Lexical, React, or shadcn into every reviewed artifact. That avoids a second frontend runtime and preserves the current zero-build HTML/Markdown review path.
+
 ## What this skill lets you do
 
 - **Edit text directly and tweak basic formatting** (e.g., bold, italic).
+- **Focus individual blocks for inline editing** with the hover toolbar.
 - **Make bulleted and numbered lists** — type `- ` or `1. ` at the start of a line, or press ⌘⇧8 / ⌘⇧7. Tab and Shift+Tab indent and outdent.
 - **Add links** — select text and press ⌘K. ⌘K inside an existing link edits or removes it.
 - **Resize images** by dragging their corner, and **move images** by dragging them to a new spot.
@@ -76,7 +91,7 @@ The generated `.review.html` remains a review surface. If the plan has a canonic
 - **Paste images** from your clipboard — file reviews save them beside the document; localhost reviews stage them for the agent to place in the app source.
 - **Select a phrase and leave a comment** anchored to the exact text.
 - **Comment on an image, chart, or section** by clicking the element.
-- **Mark planning sections** for revise, expand, touch-up, remove, or verify work in generated planning review artifacts.
+- **Mark planning sections** for revise, expand, touch-up, remove, or verify work from the same block toolbar.
 - **Remove elements** without explaining the deletion in chat.
 - **Command-click links** to review multiple pages without losing your feedback.
 - **Send every edit and comment at once** instead of writing a long chat message.
@@ -88,6 +103,7 @@ I use Human Review to edit AI-generated plans, update landing pages, review loca
 - [`cli.js`](src/cli.js) contains the `human-review`, `poll`, `status`, and `setup` commands.
 - [`server.js`](src/server.js) runs the local review session.
 - [`sdk.js`](src/sdk.js) handles editing, comments, highlights, and feedback.
+- [`editing.js`](src/editing.js) contains editing helpers and the inline block toolbar.
 - [`chrome-client.js`](src/chrome-client.js) contains the visual review interface.
 - [`markdown.js`](src/markdown.js) renders Markdown files for review.
 - [`SKILL.md`](src/SKILL.md) teaches Claude Code, Codex, and other agents how to use Human Review.
