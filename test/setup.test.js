@@ -18,11 +18,13 @@ test("global setup installs the skill and local planning runtime for every agent
       const runner = path.join(skillDir, "human-review-plan.mjs");
       const generator = path.join(skillDir, "generator.mjs");
       const fallback = path.join(skillDir, "fallback-client.js");
+      const tools = path.join(skillDir, "artifact-tools.js");
 
       assert.equal(fs.existsSync(skill), true);
       assert.equal(fs.existsSync(runner), true);
       assert.equal(fs.existsSync(generator), true);
       assert.equal(fs.existsSync(fallback), true);
+      assert.equal(fs.existsSync(tools), true);
 
       const installedSkill = fs.readFileSync(skill, "utf8");
       assert.match(installedSkill, /human-review poll/);
@@ -37,7 +39,7 @@ test("global setup installs the skill and local planning runtime for every agent
   }
 });
 
-test("installed planning runtime still emits an editor artifact without package dependencies", () => {
+test("installed planning runtime still emits full artifact tools without package dependencies", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-offline-"));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-plan-src-"));
 
@@ -58,7 +60,10 @@ test("installed planning runtime still emits an editor artifact without package 
     assert.equal(fs.existsSync(output), true);
     const html = fs.readFileSync(output, "utf8");
     assert.match(html, /id="hr-editor-bundle"/);
+    assert.match(html, /id="hr-artifact-tools"/);
     assert.match(html, /Save reviewed HTML/);
+    assert.match(html, /Save PRD/);
+    assert.match(html, /Planning document navigation/);
     assert.match(html, /contenteditable|contentEditable/);
     assert.doesNotMatch(html, /background:\s*(?:#fff(?:fff)?|white)\b/i);
   } finally {
