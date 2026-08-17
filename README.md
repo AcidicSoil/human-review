@@ -30,7 +30,7 @@ You can also install it with `npx`:
 npx -y human-review setup --global
 ```
 
-Setup now installs the planning-artifact runtime **inside each Human Review skill directory**, not just `SKILL.md`. That local runtime includes the generator, a built-in editor fallback, and the prebuilt Plate browser bundle when the package was built normally. Agents therefore do not need to download Plate/React/esbuild later just to create a planning artifact.
+Setup installs the planning-artifact runtime **inside each Human Review skill directory**, not just `SKILL.md`. That local runtime includes the generator, artifact navigation/export tools, a built-in editor fallback, and the prebuilt Plate browser bundle when the package was built normally. Agents therefore do not need to download Plate/React/esbuild later just to create a planning artifact.
 
 ## Ordinary HTML, Markdown, and localhost review
 
@@ -74,13 +74,14 @@ A source checkout can also rebuild the bundle with:
 npm run build:plate-review
 ```
 
-If a source checkout has neither the prebuilt Plate bundle nor the development dependencies required to rebuild it, generation still does not fail. The generator embeds its built-in editor runtime so the resulting HTML remains directly editable, commentable, classifiable, and exportable. Dependency availability is not turned into a user-facing artifact-generation blocker.
+If a source checkout has neither the prebuilt Plate bundle nor the development dependencies required to rebuild it, generation still does not fail. The generator embeds its built-in editor runtime so the resulting HTML remains directly editable, commentable, classifiable, navigable, and exportable. Dependency availability is not turned into a user-facing artifact-generation blocker.
 
 ### Planning editor features
 
 When the Plate bundle is available:
 
 - **Real Plate block editing**.
+- **Section navigation sidebar** generated from the document's stable review sections.
 - **Section review actions:** Revise, Expand, Touch up, Remove, Verify.
 - **Plate comment marks** on exact selected text.
 - **Block discussions** attached to the planning section containing the selection.
@@ -89,20 +90,36 @@ When the Plate bundle is available:
 - **HTML import** for headings, paragraphs, blockquotes, links, and classic HTML lists.
 - **Cmd/Ctrl + Shift + M** to start a comment from the current selection.
 - **Save reviewed HTML** to download a self-contained `.reviewed.html` that can be passed directly back to an agent.
+- **Save PRD** to download the current reviewed document as clean Markdown in `<name>.prd.md`.
 
-The built-in editor fallback preserves the core workflow: direct content editing, section actions, comments, and standalone reviewed-HTML export.
+The built-in editor fallback preserves the core workflow: direct content editing, sidebar navigation, section actions, comments, reviewed-HTML export, and PRD export.
 
 Revise, Expand, Touch up, and Verify can be combined. Remove is exclusive.
 
+### Sidebar navigation
+
+The sidebar uses the same `data-review-section` IDs and `data-container` labels already used by planning actions and discussions. Clicking a section jumps directly to that part of the document, and the active section follows the current scroll position.
+
+On narrow viewports the section navigation becomes a horizontal strip rather than consuming editor width.
+
+### Two save outputs
+
+After the review there are two different outputs:
+
+- **Save reviewed HTML** produces `<name>.reviewed.html`. It keeps Human Review state: the embedded editor, comments/discussions, section actions, and edited document state. Use this when an agent still needs to apply review instructions or when another review pass is expected.
+- **Save PRD** produces `<name>.prd.md`. It serializes the document currently visible in the editor to Markdown and removes review-only controls, action markers, comments/discussions, and editor metadata.
+
+The PRD export preserves normal document structure such as headings, paragraphs, emphasis, links, lists, blockquotes, code, tables, horizontal rules, and images where those structures are present in the rendered document.
+
 ### Artifact appearance
 
-Planning artifacts avoid plain white/light primary surfaces. The page, editor canvas, section cards, controls, and discussion surfaces use toned darker backgrounds so the review surface does not look like a white document on a white page.
+Planning artifacts avoid plain white/light primary surfaces. The page, editor canvas, section cards, controls, sidebar, and discussion surfaces use toned darker backgrounds so the review surface does not look like a white document on a white page.
 
 This is a visual constraint, not a separate “dark-only planning” product mode.
 
 ## Passing a reviewed plan back to an agent
 
-After reviewing, click **Save reviewed HTML** and give the resulting `.reviewed.html` file to the agent.
+When review instructions still need to be applied, click **Save reviewed HTML** and give the resulting `.reviewed.html` file to the agent.
 
 The artifact embeds machine-readable state in:
 
@@ -116,13 +133,17 @@ For the built-in editor fallback, `sourceHtml` contains the edited document whil
 
 The agent applies direct edits first, then unresolved discussion instructions, then section actions, and writes the result back to the canonical planning source. Editor-only metadata stays in the review artifact rather than leaking into Markdown/MDX/text.
 
+When the current reviewed text itself is the desired clean deliverable, use **Save PRD** instead and keep the `.reviewed.html` only if the review state is still needed.
+
 ## What this skill lets you do
 
 - **Edit text directly and tweak basic formatting** in ordinary reviews.
 - **Use Plate for rich planning review artifacts when the packaged bundle is present.**
 - **Still generate an editable planning artifact when rebuild dependencies are unavailable.**
+- **Jump between planning sections from a persistent navigation sidebar.**
 - **Mark plan sections** for revise, expand, touch-up, remove, or verify work.
 - **Create comments/discussions** in planning artifacts.
+- **Export a clean Markdown PRD** from the current reviewed document.
 - **Make bulleted and numbered lists** in ordinary HTML reviews.
 - **Add links** with the existing HTML review editor.
 - **Resize, move, and paste images** in ordinary file reviews.
@@ -138,6 +159,7 @@ The agent applies direct edits first, then unresolved discussion instructions, t
 - [`plate-review/generator.js`](src/plate-review/generator.js) creates self-contained editable planning artifacts without requiring runtime network access.
 - [`plate-review/client.jsx`](src/plate-review/client.jsx) contains the Plate editor, section controls, comments, and block discussions.
 - [`plate-review/fallback-client.js`](src/plate-review/fallback-client.js) keeps planning artifacts editable when the Plate bundle cannot be rebuilt locally.
+- [`plate-review/artifact-tools.js`](src/plate-review/artifact-tools.js) adds section navigation and clean PRD export to either embedded editor runtime.
 - [`plate-review/review-state.js`](src/plate-review/review-state.js) contains planning review-state helpers.
 - [`scripts/build-plate-review.mjs`](scripts/build-plate-review.mjs) compiles the Plate browser client before packaging.
 - [`setup.js`](src/setup.js) installs both the skill instructions and planning runtime into agent skill directories.
