@@ -30,6 +30,7 @@ test("review ids are stable slugs", () => {
 
 test("review surfaces avoid plain white backgrounds", () => {
   assert.match(REVIEW_CSS, /--hr-bg:\s*#11161d/);
+  assert.match(REVIEW_CSS, /\.hr-sidebar/);
   assert.doesNotMatch(REVIEW_CSS, /background:\s*(?:#fff(?:fff)?|white)\b/i);
 
   const html = createReviewHtml({
@@ -39,14 +40,16 @@ test("review surfaces avoid plain white backgrounds", () => {
     artifactName: "plan.review.html",
     bundle: "console.log('editor');",
     editor: "plate",
+    tools: "console.log('artifact tools');",
   });
   assert.match(html, /meta name="human-review-editor" content="plate"/);
   assert.match(html, /id="hr-editor-bundle"/);
+  assert.match(html, /id="hr-artifact-tools"/);
   assert.match(html, /id="hr-bootstrap" type="application\/json"/);
   assert.doesNotMatch(html, /background:\s*(?:#fff(?:fff)?|white)\b/i);
 });
 
-test("planning generation always emits an embedded editor artifact", async () => {
+test("planning generation always emits navigation, PRD export, and an embedded editor", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-plan-"));
   const input = path.join(dir, "plan.md");
   const output = path.join(dir, "plan.review.html");
@@ -58,6 +61,9 @@ test("planning generation always emits an embedded editor artifact", async () =>
   assert.equal(result.output, output);
   assert.ok(["plate", "embedded-dom"].includes(result.editor));
   assert.match(html, /id="hr-editor-bundle"/);
+  assert.match(html, /id="hr-artifact-tools"/);
   assert.match(html, /Save reviewed HTML/);
+  assert.match(html, /Save PRD/);
+  assert.match(html, /Planning document navigation/);
   assert.match(html, /data-review|review_section|review-section/);
 });
