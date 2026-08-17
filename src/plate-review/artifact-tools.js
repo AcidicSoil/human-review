@@ -132,6 +132,23 @@
     download(prdMarkdown(), `${artifactBase()}.prd.md`, "text/markdown;charset=utf-8");
   }
 
+  function ensurePrdButton() {
+    const toolbar = document.querySelector(".hr-topbar");
+    if (!toolbar || toolbar.querySelector("#hr-save-prd")) return;
+
+    const button = document.createElement("button");
+    button.id = "hr-save-prd";
+    button.type = "button";
+    button.className = "hr-btn";
+    button.textContent = "Save PRD";
+    button.onclick = savePrd;
+
+    const reviewedHtml = [...toolbar.querySelectorAll("button")]
+      .find((item) => item.textContent?.trim() === "Save reviewed HTML");
+    if (reviewedHtml) toolbar.insertBefore(button, reviewedHtml);
+    else toolbar.append(button);
+  }
+
   function sections() {
     return [...document.querySelectorAll(".hr-section[data-review-section]")].map((section, index) => ({
       id: section.dataset.reviewSection || `section-${index + 1}`,
@@ -162,6 +179,7 @@
   }
 
   function renderSidebar() {
+    ensurePrdButton();
     const items = sections();
     if (!items.length) return;
     const nextSignature = items.map(({ id, label }) => `${id}:${label}`).join("|");
@@ -195,16 +213,6 @@
       nav.append(button);
     });
     sidebar.append(nav);
-
-    const footer = document.createElement("div");
-    footer.className = "hr-sidebar-footer";
-    const save = document.createElement("button");
-    save.type = "button";
-    save.className = "hr-btn hr-save-prd";
-    save.textContent = "Save PRD";
-    save.onclick = savePrd;
-    footer.append(save);
-    sidebar.append(footer);
 
     document.body.insertBefore(sidebar, app);
     document.body.classList.add("hr-sidebar-mounted");
