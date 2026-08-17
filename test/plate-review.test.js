@@ -31,6 +31,7 @@ test("review ids are stable slugs", () => {
 test("review surfaces avoid plain white backgrounds", () => {
   assert.match(REVIEW_CSS, /--hr-bg:\s*#11161d/);
   assert.match(REVIEW_CSS, /\.hr-sidebar/);
+  assert.match(REVIEW_CSS, /\.hr-format-toolbar/);
   assert.doesNotMatch(REVIEW_CSS, /background:\s*(?:#fff(?:fff)?|white)\b/i);
 
   const html = createReviewHtml({
@@ -49,7 +50,7 @@ test("review surfaces avoid plain white backgrounds", () => {
   assert.doesNotMatch(html, /background:\s*(?:#fff(?:fff)?|white)\b/i);
 });
 
-test("planning generation always emits navigation, PRD export, and an embedded editor", async () => {
+test("planning generation always emits navigation, PRD export, contextual formatting, and an embedded editor", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-plan-"));
   const input = path.join(dir, "plan.md");
   const output = path.join(dir, "plan.review.html");
@@ -65,5 +66,8 @@ test("planning generation always emits navigation, PRD export, and an embedded e
   assert.match(html, /Save reviewed HTML/);
   assert.match(html, /Save PRD/);
   assert.match(html, /Planning document navigation/);
+  assert.match(html, /hr-format-toolbar/);
+  assert.match(html, /contextualFormatSource/);
+  assert.match(html, /source\.style\.display = "none"/);
   assert.match(html, /data-review|review_section|review-section/);
 });
