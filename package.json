@@ -27,6 +27,7 @@
   "scripts": {
     "build:plate-review": "node scripts/build-plate-review.mjs",
     "prepack": "npm run build:plate-review",
+    "postpack": "node -e \"require('node:fs').rmSync('src/plate-review/client.bundle.js',{force:true})\"",
     "test": "node --test --test-force-exit",
     "start": "node src/cli.js"
   },
