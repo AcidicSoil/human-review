@@ -48,13 +48,13 @@
     "jsdom": "^29.1.1"
   },
   "dependencies": {
-    "@platejs/basic-nodes": "^53.3.2",
-    "@platejs/comment": "^53.3.2",
-    "@platejs/link": "^53.3.2",
-    "@platejs/list-classic": "^53.3.2",
-    "esbuild": "^0.28.1",
+    "@platejs/basic-nodes": "53.0.0",
+    "@platejs/comment": "53.0.0",
+    "@platejs/link": "53.3.1",
+    "@platejs/list-classic": "53.0.0",
+    "esbuild": "0.28.1",
     "marked": "^18.0.7",
-    "platejs": "^53.3.2",
+    "platejs": "53.3.2",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   }
