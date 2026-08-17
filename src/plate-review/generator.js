@@ -21,15 +21,22 @@ html, body { margin: 0; min-height: 100%; background: var(--hr-bg); color: var(-
 body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at 20% -10%, #233248 0, transparent 38rem), #11161d; }
 button, textarea, input, select { font: inherit; }
 #hr-app { min-height: 100vh; }
-.hr-shell { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 72px; }
+.hr-shell { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 72px; }
 .hr-topbar { position: sticky; top: 12px; z-index: 40; display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 8px; border: 1px solid var(--hr-border); border-radius: 12px; background: rgba(24,32,42,.96); backdrop-filter: blur(12px); }
 .hr-topbar .spacer, .hr-thread-head .spacer { flex: 1; }
 .hr-title, .hr-status, .hr-section-name, .hr-thread-head { color: var(--hr-muted); font-size: 12px; }
 .hr-btn { border: 1px solid var(--hr-border); border-radius: 8px; background: #202a36; color: var(--hr-text); padding: 7px 10px; cursor: pointer; }
 .hr-btn:hover, .hr-btn:focus-visible { background: #283545; outline: none; }
 .hr-btn[data-active="true"] { border-color: #5b7eab; background: #263d5b; }
-.hr-editor { min-height: 70vh; outline: none; border: 1px solid var(--hr-border); border-radius: 16px; background: #151c25; padding: clamp(22px, 4vw, 54px); }
-.hr-section { position: relative; margin: 0 0 18px; padding: 22px 24px; border: 1px solid var(--hr-border); border-radius: 12px; background: #1a232e; }
+.hr-workspace { display: grid; grid-template-columns: minmax(190px, 240px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.hr-sidebar { position: sticky; top: 76px; max-height: calc(100vh - 94px); overflow: auto; border: 1px solid var(--hr-border); border-radius: 14px; background: rgba(24,32,42,.94); padding: 10px; }
+.hr-sidebar-title { padding: 7px 9px 9px; color: var(--hr-muted); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.hr-nav { display: flex; flex-direction: column; gap: 3px; }
+.hr-nav-btn { width: 100%; border: 0; border-radius: 8px; background: transparent; color: #c4ced9; padding: 8px 9px; cursor: pointer; text-align: left; line-height: 1.3; }
+.hr-nav-btn:hover, .hr-nav-btn:focus-visible { background: #202a36; color: var(--hr-text); outline: none; }
+.hr-nav-btn[data-active="true"] { background: #263d5b; color: #f3f7fc; }
+.hr-editor { min-height: 70vh; outline: none; border: 1px solid var(--hr-border); border-radius: 16px; background: #151c25; padding: clamp(22px, 4vw, 54px); scroll-margin-top: 86px; }
+.hr-section { position: relative; margin: 0 0 18px; padding: 22px 24px; border: 1px solid var(--hr-border); border-radius: 12px; background: #1a232e; scroll-margin-top: 86px; }
 .hr-section-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 14px; user-select: none; }
 .hr-section-name { margin-right: auto; font-weight: 700; }
 .hr-action { padding: 5px 8px; font-size: 12px; }
@@ -45,7 +52,15 @@ button, textarea, input, select { font: inherit; }
 .hr-comment-compose { display: flex; gap: 8px; margin-top: 10px; }
 .hr-comment-compose textarea { flex: 1; min-height: 56px; resize: vertical; border: 1px solid var(--hr-border); border-radius: 8px; background: #10161e; color: var(--hr-text); padding: 8px 10px; }
 .hr-fallback-content { outline: none; }
-@media (max-width: 900px) { .hr-shell { width: min(100% - 18px, 1180px); } .hr-editor, .hr-section { padding: 18px; } .hr-discussion-trigger { position: static; transform: none; float: right; } }
+@media (max-width: 900px) {
+  .hr-shell { width: min(100% - 18px, 1180px); }
+  .hr-workspace { grid-template-columns: 1fr; }
+  .hr-sidebar { position: static; max-height: none; overflow: hidden; }
+  .hr-nav { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
+  .hr-nav-btn { width: auto; flex: 0 0 auto; white-space: nowrap; }
+  .hr-editor, .hr-section { padding: 18px; }
+  .hr-discussion-trigger { position: static; transform: none; float: right; }
+}
 `;
 
 const safeJson = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
