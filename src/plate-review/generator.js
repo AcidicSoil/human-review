@@ -29,6 +29,9 @@ body.hr-sidebar-mounted .hr-shell { padding-left: 258px; }
 .hr-btn { border: 1px solid var(--hr-border); border-radius: 8px; background: #202a36; color: var(--hr-text); padding: 7px 10px; cursor: pointer; }
 .hr-btn:hover, .hr-btn:focus-visible { background: #283545; outline: none; }
 .hr-btn[data-active="true"] { border-color: #5b7eab; background: #263d5b; }
+.hr-format-toolbar { position: fixed; z-index: 90; display: flex; gap: 4px; transform: translate(-50%, -100%); margin-top: -8px; padding: 5px; border: 1px solid var(--hr-border); border-radius: 10px; background: rgba(24,32,42,.98); box-shadow: 0 12px 32px rgba(0,0,0,.3); backdrop-filter: blur(12px); }
+.hr-format-toolbar[hidden] { display: none; }
+.hr-format-btn { padding: 5px 8px; font-size: 12px; }
 .hr-sidebar { position: fixed; z-index: 35; top: 78px; left: max(16px, calc((100vw - 1380px) / 2)); width: 240px; max-height: calc(100vh - 96px); overflow: auto; border: 1px solid var(--hr-border); border-radius: 14px; background: rgba(24,32,42,.96); padding: 10px; backdrop-filter: blur(12px); }
 .hr-sidebar-title { padding: 7px 9px 9px; color: var(--hr-muted); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .hr-nav { display: flex; flex-direction: column; gap: 3px; }
