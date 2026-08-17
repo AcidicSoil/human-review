@@ -1,69 +1,85 @@
 ---
 name: human-review
-description: Open an HTML file, Markdown file, localhost page, or generated planning-review HTML artifact in the browser so the user can edit blocks inline, mark planning sections for specific follow-up actions, and leave comments, then send all feedback back to you. Use after writing or updating something the user will read — specs, plans, reports, newsletter drafts, landing pages, slide decks, and locally running web pages.
+description: Review HTML, Markdown, localhost pages, and large planning documents. Ordinary pages use the Human Review DOM editor and live agent feedback loop. Planning documents use the Plate planning editor with block actions, inline comments, threaded block discussions, and dark-only standalone HTML artifacts.
 ---
 
 # human-review
 
-The user reviews your HTML, Markdown, or localhost page in a real browser: they fix small things
-by typing, select anything to comment on it, and send you the whole batch at once.
+Use the review surface that matches the artifact.
 
-Markdown files open rendered. Their quotes and edits reference the rendered text,
-and the file itself is never touched — apply every change to the Markdown source,
-keeping its formatting syntax.
+- **Ordinary HTML, Markdown, and localhost pages:** use the existing Human Review DOM editor and polling loop.
+- **Large plans, specs, roadmaps, PRDs, and implementation proposals:** generate a Plate planning-review artifact with `human-review-plan`.
 
-## Inline block editing
+Do not wrap a Plate planning artifact in the ordinary `human-review <file>` review shell. Plate planning artifacts are standalone editor documents and open directly in the browser.
 
-Human Review exposes a compact block toolbar when the user hovers reviewable content.
+## Ordinary review loop
 
-- **Edit** focuses that block for direct inline editing. The user types in the document itself, then
-  clicks **Done** or presses Escape when they are finished with that block.
-- Direct edits still use the normal edit pipeline: exact new wording and formatting are captured and
-  sent to the agent.
-- Existing selection comments, block comments, drag handles, deletion, links, lists, image editing,
-  and other review behavior keep working alongside the focused block editor.
+Open an HTML or Markdown file:
 
-Do not add a second editor framework to reviewed artifacts. The block editor is supplied by Human
-Review and works against the artifact's existing DOM, which keeps arbitrary HTML intact instead of
-round-tripping it through another rich-text document model.
+```sh
+npx -y human-review path/to/file.html
+```
 
-## Planning review artifacts
+For a local application route:
 
-For a large plan, spec, roadmap, implementation proposal, or other long planning document, the
-source does not need to already be HTML. Create one self-contained HTML review artifact and use
-that as the review surface.
+```sh
+npx -y human-review http://localhost:3000/wiki
+```
 
-Use this mode when the user wants to inspect the plan visually, make exact edits, mark sections
-that need more work, or classify follow-up work before you revise the canonical document.
+Wait for the user to send feedback:
 
-### Create the artifact
+```sh
+npx -y human-review poll path/to/file.html --timeout 600
+```
 
-1. Create `<name>.review.html` next to the planning source when one exists. If the plan only exists
-   in chat or working notes, create the review artifact in the current project directory.
-2. Keep it single-file: semantic HTML and embedded CSS only. Do not add a framework, build step,
-   package, or application shell for the review artifact.
-3. Put every major plan section in a stable `data-review-section` + `data-container` block. Use a
-   short stable id and a human-readable `data-container` label.
-4. Do not render review checkboxes, action menus, or editor controls inside the artifact. Human
-   Review supplies the block editor and planning-action toolbar at review time.
-5. Open the generated file with Human Review and run the normal poll loop.
+Apply the returned batch, then acknowledge it and wait again:
 
-The planning toolbar exposes these actions on every `data-review-section` block:
+```sh
+npx -y human-review poll path/to/file.html --ack --timeout 600
+```
 
-- `revise` — substantive rewrite of the marked section.
-- `expand` — add missing detail, examples, constraints, or implementation depth.
-- `touch-up` — small clarity, grammar, organization, or wording improvements only.
-- `remove` — delete the marked section from the resulting plan.
-- `verify` — validate assumptions, claims, dependencies, or technical details and correct them.
+If a poll returns `{"status":"timeout"}`, run it again. If it returns `{"status":"closed"}`, stop polling. To check without blocking:
 
-`revise`, `expand`, `touch-up`, and `verify` may be combined. `remove` is exclusive because a
-section marked for deletion does not also need revision work.
+```sh
+npx -y human-review status path/to/file.html
+```
 
-Use this minimal pattern for each reviewable section:
+### Ordinary review rules
+
+- `edits` are changes the user already made. Carry `after` across exactly and never revert it.
+- When `before_html` or `after_html` is present, preserve the formatting change in the canonical source.
+- Markdown is reviewed rendered. Apply feedback to the Markdown source, not the rendered HTML.
+- A page with `kind: "url"` names a localhost route. Find and edit the matching project source; never write the rendered HTTP response into the application.
+- Preserve pasted assets and move them into the appropriate application asset directory when reviewing localhost pages.
+- `kind: "moved"` means the whole block moved. Preserve its content and reproduce its new position.
+- Apply every page in a returned batch.
+
+## Plate planning review
+
+Planning review is intentionally a separate editor path. It uses **Plate** for the document model and editor surface, with Plate comment marks and block discussions layered on top.
+
+The final deliverable remains one HTML file. Plate, React, the comment components, block discussion components, the edited document state, and discussion state are bundled or embedded into that artifact.
+
+### Generate the artifact
+
+From an installed package:
+
+```sh
+human-review-plan path/to/plan.md path/to/plan.review.html
+```
+
+With `npx`:
+
+```sh
+npx -y --package human-review human-review-plan path/to/plan.md path/to/plan.review.html
+```
+
+The output path is optional. Without one, `plan.md` becomes `plan.review.html` next to the source. The command opens the artifact in the browser unless `--no-open` is supplied.
+
+The generator accepts Markdown or HTML. If the source already contains explicit review sections, preserve them:
 
 ```html
 <section
-  id="architecture"
   data-review-section="architecture"
   data-container="Architecture"
 >
@@ -72,170 +88,110 @@ Use this minimal pattern for each reviewable section:
 </section>
 ```
 
-Do not make every paragraph a `data-review-section`. Use the smallest useful planning unit: normally
-one section, milestone, phase, decision, workstream, or other independently revisable block. The
-user can still hover a smaller text block and choose **Edit**, or select an exact sentence or line
-and leave a normal anchored comment when they need more precision.
+If the source does not contain `data-review-section` blocks, the Plate client groups the document into review sections from its top-level H1/H2 headings.
 
-The planning toolbar stores selected actions on the section as a canonical comma-separated
-`data-review-actions` value. That attribute is captured in edit `after_html` and persists in the
-`.review.html` artifact until the agent applies and clears it.
+### Dark-only artifact rule
 
-### Apply planning feedback
+**Planning review artifacts must never use a white or light review surface.**
 
-Treat the reviewed HTML as a review surface, not as an automatic migration of the canonical plan.
-When feedback arrives:
+Do not add a light-mode option, white canvas, white cards, or a theme toggle to planning artifacts. The `human-review-plan` generator owns the review chrome and enforces a dark palette, dark form controls, and `color-scheme: dark`. Source-document CSS is not used as the editor chrome, so light source styling cannot turn the review artifact white.
 
-1. Apply direct text edits first. They are the user's exact wording and remain literal constraints
-   on any later rewrite.
-2. Apply anchored comments to the exact quoted text or section they reference. A comment is a
-   specific instruction and refines the meaning of a generic review action.
-3. Read review actions from `data-review-actions` in edit `after_html`. If the batch does not carry
-   the latest section HTML, read the current `.review.html` file and inspect each
-   `[data-review-section][data-review-actions]` block.
-4. Execute every marked action:
-   - `revise`: rewrite the section while preserving user edits, stated constraints, and intent.
-   - `expand`: keep the existing substance and add the missing depth requested or implied.
-   - `touch-up`: make only local polish changes; do not broaden scope.
-   - `remove`: delete the section. If the same section was directly edited and then marked remove,
-     the removal is the user's final instruction for that section.
-   - `verify`: check the marked assumptions or technical claims using the available project context
-     and appropriate authoritative sources, then correct the plan where needed.
-5. Apply the result to the canonical planning source when one exists. If the review artifact is the
-   only plan, revise that file in place.
-6. Clear every applied `data-review-actions` value before the next review round so stale directives
-   cannot be applied twice.
-7. Keep `data-review-section` and `data-container` on the review artifact for the next pass. Never
-   copy review-only attributes into canonical Markdown, MDX, text, or another source format.
+When modifying the Plate planning template later, keep all primary surfaces in dark tones. Treat this as a product constraint, not a user preference that can silently fall back to light mode.
 
-Do not ask the user to restate marked work in chat. The direct edits, anchored comments, and review
-actions are the instruction set.
+## Plate editor capabilities
 
-## The loop
+The planning artifact provides:
 
-1. Write or update the HTML or Markdown file, generate a planning review artifact, or start the
-   local page being reviewed.
-2. Open it for the user:
+- rich inline block editing through Plate;
+- bold, italic, and underline controls;
+- HTML import into Plate for headings, paragraphs, blockquotes, links, and classic HTML lists;
+- per-section planning action controls;
+- exact-selection comment marks;
+- a block discussion component that shows comments and replies beside the affected planning section;
+- resolve and delete actions for discussions;
+- `Cmd/Ctrl + Shift + M` for creating a comment from the current selection;
+- **Save reviewed HTML**, which downloads a new standalone `.reviewed.html` carrying the entire review state.
 
-   ```sh
-   npx -y human-review path/to/file.html
-   ```
+### Planning actions
 
-   For a page served by a local development server, open the real route instead
-   of recreating it as a separate HTML file:
+Every Plate `review_section` exposes:
 
-   ```sh
-   npx -y human-review http://localhost:3000/wiki
-   ```
+- `revise` — substantive rewrite;
+- `expand` — add missing detail, examples, constraints, or implementation depth;
+- `touch-up` — local clarity, organization, or wording improvements only;
+- `remove` — delete the section;
+- `verify` — validate assumptions, claims, dependencies, or technical details and correct them.
 
-3. Wait for feedback. This blocks until they hit Send, or the timeout passes:
+`revise`, `expand`, `touch-up`, and `verify` may be combined. `remove` is exclusive.
 
-   ```sh
-   npx -y human-review poll path/to/file.html --timeout 600
-   ```
+## What comes back from a Plate artifact
 
-   Keep this command in the foreground. Do not end your turn while it is waiting.
-   If your shell returns a process or session handle, keep waiting on that handle
-   until the command exits. If it prints `{"status":"timeout"}`, no feedback has
-   arrived yet — run the same poll command again to keep waiting. Feedback is
-   saved even if a poll dies, so nothing is ever lost.
+When the user finishes, they click **Save reviewed HTML** and pass the resulting `.reviewed.html` file back to the agent.
 
-   If it prints `{"status":"closed"}`, the user ended the review from the
-   browser — stop polling and do not run the poll command again. Unsent
-   feedback is kept and ships the next time this target is reviewed.
+Read the JSON inside:
 
-4. Apply what comes back, then wait again. `--ack` clears the batch you just handled:
-
-   ```sh
-   npx -y human-review poll path/to/file.html --ack --timeout 600
-   ```
-
-Repeat 3–4 until the user says they are done.
-
-Not sure whether feedback is already waiting — say, at the start of a new turn?
-This answers instantly without blocking:
-
-```sh
-npx -y human-review status path/to/file.html
+```html
+<script id="hr-bootstrap" type="application/json">...</script>
 ```
 
-It prints `{"status": "feedback-waiting"}` when a batch is ready for a poll,
-plus counts of unsent comments and edits still in the browser.
-
-## What you get
-
-One batch covers every page the user visited, grouped by file or localhost URL.
+A reviewed artifact has this conceptual shape:
 
 ```json
 {
-  "status": "feedback",
-  "pages": [
+  "version": 1,
+  "editor": "plate",
+  "sourcePath": "/absolute/path/to/plan.md",
+  "document": [
     {
-      "file": "/abs/path/to/page.html",
-      "comments": [
-        { "id": "c_1", "kind": "selection", "quote": "the exact text they selected",
-          "anchor": { "prefix": "...", "quote": "...", "suffix": "..." },
-          "feedback": "what they want changed" }
-      ],
-      "edits": [
-        { "label": "Problem body", "kind": "edited",
-          "before": "the original wording",
-          "after": "their exact new wording",
-          "after_html": "their exact new wording with <strong>formatting</strong>" },
-        { "label": "Architecture", "kind": "edited",
-          "before": "Existing architecture text",
-          "after": "Existing architecture text",
-          "after_html": "<section data-review-section=\"architecture\" data-container=\"Architecture\" data-review-actions=\"revise,verify\">...</section>" }
-      ]
+      "type": "review_section",
+      "reviewId": "architecture",
+      "label": "Architecture",
+      "reviewActions": ["revise", "verify"],
+      "children": []
     }
   ],
-  "overall_note": "feedback not tied to any one page"
+  "discussions": [
+    {
+      "id": "discussion-id",
+      "documentContent": "selected text",
+      "isResolved": false,
+      "comments": [
+        {
+          "contentRich": [
+            { "type": "p", "children": [{ "text": "Explain why this is needed." }] }
+          ]
+        }
+      ]
+    }
+  ]
 }
 ```
 
-## Rules
+`document` is the edited Plate document and is authoritative for direct user edits. Text lives in descendant `{ "text": "..." }` leaves. Marks such as `bold`, `italic`, and `underline` live on those text leaves. Links, lists, headings, and blockquotes remain structured Plate nodes.
 
-- **`edits` are changes the user already made.** `after` is their exact wording —
-  carry it across verbatim and never revert it. If the HTML was generated from
-  something else (MDX, Markdown, a template), apply `after` to the **source** too,
-  or their fix disappears on the next build.
-- When `before_html`/`after_html` are present, the user changed formatting, not
-  just words — bold, italic, underline, links, or review metadata. Use the HTML version to carry
-  formatting into the source, translated to its syntax, and interpret `data-review-actions` only
-  as planning directives rather than canonical content.
-- A page with `kind: "url"` was edited directly in the review UI. Its `file`
-  and `url` fields name the localhost route, not a writable file. Find the
-  matching project source (such as MDX, TSX, or a template), apply every edit
-  and deletion there, then acknowledge so the route reloads. Never write the
-  rendered HTTP response back into the app.
-- When an edit's `after_html` contains `<img src="assets/...">`, the user pasted
-  an image: the file already exists in an `assets/` folder next to the reviewed
-  file. Keep that relative path — in Markdown, reference it as
-  `![](assets/...)`. Never regenerate or inline the image.
-- On a localhost page, a pasted image arrives under `staged_assets`. Copy its
-  local `path` into the app's appropriate asset folder, replace the temporary
-  preview URL in `after_html`, and preserve the image at the user's insertion
-  point. Never leave the temporary preview URL in source.
-- An edit with `kind: "moved"` means the user relocated that whole block.
-  Reposition it in the source without rewriting its content: it now sits right
-  after the block whose text starts with `moved_after`, and right before the
-  block whose text starts with `moved_before`. An empty `moved_after` means it
-  is now the first block in its container.
-- Find each comment by its `quote`; that exact string is in the file.
-- `kind: "element"` points at a whole block, so `quote` is its label, not body text.
-- Fix every page in `pages`, not just the first.
-- **Do not write a reply.** There is no chat. The user sees your work when the page
-  reloads, which happens on its own the moment you save the file.
+`discussions` contains Plate comment threads. `documentContent` records the selected text that started a discussion. Each comment's `contentRich` is a Plate value; read its descendant text leaves to recover the comment text. Ignore resolved discussions unless the user's current request requires retaining historical context.
 
-## Better edit labels (optional)
+## Apply a reviewed planning artifact
 
-Name the sections you author and the user's edit list uses your names instead of
-guessing from the DOM:
+Apply planning feedback in this order:
+
+1. Read `hr-bootstrap.document` and reconstruct the user's direct edits first. Their edited wording is a literal constraint on later rewriting.
+2. Read every unresolved discussion and apply the specific comment instructions to the selected text or containing section.
+3. Read `reviewActions` from each `review_section` and execute every marked action.
+4. `remove` wins over every other action on the same section.
+5. Apply the result to the canonical planning source named by `sourcePath` when that source exists.
+6. Do not copy Plate-only state, discussion IDs, comment marks, or review metadata into canonical Markdown/MDX/text.
+7. For another review round, generate a fresh Plate artifact from the updated canonical source. Do not carry completed review actions forward.
+
+Do not ask the user to restate edits, comments, or section actions in chat. The reviewed HTML artifact is the instruction set.
+
+## Better labels for ordinary HTML reviews
+
+For non-Plate HTML reviews, authored labels still improve the existing DOM editor:
 
 ```html
-<p data-block="Problem body">…</p>
-<div data-container="Metrics callout">…</div>
+<p data-block="Problem body">...</p>
+<div data-container="Metrics callout">...</div>
 ```
 
-`data-block` names a region for the edit list. `data-container` also makes the block
-clickable as a comment target.
+`data-block` names a region for the edit list. `data-container` also makes the region clickable as a comment target.
