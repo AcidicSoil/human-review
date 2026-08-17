@@ -43,14 +43,16 @@ The preferred editor is **Plate**. The packaged build compiles the Plate/React e
 Planning review supports:
 
 - inline rich-text/block editing;
+- a persistent section sidebar for quick navigation through the planning document;
 - per-section **Revise**, **Expand**, **Touch up**, **Remove**, and **Verify** actions;
 - comments/discussions tied to the reviewed content;
 - discussion replies and resolve/delete controls when the Plate runtime is active;
-- saving the reviewed state back into a standalone `.reviewed.html` file.
+- **Save reviewed HTML** for the stateful Human Review artifact;
+- **Save PRD** for a clean Markdown PRD export of the current reviewed document.
 
-The fallback embedded editor preserves the same core review contract: direct editing, section actions, comments, and standalone reviewed-HTML export. Never discard the user's ability to edit merely because the richer Plate bundle cannot be rebuilt in the current runtime.
+The fallback embedded editor preserves the same core review contract: direct editing, sidebar navigation, section actions, comments, reviewed-HTML export, and PRD export. Never discard the user's ability to edit merely because the richer Plate bundle cannot be rebuilt in the current runtime.
 
-### Review sections
+### Review sections and navigation
 
 When authoring source HTML, use stable section metadata where practical:
 
@@ -66,6 +68,8 @@ When authoring source HTML, use stable section metadata where practical:
 
 For Markdown or HTML without explicit review sections, the planning editor groups the document from top-level H1/H2 headings.
 
+The artifact sidebar is generated from those same stable section IDs and labels. Clicking a sidebar item scrolls directly to that review section. Do not create a separate table-of-contents data model or duplicate section IDs solely for navigation.
+
 Planning actions mean:
 
 - `revise` — substantive rewrite;
@@ -75,6 +79,15 @@ Planning actions mean:
 - `verify` — validate assumptions, claims, dependencies, or technical details and correct them.
 
 `revise`, `expand`, `touch-up`, and `verify` may be combined. `remove` is exclusive.
+
+### Review outputs
+
+The artifact exposes two distinct save operations after the human review:
+
+- **Save reviewed HTML** downloads `<name>.reviewed.html`. This is the stateful Human Review artifact. It preserves editor state, review actions, comments/discussions, and the embedded editor runtime so the agent can apply feedback or the user can continue reviewing.
+- **Save PRD** downloads `<name>.prd.md`. This is a clean Markdown serialization of the document as it currently appears in the editor. It excludes review controls, action markers, comments/discussions, and editor-only metadata.
+
+Do not treat the PRD export as a replacement for the reviewed HTML when unresolved comments or review actions still need agent work. The PRD is the clean current document; the reviewed HTML is the review instruction/state carrier.
 
 ## Artifact appearance
 
