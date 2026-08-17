@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { installSkills, invocation, isNpxCachePath } from "../src/setup.js";
@@ -33,6 +34,36 @@ test("global setup installs the skill and local planning runtime for every agent
     assert.match(result.join("\n"), /Shared agents plan runtime/);
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("installed planning runtime still emits an editor artifact without package dependencies", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-offline-"));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-plan-src-"));
+
+  try {
+    installSkills(work, { global: true, home });
+    const runner = path.join(home, ".agents", "skills", "human-review", "human-review-plan.mjs");
+    const input = path.join(work, "plan.md");
+    const output = path.join(work, "plan.review.html");
+    fs.writeFileSync(input, "# Plan\n\n## Architecture\n\nEditable text.\n");
+
+    const run = spawnSync(process.execPath, [runner, input, output, "--no-open"], {
+      cwd: home,
+      encoding: "utf8",
+      env: { ...process.env, NODE_PATH: "" },
+    });
+
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    assert.equal(fs.existsSync(output), true);
+    const html = fs.readFileSync(output, "utf8");
+    assert.match(html, /id="hr-editor-bundle"/);
+    assert.match(html, /Save reviewed HTML/);
+    assert.match(html, /contenteditable|contentEditable/);
+    assert.doesNotMatch(html, /background:\s*(?:#fff(?:fff)?|white)\b/i);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+    fs.rmSync(work, { recursive: true, force: true });
   }
 });
 
