@@ -7,6 +7,7 @@
   let signature = "";
   let observer = null;
   let activeId = "";
+  let formatListenersBound = false;
 
   const reviewUiSelector = [
     ".hr-section-head",
@@ -14,6 +15,7 @@
     ".hr-comment-compose",
     ".hr-discussion-trigger",
     ".hr-fallback-discussions",
+    ".hr-format-toolbar",
   ].join(",");
 
   function artifactBase() {
@@ -149,6 +151,90 @@
     else toolbar.append(button);
   }
 
+  function formattingSources() {
+    const toolbar = document.querySelector(".hr-topbar");
+    if (!toolbar) return [];
+    const labels = ["Bold", "Italic", "Underline"];
+    return labels.map((label) => {
+      const source = [...toolbar.querySelectorAll("button")]
+        .find((button) => button.textContent?.trim() === label);
+      return source ? { label, source } : null;
+    }).filter(Boolean);
+  }
+
+  function selectionRect() {
+    const editor = document.querySelector(".hr-editor");
+    const selection = window.getSelection();
+    if (!editor || !selection || selection.isCollapsed || selection.rangeCount === 0) return null;
+
+    const anchor = selection.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection.anchorNode?.parentElement;
+    const focus = selection.focusNode?.nodeType === Node.ELEMENT_NODE ? selection.focusNode : selection.focusNode?.parentElement;
+    if (!anchor || !focus || !editor.contains(anchor) || !editor.contains(focus)) return null;
+
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    if (!rect || (!rect.width && !rect.height)) return null;
+    return rect;
+  }
+
+  function updateFormattingToolbar() {
+    const toolbar = document.getElementById("hr-format-toolbar");
+    if (!toolbar) return;
+    const rect = selectionRect();
+    if (!rect) {
+      toolbar.hidden = true;
+      return;
+    }
+
+    const halfWidth = Math.max(100, toolbar.offsetWidth / 2 || 100);
+    const left = Math.min(window.innerWidth - halfWidth - 8, Math.max(halfWidth + 8, rect.left + rect.width / 2));
+    const top = Math.max(8, rect.top - 10);
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+    toolbar.hidden = false;
+  }
+
+  function ensureFormattingToolbar() {
+    const sources = formattingSources();
+    if (sources.length !== 3) return;
+
+    for (const { label, source } of sources) {
+      source.dataset.contextualFormatSource = label.toLowerCase();
+      source.style.display = "none";
+    }
+
+    let toolbar = document.getElementById("hr-format-toolbar");
+    if (!toolbar) {
+      toolbar = document.createElement("div");
+      toolbar.id = "hr-format-toolbar";
+      toolbar.className = "hr-format-toolbar";
+      toolbar.hidden = true;
+      toolbar.setAttribute("role", "toolbar");
+      toolbar.setAttribute("aria-label", "Text formatting");
+
+      for (const { label, source } of sources) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "hr-btn hr-format-btn";
+        button.textContent = label;
+        button.onmousedown = (event) => event.preventDefault();
+        button.onclick = () => {
+          source.click();
+          requestAnimationFrame(updateFormattingToolbar);
+        };
+        toolbar.append(button);
+      }
+      app.append(toolbar);
+    }
+
+    if (!formatListenersBound) {
+      formatListenersBound = true;
+      document.addEventListener("selectionchange", updateFormattingToolbar);
+      window.addEventListener("resize", updateFormattingToolbar);
+      window.addEventListener("scroll", updateFormattingToolbar, true);
+    }
+    updateFormattingToolbar();
+  }
+
   function sections() {
     return [...document.querySelectorAll(".hr-section[data-review-section]")].map((section, index) => ({
       id: section.dataset.reviewSection || `section-${index + 1}`,
@@ -180,6 +266,7 @@
 
   function renderSidebar() {
     ensurePrdButton();
+    ensureFormattingToolbar();
     const items = sections();
     if (!items.length) return;
     const nextSignature = items.map(({ id, label }) => `${id}:${label}`).join("|");
