@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
-  DARK_REVIEW_CSS,
-  bundlePlateReviewClient,
-  createPlateReviewHtml,
+  REVIEW_CSS,
+  createReviewHtml,
+  generateReviewArtifact,
 } from "../src/plate-review/artifact.js";
 import {
   normalizeReviewActions,
@@ -25,25 +28,36 @@ test("review ids are stable slugs", () => {
   assert.equal(slugifyReviewId(""), "section");
 });
 
-test("planning artifacts enforce a dark shell", () => {
-  assert.match(DARK_REVIEW_CSS, /color-scheme:\s*dark/);
-  assert.match(DARK_REVIEW_CSS, /--hr-bg:\s*#090d12/);
-  assert.doesNotMatch(DARK_REVIEW_CSS, /background:\s*(?:#fff(?:fff)?|white)\b/i);
+test("review surfaces avoid plain white backgrounds", () => {
+  assert.match(REVIEW_CSS, /--hr-bg:\s*#11161d/);
+  assert.doesNotMatch(REVIEW_CSS, /background:\s*(?:#fff(?:fff)?|white)\b/i);
 
-  const html = createPlateReviewHtml({
+  const html = createReviewHtml({
     sourceHtml: "<section data-review-section=\"scope\"><h2>Scope</h2><p>Plan</p></section>",
     title: "Plan",
     sourcePath: "/tmp/plan.md",
     artifactName: "plan.review.html",
-    bundle: "console.log('plate');",
+    bundle: "console.log('editor');",
+    editor: "plate",
   });
-  assert.match(html, /data-theme="dark"/);
   assert.match(html, /meta name="human-review-editor" content="plate"/);
+  assert.match(html, /id="hr-editor-bundle"/);
   assert.match(html, /id="hr-bootstrap" type="application\/json"/);
+  assert.doesNotMatch(html, /background:\s*(?:#fff(?:fff)?|white)\b/i);
 });
 
-test("Plate review client bundles for the browser", async () => {
-  const bundle = await bundlePlateReviewClient();
-  assert.ok(bundle.length > 1000);
-  assert.match(bundle, /Plate planning review|Save reviewed HTML/);
+test("planning generation always emits an embedded editor artifact", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-plan-"));
+  const input = path.join(dir, "plan.md");
+  const output = path.join(dir, "plan.review.html");
+  fs.writeFileSync(input, "# Plan\n\n## Architecture\n\nEdit this block.\n");
+
+  const result = await generateReviewArtifact(input, output);
+  const html = fs.readFileSync(output, "utf8");
+
+  assert.equal(result.output, output);
+  assert.ok(["plate", "embedded-dom"].includes(result.editor));
+  assert.match(html, /id="hr-editor-bundle"/);
+  assert.match(html, /Save reviewed HTML/);
+  assert.match(html, /data-review|review_section|review-section/);
 });

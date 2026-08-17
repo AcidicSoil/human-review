@@ -25,6 +25,9 @@
     "node": ">=20"
   },
   "scripts": {
+    "build:plate-review": "node scripts/build-plate-review.mjs",
+    "prepack": "npm run build:plate-review",
+    "postpack": "node -e \"require('node:fs').rmSync('src/plate-review/client.bundle.js',{force:true})\"",
     "test": "node --test --test-force-exit",
     "start": "node src/cli.js"
   },
@@ -44,16 +47,16 @@
   "publishConfig": {
     "access": "public"
   },
-  "devDependencies": {
-    "jsdom": "^29.1.1"
-  },
   "dependencies": {
+    "marked": "^18.0.7"
+  },
+  "devDependencies": {
     "@platejs/basic-nodes": "53.0.0",
     "@platejs/comment": "53.0.0",
     "@platejs/link": "53.3.1",
     "@platejs/list-classic": "53.0.0",
     "esbuild": "0.28.1",
-    "marked": "^18.0.7",
+    "jsdom": "^29.1.1",
     "platejs": "53.3.2",
     "react": "19.2.7",
     "react-dom": "19.2.7"

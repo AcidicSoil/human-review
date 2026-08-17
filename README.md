@@ -30,6 +30,8 @@ You can also install it with `npx`:
 npx -y human-review setup --global
 ```
 
+Setup now installs the planning-artifact runtime **inside each Human Review skill directory**, not just `SKILL.md`. That local runtime includes the generator, a built-in editor fallback, and the prebuilt Plate browser bundle when the package was built normally. Agents therefore do not need to download Plate/React/esbuild later just to create a planning artifact.
+
 ## Ordinary HTML, Markdown, and localhost review
 
 Open an HTML or Markdown file:
@@ -46,29 +48,39 @@ Review a page running on localhost:
 
 Human Review opens the file in your browser. Make direct edits, leave comments, and click Send. Your agent receives all your feedback in one batch, updates the source, and refreshes the page for another review.
 
-The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; the existing selection comments, block comments, drag handles, links, lists, image editing, and polling workflow continue to work there.
+The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; selection comments, block comments, drag handles, links, lists, image editing, and the polling workflow continue to work there.
 
-## Plate planning review
+## Planning review artifacts
 
-Large plans, specs, PRDs, roadmaps, and implementation proposals now use a dedicated **Plate** editor instead of the generic DOM editor.
+Large plans, specs, PRDs, roadmaps, and implementation proposals generate one standalone editable HTML artifact.
 
-Generate a standalone planning artifact from Markdown or HTML:
+From an installed package:
 
 ```sh
 human-review-plan plan.md plan.review.html
 ```
 
-Or without a global install:
+After `human-review setup`, the installed skill points agents at its local planning runner directly, so later artifact generation does not depend on `npx` or npm network access.
+
+### The editor is inside the HTML
+
+The planning artifact is not a static preview that expects a separate web app. Its editor JavaScript is embedded directly in the generated HTML.
+
+The normal package build compiles the **Plate + React** planning editor ahead of time and ships that prebuilt browser bundle with Human Review. `human-review-plan` copies that bundle into each artifact.
+
+A source checkout can also rebuild the bundle with:
 
 ```sh
-npx -y --package human-review human-review-plan plan.md plan.review.html
+npm run build:plate-review
 ```
 
-The generated file is still one HTML artifact. The generator bundles Plate and React directly into that file, and the editor stores its complete edited document and discussion state inside the artifact when you click **Save reviewed HTML**.
+If a source checkout has neither the prebuilt Plate bundle nor the development dependencies required to rebuild it, generation still does not fail. The generator embeds its built-in editor runtime so the resulting HTML remains directly editable, commentable, classifiable, and exportable. Dependency availability is not turned into a user-facing artifact-generation blocker.
 
 ### Planning editor features
 
-- **Real Plate block editing** rather than a DOM-only approximation.
+When the Plate bundle is available:
+
+- **Real Plate block editing**.
 - **Section review actions:** Revise, Expand, Touch up, Remove, Verify.
 - **Plate comment marks** on exact selected text.
 - **Block discussions** attached to the planning section containing the selection.
@@ -78,55 +90,57 @@ The generated file is still one HTML artifact. The generator bundles Plate and R
 - **Cmd/Ctrl + Shift + M** to start a comment from the current selection.
 - **Save reviewed HTML** to download a self-contained `.reviewed.html` that can be passed directly back to an agent.
 
+The built-in editor fallback preserves the core workflow: direct content editing, section actions, comments, and standalone reviewed-HTML export.
+
 Revise, Expand, Touch up, and Verify can be combined. Remove is exclusive.
 
-### Dark-only planning artifacts
+### Artifact appearance
 
-Planning artifacts are intentionally **dark only**. The editor shell, document canvas, section cards, discussion threads, form controls, and comment surfaces all use dark tones and `color-scheme: dark`.
+Planning artifacts avoid plain white/light primary surfaces. The page, editor canvas, section cards, controls, and discussion surfaces use toned darker backgrounds so the review surface does not look like a white document on a white page.
 
-There is no light-mode fallback or white canvas. Source-document CSS is not used as the Plate editor chrome, so a light source document cannot turn the review artifact into a white page.
+This is a visual constraint, not a separate “dark-only planning” product mode.
 
 ## Passing a reviewed plan back to an agent
 
 After reviewing, click **Save reviewed HTML** and give the resulting `.reviewed.html` file to the agent.
 
-The artifact embeds a machine-readable state object in:
+The artifact embeds machine-readable state in:
 
 ```html
 <script id="hr-bootstrap" type="application/json">...</script>
 ```
 
-That state contains:
+For Plate artifacts that state contains the full edited Plate document, stable planning section IDs and labels, selected review actions, comment/discussion state, and the original source path when known.
 
-- the full edited Plate document;
-- stable planning section IDs and labels;
-- each section's selected review actions;
-- inline comment marks;
-- unresolved and resolved discussion threads;
-- the original canonical source path when known.
+For the built-in editor fallback, `sourceHtml` contains the edited document while `data-review-actions` and discussion records preserve the same planning-review instructions.
 
-The agent applies direct edits first, then unresolved discussion instructions, then section actions, and writes the result back to the canonical planning source. Plate-only metadata stays in the review artifact rather than leaking into Markdown/MDX/text.
+The agent applies direct edits first, then unresolved discussion instructions, then section actions, and writes the result back to the canonical planning source. Editor-only metadata stays in the review artifact rather than leaking into Markdown/MDX/text.
 
 ## What this skill lets you do
 
 - **Edit text directly and tweak basic formatting** in ordinary reviews.
-- **Use a dedicated Plate editor for large planning documents.**
+- **Use Plate for rich planning review artifacts when the packaged bundle is present.**
+- **Still generate an editable planning artifact when rebuild dependencies are unavailable.**
 - **Mark plan sections** for revise, expand, touch-up, remove, or verify work.
-- **Create exact-selection comments and threaded block discussions** in Plate planning artifacts.
+- **Create comments/discussions** in planning artifacts.
 - **Make bulleted and numbered lists** in ordinary HTML reviews.
 - **Add links** with the existing HTML review editor.
 - **Resize, move, and paste images** in ordinary file reviews.
 - **Rearrange page blocks** with drag handles.
 - **Review localhost routes** without writing rendered responses back into app source.
 - **Send ordinary review feedback live** through the existing agent polling loop.
-- **Return planning feedback as one reviewed HTML artifact** with the entire Plate state embedded.
+- **Return planning feedback as one reviewed HTML artifact** with the editor state embedded.
 
 ## What’s inside
 
 - [`cli.js`](src/cli.js) contains the ordinary `human-review`, `poll`, `status`, and `setup` commands.
-- [`plate-review/artifact.js`](src/plate-review/artifact.js) generates dark single-file Plate planning artifacts.
-- [`plate-review/client.jsx`](src/plate-review/client.jsx) contains the Plate editor, section block controls, comments, and block discussions.
+- [`plate-review/artifact.js`](src/plate-review/artifact.js) is the planning-artifact CLI entry point.
+- [`plate-review/generator.js`](src/plate-review/generator.js) creates self-contained editable planning artifacts without requiring runtime network access.
+- [`plate-review/client.jsx`](src/plate-review/client.jsx) contains the Plate editor, section controls, comments, and block discussions.
+- [`plate-review/fallback-client.js`](src/plate-review/fallback-client.js) keeps planning artifacts editable when the Plate bundle cannot be rebuilt locally.
 - [`plate-review/review-state.js`](src/plate-review/review-state.js) contains planning review-state helpers.
+- [`scripts/build-plate-review.mjs`](scripts/build-plate-review.mjs) compiles the Plate browser client before packaging.
+- [`setup.js`](src/setup.js) installs both the skill instructions and planning runtime into agent skill directories.
 - [`server.js`](src/server.js) runs the ordinary live review session.
 - [`sdk.js`](src/sdk.js) handles ordinary DOM editing, comments, highlights, and feedback.
 - [`editing.js`](src/editing.js) contains ordinary DOM editing helpers and the inline block toolbar.
