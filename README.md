@@ -30,9 +30,7 @@ You can also install it with `npx`:
 npx -y human-review setup --global
 ```
 
-## How to use /human-review
-
-![Human Review visual editor](assets/human-review.png)
+## Ordinary HTML, Markdown, and localhost review
 
 Open an HTML or Markdown file:
 
@@ -48,65 +46,93 @@ Review a page running on localhost:
 
 Human Review opens the file in your browser. Make direct edits, leave comments, and click Send. Your agent receives all your feedback in one batch, updates the source, and refreshes the page for another review.
 
-Note: For HTML files, direct edits and resizes save automatically. For Markdown and localhost pages, click Send so your agent can apply them to the source.
+The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; the existing selection comments, block comments, drag handles, links, lists, image editing, and polling workflow continue to work there.
 
-## Inline block editing
+## Plate planning review
 
-Hover a block and use the compact **Edit** control to focus it for inline changes. Type directly in the document, then click **Done** or press Escape when you are finished with that block.
+Large plans, specs, PRDs, roadmaps, and implementation proposals now use a dedicated **Plate** editor instead of the generic DOM editor.
 
-This uses the existing Human Review DOM editing pipeline rather than converting the page into a second editor document model. Arbitrary HTML remains intact, while the exact before/after text and formatting still flow back to the agent.
+Generate a standalone planning artifact from Markdown or HTML:
 
-## Review a large plan
+```sh
+human-review-plan plan.md plan.review.html
+```
 
-The skill can create a temporary single-file HTML review artifact even when the plan starts as Markdown, plain text, working notes, or chat content.
+Or without a global install:
 
-Ask your agent to create a planning review artifact, then review it with the same `/human-review` loop. Major planning sections are marked with `data-review-section`, and Human Review adds section actions directly to the block toolbar:
+```sh
+npx -y --package human-review human-review-plan plan.md plan.review.html
+```
 
-- **Revise** — substantively rewrite the section.
-- **Expand** — add missing depth or detail.
-- **Touch up** — make small clarity or organization improvements.
-- **Remove** — delete the section.
-- **Verify** — validate assumptions or technical claims and correct them.
+The generated file is still one HTML artifact. The generator bundles Plate and React directly into that file, and the editor stores its complete edited document and discussion state inside the artifact when you click **Save reviewed HTML**.
+
+### Planning editor features
+
+- **Real Plate block editing** rather than a DOM-only approximation.
+- **Section review actions:** Revise, Expand, Touch up, Remove, Verify.
+- **Plate comment marks** on exact selected text.
+- **Block discussions** attached to the planning section containing the selection.
+- **Thread replies**, resolve, and delete controls.
+- **Bold, italic, and underline** editing controls.
+- **HTML import** for headings, paragraphs, blockquotes, links, and classic HTML lists.
+- **Cmd/Ctrl + Shift + M** to start a comment from the current selection.
+- **Save reviewed HTML** to download a self-contained `.reviewed.html` that can be passed directly back to an agent.
 
 Revise, Expand, Touch up, and Verify can be combined. Remove is exclusive.
 
-You can combine those markers with direct text edits and exact-text comments. When you click Send, the agent treats the three feedback types differently: your direct edits are preserved as exact wording, comments provide specific instructions, and section actions tell the agent what kind of follow-up work to perform.
+### Dark-only planning artifacts
 
-The generated `.review.html` remains a review surface. If the plan has a canonical Markdown, MDX, or other source file, the agent applies the approved changes back to that source and clears the action markers before the next review pass.
+Planning artifacts are intentionally **dark only**. The editor shell, document canvas, section cards, discussion threads, form controls, and comment surfaces all use dark tones and `color-scheme: dark`.
 
-## Why the editor stays lightweight
+There is no light-mode fallback or white canvas. Source-document CSS is not used as the Plate editor chrome, so a light source document cannot turn the review artifact into a white page.
 
-The interaction model follows mature rich-text editors: focused block editing, contextual controls, block-level actions, and anchored discussions. Plate is the closest reference for the review workflow because it exposes block selection, floating toolbars, comments, suggestions, and block discussions as separate editor capabilities.
+## Passing a reviewed plan back to an agent
 
-Human Review keeps those interaction patterns without embedding Plate, TipTap, Lexical, React, or shadcn into every reviewed artifact. That avoids a second frontend runtime and preserves the current zero-build HTML/Markdown review path.
+After reviewing, click **Save reviewed HTML** and give the resulting `.reviewed.html` file to the agent.
+
+The artifact embeds a machine-readable state object in:
+
+```html
+<script id="hr-bootstrap" type="application/json">...</script>
+```
+
+That state contains:
+
+- the full edited Plate document;
+- stable planning section IDs and labels;
+- each section's selected review actions;
+- inline comment marks;
+- unresolved and resolved discussion threads;
+- the original canonical source path when known.
+
+The agent applies direct edits first, then unresolved discussion instructions, then section actions, and writes the result back to the canonical planning source. Plate-only metadata stays in the review artifact rather than leaking into Markdown/MDX/text.
 
 ## What this skill lets you do
 
-- **Edit text directly and tweak basic formatting** (e.g., bold, italic).
-- **Focus individual blocks for inline editing** with the hover toolbar.
-- **Make bulleted and numbered lists** — type `- ` or `1. ` at the start of a line, or press ⌘⇧8 / ⌘⇧7. Tab and Shift+Tab indent and outdent.
-- **Add links** — select text and press ⌘K. ⌘K inside an existing link edits or removes it.
-- **Resize images** by dragging their corner, and **move images** by dragging them to a new spot.
-- **Rearrange the page** — hover any block and drag the handle on its left edge to move the whole block somewhere else.
-- **Paste images** from your clipboard — file reviews save them beside the document; localhost reviews stage them for the agent to place in the app source.
-- **Select a phrase and leave a comment** anchored to the exact text.
-- **Comment on an image, chart, or section** by clicking the element.
-- **Mark planning sections** for revise, expand, touch-up, remove, or verify work from the same block toolbar.
-- **Remove elements** without explaining the deletion in chat.
-- **Command-click links** to review multiple pages without losing your feedback.
-- **Send every edit and comment at once** instead of writing a long chat message.
-
-I use Human Review to edit AI-generated plans, update landing pages, review localhost apps, and remove the extra copy AI likes to add to UX.
+- **Edit text directly and tweak basic formatting** in ordinary reviews.
+- **Use a dedicated Plate editor for large planning documents.**
+- **Mark plan sections** for revise, expand, touch-up, remove, or verify work.
+- **Create exact-selection comments and threaded block discussions** in Plate planning artifacts.
+- **Make bulleted and numbered lists** in ordinary HTML reviews.
+- **Add links** with the existing HTML review editor.
+- **Resize, move, and paste images** in ordinary file reviews.
+- **Rearrange page blocks** with drag handles.
+- **Review localhost routes** without writing rendered responses back into app source.
+- **Send ordinary review feedback live** through the existing agent polling loop.
+- **Return planning feedback as one reviewed HTML artifact** with the entire Plate state embedded.
 
 ## What’s inside
 
-- [`cli.js`](src/cli.js) contains the `human-review`, `poll`, `status`, and `setup` commands.
-- [`server.js`](src/server.js) runs the local review session.
-- [`sdk.js`](src/sdk.js) handles editing, comments, highlights, and feedback.
-- [`editing.js`](src/editing.js) contains editing helpers and the inline block toolbar.
-- [`chrome-client.js`](src/chrome-client.js) contains the visual review interface.
-- [`markdown.js`](src/markdown.js) renders Markdown files for review.
-- [`SKILL.md`](src/SKILL.md) teaches Claude Code, Codex, and other agents how to use Human Review.
+- [`cli.js`](src/cli.js) contains the ordinary `human-review`, `poll`, `status`, and `setup` commands.
+- [`plate-review/artifact.js`](src/plate-review/artifact.js) generates dark single-file Plate planning artifacts.
+- [`plate-review/client.jsx`](src/plate-review/client.jsx) contains the Plate editor, section block controls, comments, and block discussions.
+- [`plate-review/review-state.js`](src/plate-review/review-state.js) contains planning review-state helpers.
+- [`server.js`](src/server.js) runs the ordinary live review session.
+- [`sdk.js`](src/sdk.js) handles ordinary DOM editing, comments, highlights, and feedback.
+- [`editing.js`](src/editing.js) contains ordinary DOM editing helpers and the inline block toolbar.
+- [`chrome-client.js`](src/chrome-client.js) contains the ordinary visual review interface.
+- [`markdown.js`](src/markdown.js) renders Markdown files for ordinary review.
+- [`SKILL.md`](src/SKILL.md) teaches agents which review path to use.
 
 Everything runs on your computer. Human Review doesn’t require an account, cloud service, database, or API key.
 
