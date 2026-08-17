@@ -44,7 +44,7 @@ export function installPlanRuntime(skillDir) {
 
 export const skillFor = (cmd, planCmd) => readSkill()
   .replaceAll("npx -y human-review", cmd)
-  .replaceAll("human-review-plan", planCmd);
+  .replaceAll("human-review-plan path/to/plan.md", `${planCmd} path/to/plan.md`);
 
 const CODEX_BLOCK = `
 ## Reviewing files and localhost pages with human-review
