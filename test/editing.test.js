@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { linkStyleFixup, listCommandFor, listStyleFixup, normalizeHref } from "../src/editing.js";
+import {
+  linkStyleFixup,
+  listCommandFor,
+  listStyleFixup,
+  normalizeHref,
+  normalizeReviewActions,
+  reviewActionLabel,
+  toggleReviewAction,
+} from "../src/editing.js";
 
 test("list markers typed at the start of a line convert to the right list", () => {
   assert.equal(listCommandFor("-"), "insertUnorderedList");
@@ -72,4 +80,26 @@ test("executable and unknown schemes are rejected outright", () => {
   assert.equal(normalizeHref("data:text/html,<script>x</script>"), "");
   assert.equal(normalizeHref("vbscript:x"), "");
   assert.equal(normalizeHref(""), "");
+});
+
+test("review actions normalize to one canonical machine-readable order", () => {
+  assert.deepEqual(normalizeReviewActions("verify, revise,revise, touch-up"), ["revise", "touch-up", "verify"]);
+  assert.deepEqual(normalizeReviewActions("unknown,expand"), ["expand"]);
+  assert.deepEqual(normalizeReviewActions("remove,expand,verify"), ["remove"]);
+  assert.deepEqual(normalizeReviewActions(""), []);
+});
+
+test("remove is exclusive while the other review actions can be combined", () => {
+  assert.deepEqual(toggleReviewAction("", "revise"), ["revise"]);
+  assert.deepEqual(toggleReviewAction("revise", "expand"), ["revise", "expand"]);
+  assert.deepEqual(toggleReviewAction("revise,expand", "revise"), ["expand"]);
+  assert.deepEqual(toggleReviewAction("revise,expand", "remove"), ["remove"]);
+  assert.deepEqual(toggleReviewAction("remove", "verify"), ["verify"]);
+  assert.deepEqual(toggleReviewAction("remove", "remove"), []);
+});
+
+test("review action labels are concise UI labels", () => {
+  assert.equal(reviewActionLabel("revise"), "Revise");
+  assert.equal(reviewActionLabel("touch-up"), "Touch up");
+  assert.equal(reviewActionLabel("verify"), "Verify");
 });
