@@ -22,20 +22,22 @@ body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSyst
 button, textarea, input, select { font: inherit; }
 #hr-app { min-height: 100vh; }
 .hr-shell { width: min(1380px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 72px; }
+body.hr-sidebar-mounted .hr-shell { padding-left: 258px; }
 .hr-topbar { position: sticky; top: 12px; z-index: 40; display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 8px; border: 1px solid var(--hr-border); border-radius: 12px; background: rgba(24,32,42,.96); backdrop-filter: blur(12px); }
 .hr-topbar .spacer, .hr-thread-head .spacer { flex: 1; }
 .hr-title, .hr-status, .hr-section-name, .hr-thread-head { color: var(--hr-muted); font-size: 12px; }
 .hr-btn { border: 1px solid var(--hr-border); border-radius: 8px; background: #202a36; color: var(--hr-text); padding: 7px 10px; cursor: pointer; }
 .hr-btn:hover, .hr-btn:focus-visible { background: #283545; outline: none; }
 .hr-btn[data-active="true"] { border-color: #5b7eab; background: #263d5b; }
-.hr-workspace { display: grid; grid-template-columns: minmax(190px, 240px) minmax(0, 1fr); gap: 18px; align-items: start; }
-.hr-sidebar { position: sticky; top: 76px; max-height: calc(100vh - 94px); overflow: auto; border: 1px solid var(--hr-border); border-radius: 14px; background: rgba(24,32,42,.94); padding: 10px; }
+.hr-sidebar { position: fixed; z-index: 35; top: 78px; left: max(16px, calc((100vw - 1380px) / 2)); width: 240px; max-height: calc(100vh - 96px); overflow: auto; border: 1px solid var(--hr-border); border-radius: 14px; background: rgba(24,32,42,.96); padding: 10px; backdrop-filter: blur(12px); }
 .hr-sidebar-title { padding: 7px 9px 9px; color: var(--hr-muted); font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .hr-nav { display: flex; flex-direction: column; gap: 3px; }
 .hr-nav-btn { width: 100%; border: 0; border-radius: 8px; background: transparent; color: #c4ced9; padding: 8px 9px; cursor: pointer; text-align: left; line-height: 1.3; }
 .hr-nav-btn:hover, .hr-nav-btn:focus-visible { background: #202a36; color: var(--hr-text); outline: none; }
 .hr-nav-btn[data-active="true"] { background: #263d5b; color: #f3f7fc; }
-.hr-editor { min-height: 70vh; outline: none; border: 1px solid var(--hr-border); border-radius: 16px; background: #151c25; padding: clamp(22px, 4vw, 54px); scroll-margin-top: 86px; }
+.hr-sidebar-footer { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hr-border); }
+.hr-save-prd { width: 100%; }
+.hr-editor { min-height: 70vh; outline: none; border: 1px solid var(--hr-border); border-radius: 16px; background: #151c25; padding: clamp(22px, 4vw, 54px); }
 .hr-section { position: relative; margin: 0 0 18px; padding: 22px 24px; border: 1px solid var(--hr-border); border-radius: 12px; background: #1a232e; scroll-margin-top: 86px; }
 .hr-section-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -4px 0 14px; user-select: none; }
 .hr-section-name { margin-right: auto; font-weight: 700; }
@@ -54,10 +56,12 @@ button, textarea, input, select { font: inherit; }
 .hr-fallback-content { outline: none; }
 @media (max-width: 900px) {
   .hr-shell { width: min(100% - 18px, 1180px); }
-  .hr-workspace { grid-template-columns: 1fr; }
-  .hr-sidebar { position: static; max-height: none; overflow: hidden; }
+  body.hr-sidebar-mounted .hr-shell { padding-left: 0; }
+  .hr-sidebar { position: relative; top: auto; left: auto; width: min(100% - 18px, 1180px); max-height: none; margin: 12px auto 0; }
   .hr-nav { flex-direction: row; overflow-x: auto; padding-bottom: 2px; }
   .hr-nav-btn { width: auto; flex: 0 0 auto; white-space: nowrap; }
+  .hr-sidebar-footer { display: flex; justify-content: flex-end; }
+  .hr-save-prd { width: auto; }
   .hr-editor, .hr-section { padding: 18px; }
   .hr-discussion-trigger { position: static; transform: none; float: right; }
 }
@@ -66,6 +70,7 @@ button, textarea, input, select { font: inherit; }
 const safeJson = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
 const bodyHtml = (source) => String(source).match(/<body(?:\s[^>]*)?>([\s\S]*?)<\/body\s*>/i)?.[1] || String(source);
 const titleFrom = (source, fallback) => (String(source).match(/<title(?:\s[^>]*)?>([\s\S]*?)<\/title\s*>/i)?.[1] || fallback).replace(/<[^>]+>/g, "").trim() || fallback;
+const inlineScript = (source) => String(source || "").replace(/<\/script/gi, "<\\/script");
 
 function basicMarkdown(source) {
   const escape = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -105,15 +110,15 @@ async function buildPlateBundle() {
       target: ["chrome120", "edge120", "firefox121", "safari17"], write: false, minify: true,
       jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' },
     });
-    return { bundle: result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script"), editor: "plate" };
+    return { bundle: result.outputFiles[0].text, editor: "plate" };
   } catch {
-    return { bundle: fs.readFileSync(path.join(here, "fallback-client.js"), "utf8").replace(/<\/script/gi, "<\\/script"), editor: "embedded-dom" };
+    return { bundle: fs.readFileSync(path.join(here, "fallback-client.js"), "utf8"), editor: "embedded-dom" };
   }
 }
 
-export function createReviewHtml({ sourceHtml, title, sourcePath, artifactName, bundle, editor }) {
+export function createReviewHtml({ sourceHtml, title, sourcePath, artifactName, bundle, editor, tools = "" }) {
   const bootstrap = { version: 1, editor, sourceHtml: bodyHtml(sourceHtml), sourcePath, artifactName, document: null, discussions: [] };
-  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<meta name="human-review-editor" content="${editor}">\n<title>${String(title).replace(/[<&]/g, "")}</title>\n<style id="hr-review-theme">${REVIEW_CSS}</style>\n</head>\n<body>\n<div id="hr-app"></div>\n<script id="hr-bootstrap" type="application/json">${safeJson(bootstrap)}</script>\n<script id="hr-editor-bundle">${bundle}</script>\n</body>\n</html>\n`;
+  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<meta name="human-review-editor" content="${editor}">\n<title>${String(title).replace(/[<&]/g, "")}</title>\n<style id="hr-review-theme">${REVIEW_CSS}</style>\n</head>\n<body>\n<div id="hr-app"></div>\n<script id="hr-bootstrap" type="application/json">${safeJson(bootstrap)}</script>\n<script id="hr-editor-bundle">${inlineScript(bundle)}</script>\n<script id="hr-artifact-tools">${inlineScript(tools)}</script>\n</body>\n</html>\n`;
 }
 
 export async function generateReviewArtifact(inputFile, outputFile) {
@@ -125,7 +130,8 @@ export async function generateReviewArtifact(inputFile, outputFile) {
   const base = path.basename(input, ext).replace(/\.review$/i, "");
   const output = path.resolve(outputFile || path.join(path.dirname(input), `${base}.review.html`));
   const { bundle, editor } = await buildPlateBundle();
-  fs.writeFileSync(output, createReviewHtml({ sourceHtml: rendered, title: titleFrom(raw, base), sourcePath: input, artifactName: path.basename(output), bundle, editor }));
+  const tools = fs.readFileSync(path.join(here, "artifact-tools.js"), "utf8");
+  fs.writeFileSync(output, createReviewHtml({ sourceHtml: rendered, title: titleFrom(raw, base), sourcePath: input, artifactName: path.basename(output), bundle, editor, tools }));
   return { output, editor };
 }
 
