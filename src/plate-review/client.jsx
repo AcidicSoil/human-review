@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { nanoid, NodeApi } from "platejs";
+import { nanoid } from "platejs";
 import {
   ParagraphPlugin,
   Plate,
@@ -83,9 +83,12 @@ function LinkElement(props) {
       {...props}
       as="a"
       className="hr-link"
-      href={props.element.url || props.element.href || "#"}
-      target="_blank"
-      rel="noreferrer"
+      attributes={{
+        ...props.attributes,
+        href: props.element.url || props.element.href || "#",
+        target: "_blank",
+        rel: "noreferrer",
+      }}
     >
       {props.children}
     </PlateElement>
@@ -107,10 +110,10 @@ function CommentLeaf(props) {
     <PlateLeaf
       {...props}
       className="hr-comment-mark"
-      data-active={activeId === currentId || hoverId === currentId || undefined}
-      data-overlapping={overlapping || undefined}
       attributes={{
         ...props.attributes,
+        "data-active": activeId === currentId || hoverId === currentId ? "true" : undefined,
+        "data-overlapping": overlapping ? "true" : undefined,
         onClick: () => setOption("activeId", currentId || null),
         onMouseEnter: () => setOption("hoverId", currentId || null),
         onMouseLeave: () => setOption("hoverId", null),
@@ -180,13 +183,20 @@ function markDiscussionResolved(editor, id, remove = false) {
   editor.setOption(commentPlugin, "activeId", null);
 }
 
+function richTextToString(value) {
+  if (Array.isArray(value)) return value.map(richTextToString).join("");
+  if (!value || typeof value !== "object") return "";
+  if (typeof value.text === "string") return value.text;
+  return richTextToString(value.children);
+}
+
 function CommentCard({ comment }) {
   return (
     <div className="hr-comment">
       <div className="hr-comment-meta">
         Reviewer · {new Date(comment.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
       </div>
-      <div className="hr-comment-body">{NodeApi.string({ type: "p", children: comment.contentRich || [] })}</div>
+      <div className="hr-comment-body">{richTextToString(comment.contentRich)}</div>
     </div>
   );
 }
@@ -254,6 +264,7 @@ function BlockDiscussion(_pluginProps) {
     const discussions = usePluginOption(discussionPlugin, "discussions") || [];
     const activeId = usePluginOption(commentPlugin, "activeId");
     const commentingBlock = usePluginOption(commentPlugin, "commentingBlock");
+    const [open, setOpen] = React.useState(false);
     const blockPath = editor.api.findPath(element) || [];
     const topLevel = blockPath.length === 1 && element.type === "review_section";
     if (!topLevel) return <>{children}</>;
@@ -266,7 +277,6 @@ function BlockDiscussion(_pluginProps) {
     const active = related.find((item) => item.id === activeId) || related[0] || null;
     const draftActive = activeId === getDraftCommentKey() && !!draftNode;
     const commentingHere = Array.isArray(commentingBlock) ? commentingBlock[0] === blockPath[0] : false;
-    const [open, setOpen] = React.useState(false);
     const visible = open || !!active || (draftActive && commentingHere);
 
     const createFirstComment = (contentRich) => {
@@ -332,9 +342,12 @@ function ReviewSectionElement(props) {
       {...props}
       as="section"
       className="hr-section"
-      data-review-section={props.element.reviewId}
-      data-container={label}
-      data-review-actions={actions.join(",") || undefined}
+      attributes={{
+        ...props.attributes,
+        "data-review-section": props.element.reviewId,
+        "data-container": label,
+        "data-review-actions": actions.join(",") || undefined,
+      }}
     >
       <div className="hr-section-head" contentEditable={false}>
         <span className="hr-section-name">{label}</span>
