@@ -30,6 +30,7 @@ export function installPlanRuntime(skillDir) {
 
   fs.copyFileSync(path.join(plateHere, "generator.js"), path.join(skillDir, "generator.mjs"));
   fs.copyFileSync(path.join(plateHere, "fallback-client.js"), path.join(skillDir, "fallback-client.js"));
+  fs.copyFileSync(path.join(plateHere, "artifact-tools.js"), path.join(skillDir, "artifact-tools.js"));
 
   const prebuilt = path.join(plateHere, "client.bundle.js");
   const installedBundle = path.join(skillDir, "client.bundle.js");
