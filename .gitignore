@@ -12,3 +12,5 @@ videos/
 
 # Local launch and review artifacts
 output/
+.ecc-hooks-disable
+.ecc-hooks-disable.bak
