@@ -1,0 +1,8 @@
+interface:
+  display_name: Human Review
+  short_description: Review files visually
+  brand_color: "#E4572E"
+  default_prompt: Open this file for visual review and collect my edits and comments.
+policy:
+  products: [CHAT, CODEX]
+  allow_implicit_invocation: true

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">Human Review</title>
+  <rect width="256" height="256" rx="56" fill="#E4572E"/>
+  <path d="M70 128a58 58 0 0 1 99-41l15-15v48h-48l15-15a38 38 0 1 0 3 53" fill="none" stroke="#FFF7F2" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m94 169 40-40 25 25-40 40-31 7z" fill="#FFF7F2" stroke="#7C2D1A" stroke-width="8" stroke-linejoin="round"/>
+  <path d="m134 129 25 25 10-10-25-25z" fill="#FFD1C2"/>
+  <path d="m88 201 7-31 24 23z" fill="#7C2D1A"/>
+</svg>

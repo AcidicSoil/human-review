@@ -32,6 +32,16 @@ npx -y human-review setup --global
 
 Setup installs the planning-artifact runtime **inside each Human Review skill directory**, not just `SKILL.md`. That local runtime includes the generator, artifact navigation/export tools, a built-in editor fallback, and the prebuilt Plate browser bundle when the package was built normally. Agents therefore do not need to download Plate/React/esbuild later just to create a planning artifact.
 
+### ChatGPT/Codex plugin
+
+This repository also contains a skills-only ChatGPT/Codex plugin. Add the repository as a marketplace:
+
+```sh
+codex plugin marketplace add AcidicSoil/human-review
+```
+
+For a local checkout, pass its absolute path instead. Restart the ChatGPT desktop app, open the Plugins Directory, choose the Human Review marketplace, and install **Human Review**.
+
 ## Ordinary HTML, Markdown, and localhost review
 
 Open an HTML or Markdown file:
