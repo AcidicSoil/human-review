@@ -9,6 +9,7 @@ Use the review surface that matches the artifact.
 
 - **Ordinary HTML, Markdown, and localhost pages:** use the normal Human Review polling loop.
 - **Large plans, specs, roadmaps, PRDs, and implementation proposals:** generate one standalone editable `.review.html` artifact with `human-review-plan`.
+- **Structured Lists of Actions with plugin/skill catalogs:** generate an offline, editable LOA composition artifact with `human-review-loa`. Use this third review mode instead of ordinary DOM or planning review when the input is machine-readable LOA JSON.
 
 ## Required planning-artifact behavior
 
@@ -23,6 +24,24 @@ human-review-plan path/to/plan.md path/to/plan.review.html
 ```
 
 The output path is optional. Without one, `plan.md` becomes `plan.review.html` next to the source.
+
+## LOA component review
+
+For a structured List of Actions and component catalog, create the artifact in the current turn:
+
+```sh
+human-review-loa path/to/loa.json path/to/loa.loa.review.html
+```
+
+The output path is optional. The input shape is `{ "loa": { "actions": [] }, "catalog": [] }`.
+Each action has a stable non-empty `id`, string `content`, and an unbounded `snapIns` array. The
+catalog is organized as category → plugin → skills. The artifact never loads or executes a
+plugin; it only lets the reviewer attach catalog refs, edit action content, remove or reorder
+actions, and preserve missing refs as unavailable. Click a component or drag it onto an action.
+Use the action move controls when drag-and-drop is unavailable.
+
+Save reviewed HTML to retain the editable review state, or save clean LOA JSON to pass the
+canonical `{ "loa", "catalog" }` result to the next agent. Do not persist an event log.
 
 ### Never turn dependency availability into a user blocker
 

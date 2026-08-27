@@ -14,7 +14,8 @@
   "type": "module",
   "bin": {
     "human-review": "src/cli.js",
-    "human-review-plan": "src/plate-review/artifact.js"
+    "human-review-plan": "src/plate-review/artifact.js",
+    "human-review-loa": "src/loa-review/artifact.js"
   },
   "files": [
     "src",
