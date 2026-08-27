@@ -1,10 +1,10 @@
 {
   "name": "human-review",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Review and edit agent-generated files and localhost pages in the browser, then send the whole batch back to your agent.",
   "author": {
-    "name": "Peter Yang",
-    "url": "https://github.com/petergyang"
+    "name": "AcidicSoil",
+    "url": "https://github.com/AcidicSoil"
   },
   "homepage": "https://github.com/AcidicSoil/human-review#readme",
   "repository": "https://github.com/AcidicSoil/human-review",
@@ -13,7 +13,7 @@
     "displayName": "Human Review",
     "shortDescription": "Review files visually",
     "longDescription": "Human Review lets you open HTML, Markdown, localhost pages, plans, and structured review artifacts in a browser. Edit content directly, leave comments, mark sections for revision, and send the complete feedback batch back to your agent. The workflow runs locally and preserves the existing Human Review CLI and offline planning and LOA artifact behavior.",
-    "developerName": "Peter Yang",
+    "developerName": "AcidicSoil",
     "category": "Productivity",
     "capabilities": [
       "Visually review HTML, Markdown, and localhost pages",

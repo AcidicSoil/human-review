@@ -6,6 +6,8 @@ Edit HTML and Markdown files directly, leave comments like a Google Doc, and sen
 
 https://github.com/user-attachments/assets/7cab09c9-eaa0-4e8b-984d-2925e810b5c2
 
+This fork is maintained and distributed by **AcidicSoil**. The original Human Review project was created by Peter Yang; the upstream MIT copyright and license are preserved in [`LICENSE`](LICENSE).
+
 ## Problem
 
 Giving AI feedback on files in chat is painful.
@@ -21,7 +23,7 @@ Then the agent changes the file and you have to check whether it understood ever
 The easiest way to install the skill is to paste this into ChatGPT, Claude Code, Codex, or your favorite coding agent:
 
 ```text
-Install the /human-review skill globally from https://github.com/petergyang/human-review
+Install the /human-review skill globally from https://github.com/AcidicSoil/human-review
 ```
 
 You can also install it with `npx`:

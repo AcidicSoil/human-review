@@ -50,6 +50,22 @@ test("plugin manifest and marketplace declare the skills-only package surface", 
   assert.equal("apps" in manifest, false);
   assert.equal(manifest.interface.logo, "./assets/logo-light.svg");
   assert.equal(manifest.interface.composerIcon, "./assets/composer-icon.svg");
+  assert.deepEqual(manifest.author, {
+    name: "AcidicSoil",
+    url: "https://github.com/AcidicSoil",
+  });
+  assert.equal(manifest.interface.developerName, "AcidicSoil");
+
+  const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  assert.equal(manifest.version, "0.6.2");
+  assert.equal(packageJson.version, "0.6.2");
+  assert.equal(packageJson.author, "AcidicSoil");
+  assert.equal(packageJson.homepage, "https://github.com/AcidicSoil/human-review#readme");
+  assert.deepEqual(packageJson.repository, {
+    type: "git",
+    url: "https://github.com/AcidicSoil/human-review.git",
+  });
+  assert.equal(packageJson.bugs.url, "https://github.com/AcidicSoil/human-review/issues");
   assert.deepEqual(marketplace.plugins[0].source, {
     source: "url",
     url: "https://github.com/AcidicSoil/human-review.git",
