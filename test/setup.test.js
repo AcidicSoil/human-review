@@ -19,16 +19,24 @@ test("global setup installs the skill and local planning runtime for every agent
       const generator = path.join(skillDir, "generator.mjs");
       const fallback = path.join(skillDir, "fallback-client.js");
       const tools = path.join(skillDir, "artifact-tools.js");
+      const loaGenerator = path.join(skillDir, "loa-generator.mjs");
+      const loaClient = path.join(skillDir, "loa-client.js");
+      const loaRunner = path.join(skillDir, "human-review-loa.mjs");
 
       assert.equal(fs.existsSync(skill), true);
       assert.equal(fs.existsSync(runner), true);
       assert.equal(fs.existsSync(generator), true);
       assert.equal(fs.existsSync(fallback), true);
       assert.equal(fs.existsSync(tools), true);
+      assert.equal(fs.existsSync(loaGenerator), true);
+      assert.equal(fs.existsSync(loaClient), true);
+      assert.equal(fs.existsSync(loaRunner), true);
 
       const installedSkill = fs.readFileSync(skill, "utf8");
       assert.match(installedSkill, /human-review poll/);
       assert.match(installedSkill, /human-review-plan\.mjs/);
+      assert.match(installedSkill, /human-review-loa\.mjs/);
+      assert.match(installedSkill, /third review mode|LOA review/i);
       assert.match(installedSkill, /Do not stop and tell the user to run a generator later/);
     }
     assert.match(result.join("\n"), /Claude Code plan runtime/);

@@ -14,7 +14,8 @@
   "type": "module",
   "bin": {
     "human-review": "src/cli.js",
-    "human-review-plan": "src/plate-review/artifact.js"
+    "human-review-plan": "src/plate-review/artifact.js",
+    "human-review-loa": "src/loa-review/artifact.js"
   },
   "files": [
     "src",
@@ -57,7 +58,7 @@
     "@platejs/list-classic": "53.0.0",
     "esbuild": "0.28.1",
     "jsdom": "^29.1.1",
-    "platejs": "53.3.2",
+    "platejs": "53.3.3",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   }

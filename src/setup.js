@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const plateHere = path.join(here, "plate-review");
+const loaHere = path.join(here, "loa-review");
 
 export function invocation(run = spawnSync) {
   const probe = process.platform === "win32" ? "where" : "which";
@@ -43,9 +44,22 @@ export function installPlanRuntime(skillDir) {
   return runnerFile;
 }
 
-export const skillFor = (cmd, planCmd) => readSkill()
+export function installLoaRuntime(skillDir) {
+  fs.mkdirSync(skillDir, { recursive: true });
+  const generator = fs.readFileSync(path.join(loaHere, "generator.js"), "utf8")
+    .replaceAll("from \"./runtime.js\"", "from \"./loa-client.js\"");
+  fs.writeFileSync(path.join(skillDir, "loa-generator.mjs"), generator);
+  fs.copyFileSync(path.join(loaHere, "runtime.js"), path.join(skillDir, "loa-client.js"));
+  const runner = `#!/usr/bin/env node\nimport { runCli } from "./loa-generator.mjs";\nrunCli().then((code) => { process.exitCode = code; }).catch((error) => { console.error(error.message || error); process.exitCode = 1; });\n`;
+  const runnerFile = path.join(skillDir, "human-review-loa.mjs");
+  fs.writeFileSync(runnerFile, runner);
+  return runnerFile;
+}
+
+export const skillFor = (cmd, planCmd, loaCmd = "human-review-loa") => readSkill()
   .replaceAll("npx -y human-review", cmd)
-  .replaceAll("human-review-plan path/to/plan.md", `${planCmd} path/to/plan.md`);
+  .replaceAll("human-review-plan path/to/plan.md", `${planCmd} path/to/plan.md`)
+  .replaceAll("human-review-loa path/to/loa.json", `${loaCmd} path/to/loa.json`);
 
 const CODEX_BLOCK = `
 ## Reviewing files and localhost pages with human-review
@@ -60,8 +74,10 @@ feedback batch arrives, apply it, then poll again with \`--ack\`.
 
 For a large plan/spec/PRD, generate the review artifact with \`__PLAN__ <source> <output.review.html>\`.
 That generator is installed with this skill and embeds an editor runtime directly into the HTML.
+For a structured List of Actions plus component catalog, generate an LOA review with
+\`__LOA__ <input.json> <output.loa.review.html>\`. It is also offline and self-contained.
 Do not stop because npm, Plate, React, esbuild, or network access is unavailable at review time;
-the installed generator must still emit an editable review artifact.
+the installed generators must still emit editable review artifacts.
 
 Items under \`edits\` are changes the user already made: carry \`after\` across
 verbatim and never revert it. For Markdown, apply feedback to the source. For
@@ -82,15 +98,20 @@ export function installSkills(cwd, { global: isGlobal = false, home = os.homedir
     : [["Claude Code", path.join(cwd, ".claude")]];
 
   let projectPlanCmd = "";
+  let projectLoaCmd = "";
   for (const [agent, base] of skillRoots) {
     const skillDir = path.join(base, "skills", "human-review");
     const skillFile = path.join(skillDir, "SKILL.md");
     const runnerFile = installPlanRuntime(skillDir);
+    const loaRunnerFile = installLoaRuntime(skillDir);
     const planCmd = `node ${shellQuote(runnerFile)}`;
+    const loaCmd = `node ${shellQuote(loaRunnerFile)}`;
     if (!projectPlanCmd) projectPlanCmd = planCmd;
-    fs.writeFileSync(skillFile, skillFor(cmd, planCmd));
+    if (!projectLoaCmd) projectLoaCmd = loaCmd;
+    fs.writeFileSync(skillFile, skillFor(cmd, planCmd, loaCmd));
     done.push(`${agent} skill  ${skillFile}${isGlobal ? "   (all projects)" : ""}`);
     done.push(`${agent} plan runtime  ${runnerFile}`);
+    done.push(`${agent} LOA runtime  ${loaRunnerFile}`);
   }
 
   if (!isGlobal) {
@@ -101,7 +122,8 @@ export function installSkills(cwd, { global: isGlobal = false, home = os.homedir
     } else {
       const block = CODEX_BLOCK
         .replaceAll("npx -y human-review", cmd)
-        .replaceAll("__PLAN__", projectPlanCmd);
+        .replaceAll("__PLAN__", projectPlanCmd)
+        .replaceAll("__LOA__", projectLoaCmd);
       fs.writeFileSync(agents, existing ? `${existing.trimEnd()}\n${block}` : block.trimStart());
       done.push(`${existing ? "Updated" : "Created"} AGENTS.md   (Codex)`);
     }
@@ -109,6 +131,7 @@ export function installSkills(cwd, { global: isGlobal = false, home = os.homedir
 
   done.push("", `Agents will be told to run: ${cmd}`);
   done.push(`Planning artifacts use: ${projectPlanCmd}`);
+  done.push(`LOA artifacts use: ${projectLoaCmd}`);
   if (cmd.startsWith("npx")) {
     done.push("Ordinary human-review commands still use npx until the package is installed or linked.");
     done.push("Planning artifact generation does not depend on that npx call after setup.");

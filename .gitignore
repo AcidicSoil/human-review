@@ -14,3 +14,9 @@ videos/
 output/
 .ecc-hooks-disable
 .ecc-hooks-disable.bak
+
+# Local agent harness state
+.atlas/
+.claude/
+.instance/
+.worktrees/

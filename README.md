@@ -50,6 +50,27 @@ Human Review opens the file in your browser. Make direct edits, leave comments, 
 
 The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; selection comments, block comments, drag handles, links, lists, image editing, and the polling workflow continue to work there.
 
+## LOA component review
+
+A third review mode handles a machine-readable List of Actions (LOA) plus a plugin/skill
+catalog. It creates a self-contained artifact with a categorized component rail and an ordered
+action list:
+
+```sh
+human-review-loa loa.json loa.loa.review.html
+```
+
+The input shape is `{ "loa": { "actions": [] }, "catalog": [] }`. Actions have stable IDs,
+editable content, and an unbounded `snapIns[]` array. Click or drag plugins and nested skills
+onto an action; duplicate refs on one action are ignored. Actions can be edited, removed, and
+reordered with the card drag surface, keyboard-accessible move controls, or the keyboard
+shortcuts. Existing refs missing from the current catalog remain visible as unavailable.
+
+The artifact never installs or executes a plugin or skill. **Save reviewed HTML** retains the
+canonical LOA and editable review state. **Save clean LOA JSON** exports only the `{ loa, catalog
+}` result for the next agent. The runtime is embedded, so the artifact works from `file://` without
+npm, a dev server, a CDN, or network access.
+
 ## Planning review artifacts
 
 Large plans, specs, PRDs, roadmaps, and implementation proposals generate one standalone editable HTML artifact.
@@ -161,6 +182,9 @@ When the current reviewed text itself is the desired clean deliverable, use **Sa
 - [`plate-review/fallback-client.js`](src/plate-review/fallback-client.js) keeps planning artifacts editable when the Plate bundle cannot be rebuilt locally.
 - [`plate-review/artifact-tools.js`](src/plate-review/artifact-tools.js) adds section navigation and clean PRD export to either embedded editor runtime.
 - [`plate-review/review-state.js`](src/plate-review/review-state.js) contains planning review-state helpers.
+- [`loa-review/generator.js`](src/loa-review/generator.js) validates LOA JSON and creates the standalone component-review artifact.
+- [`loa-review/runtime.js`](src/loa-review/runtime.js) contains the embedded rail, action editor, drag/drop, and save controls.
+- [`loa-review/state.js`](src/loa-review/state.js) contains immutable LOA action and snap-in helpers.
 - [`scripts/build-plate-review.mjs`](scripts/build-plate-review.mjs) compiles the Plate browser client before packaging.
 - [`setup.js`](src/setup.js) installs both the skill instructions and planning runtime into agent skill directories.
 - [`server.js`](src/server.js) runs the ordinary live review session.
