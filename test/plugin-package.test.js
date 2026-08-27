@@ -50,7 +50,11 @@ test("plugin manifest and marketplace declare the skills-only package surface", 
   assert.equal("apps" in manifest, false);
   assert.equal(manifest.interface.logo, "./assets/logo-light.svg");
   assert.equal(manifest.interface.composerIcon, "./assets/composer-icon.svg");
-  assert.deepEqual(marketplace.plugins[0].source, { source: "local", path: "./" });
+  assert.deepEqual(marketplace.plugins[0].source, {
+    source: "url",
+    url: "https://github.com/AcidicSoil/human-review.git",
+    ref: "main",
+  });
   assert.equal(marketplace.plugins[0].policy.installation, "AVAILABLE");
   assert.equal(marketplace.plugins[0].policy.authentication, "ON_INSTALL");
   assert.equal(marketplace.plugins[0].category, "Productivity");

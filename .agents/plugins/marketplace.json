@@ -7,8 +7,9 @@
     {
       "name": "human-review",
       "source": {
-        "source": "local",
-        "path": "./"
+        "source": "url",
+        "url": "https://github.com/AcidicSoil/human-review.git",
+        "ref": "main"
       },
       "policy": {
         "installation": "AVAILABLE",

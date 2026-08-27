@@ -38,9 +38,10 @@ This repository also contains a skills-only ChatGPT/Codex plugin. Add the reposi
 
 ```sh
 codex plugin marketplace add AcidicSoil/human-review
+codex plugin add human-review@human-review
 ```
 
-For a local checkout, pass its absolute path instead. Restart the ChatGPT desktop app, open the Plugins Directory, choose the Human Review marketplace, and install **Human Review**.
+For a local checkout, pass its absolute path to `codex plugin marketplace add` instead. Restart the ChatGPT desktop app after installation.
 
 ## Ordinary HTML, Markdown, and localhost review
 
