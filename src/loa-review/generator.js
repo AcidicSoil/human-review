@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LOA_CLIENT_SOURCE } from "./runtime.js";
+import { discoverCodexCatalog } from "./catalog.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -230,7 +231,7 @@ export function createLoaReviewHtml({ loa, catalog, sourcePath, artifactName } =
 `;
 }
 
-export async function generateLoaArtifact(inputFile, outputFile) {
+export async function generateLoaArtifact(inputFile, outputFile, { discoverCatalog = discoverCodexCatalog } = {}) {
   const input = path.resolve(inputFile);
   if (!fs.existsSync(input)) throw new Error(`File not found: ${input}`);
   let parsed;
@@ -239,6 +240,7 @@ export async function generateLoaArtifact(inputFile, outputFile) {
   } catch (error) {
     throw new Error(`Invalid LOA JSON in ${input}: ${error.message}`);
   }
+  if (parsed.catalog === undefined) parsed = { ...parsed, catalog: discoverCatalog() };
   const validated = validateLoaInput(parsed);
   const base = path.basename(input, path.extname(input)).replace(/\.loa$/i, "");
   const output = path.resolve(outputFile || path.join(path.dirname(input), `${base}.loa.review.html`));

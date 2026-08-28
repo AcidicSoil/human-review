@@ -52,7 +52,7 @@ After selecting or @-mentioning **Human Review**, name the entry skill in the sa
 ```text
 @Human Review — ordinary-review: Review ./prototype.html and apply my browser feedback.
 @Human Review — planning-review: Turn docs/implementation-plan.md into an editable review artifact.
-@Human Review — loa-review: Build a reviewable LOA for shipping the settings feature and use only plugin/skill refs you can actually see.
+@Human Review — loa-review: Build a reviewable LOA for shipping the settings feature. Populate the component rail from my installed Codex plugins and skills.
 ```
 
 The plugin exposes three focused entry skills:
@@ -91,11 +91,9 @@ action list:
 human-review-loa loa.json loa.loa.review.html
 ```
 
-The input shape is `{ "loa": { "actions": [] }, "catalog": [] }`. Actions have stable IDs,
-editable content, and an unbounded `snapIns[]` array. Click or drag plugins and nested skills
-onto an action; duplicate refs on one action are ignored. Actions can be edited, removed, and
-reordered with the card drag surface, keyboard-accessible move controls, or the keyboard
-shortcuts. Existing refs missing from the current catalog remain visible as unavailable.
+For Codex, the normal input can be just `{ "loa": { "actions": [] } }`. If `catalog` is omitted, Human Review reads Codex's installed/enabled plugin inventory, resolves each installed plugin's nested `SKILL.md` packages, and fills the Component Rail automatically. Skill refs use the prototype's canonical form, for example `skills://plugins/superpowers/test-driven-development`.
+
+An explicitly supplied `catalog` is still supported and is preserved as the manual override. Actions have stable IDs, editable content, and an unbounded `snapIns[]` array. Click or drag plugins and nested skills onto an action; duplicate refs on one action are ignored. Actions can be edited, removed, and reordered with the card drag surface, keyboard-accessible move controls, or the keyboard shortcuts. Existing refs missing from the current catalog remain visible as unavailable.
 
 The artifact never installs or executes a plugin or skill. **Save reviewed HTML** retains the
 canonical LOA and editable review state. **Save clean LOA JSON** exports only the `{ loa, catalog

@@ -55,3 +55,11 @@ test("plugin starter prompts surface every focused review skill", () => {
   const prompts = manifest.interface.defaultPrompt.join("\n");
   for (const entry of cases) assert.match(prompts, new RegExp(entry.name));
 });
+
+test("loa-review defaults to the approved prototype catalog contract", () => {
+  const skill = fs.readFileSync(path.join(skillsRoot, "loa-review", "SKILL.md"), "utf8");
+  assert.match(skill, /Codex.*catalog/i);
+  assert.match(skill, /skills:\/\/plugins\/<plugin>\/<skill>/);
+  assert.match(skill, /omit.*catalog/i);
+  assert.doesNotMatch(skill, /"catalog"\s*:\s*\[\]/);
+});
