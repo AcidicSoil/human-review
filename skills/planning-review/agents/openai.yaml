@@ -1,0 +1,8 @@
+interface:
+  display_name: Planning Review
+  short_description: Review plans and specs visually
+  brand_color: "#E4572E"
+  default_prompt: Turn this plan, spec, PRD, or roadmap into an editable Human Review artifact.
+policy:
+  products: [CHAT, CODEX]
+  allow_implicit_invocation: true

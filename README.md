@@ -45,6 +45,24 @@ codex plugin add human-review@human-review
 
 For a local checkout, pass its absolute path to `codex plugin marketplace add` instead. Restart the ChatGPT desktop app after installation.
 
+### Use the plugin by skill
+
+After selecting or @-mentioning **Human Review**, name the entry skill in the same request. You do not need to remember the underlying CLI commands.
+
+```text
+@Human Review — ordinary-review: Review ./prototype.html and apply my browser feedback.
+@Human Review — planning-review: Turn docs/implementation-plan.md into an editable review artifact.
+@Human Review — loa-review: Build a reviewable LOA for shipping the settings feature and use only plugin/skill refs you can actually see.
+```
+
+The plugin exposes three focused entry skills:
+
+- `ordinary-review` — HTML, rendered Markdown, or localhost pages with the live feedback loop.
+- `planning-review` — plans, specs, PRDs, roadmaps, and implementation proposals.
+- `loa-review` — structured Lists of Actions with plugin/skill composition.
+
+The existing `human-review` skill remains as a backwards-compatible umbrella and shared runtime support.
+
 ## Ordinary HTML, Markdown, and localhost review
 
 Open an HTML or Markdown file:

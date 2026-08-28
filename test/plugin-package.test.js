@@ -57,8 +57,8 @@ test("plugin manifest and marketplace declare the skills-only package surface", 
   assert.equal(manifest.interface.developerName, "AcidicSoil");
 
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  assert.equal(manifest.version, "0.6.2");
-  assert.equal(packageJson.version, "0.6.2");
+  assert.equal(manifest.version, "0.6.3");
+  assert.equal(packageJson.version, "0.6.3");
   assert.equal(packageJson.author, "AcidicSoil");
   assert.equal(packageJson.homepage, "https://github.com/AcidicSoil/human-review#readme");
   assert.deepEqual(packageJson.repository, {
