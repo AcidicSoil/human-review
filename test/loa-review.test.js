@@ -264,3 +264,30 @@ test("embedded runtime supports component attachment, action editing, and keyboa
   cards()[0].querySelector("[data-action-move-down]").click();
   assert.deepEqual(cards().map((card) => card.dataset.actionId), ["second", "first", "third"]);
 });
+
+test("generator auto-populates a missing catalog before rendering the component rail", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-loa-auto-catalog-"));
+  const inputPath = path.join(dir, "auto.json");
+  const outputPath = path.join(dir, "auto.review.html");
+  fs.writeFileSync(inputPath, JSON.stringify({ loa: { title: "Auto catalog", actions: [{ id: "x", content: "Do it", snapIns: [] }] } }));
+
+  await generateLoaArtifact(inputPath, outputPath, { discoverCatalog: () => validInput.catalog });
+  const html = fs.readFileSync(outputPath, "utf8");
+  const bootstrap = html.match(/<script id="hr-loa-bootstrap" type="application\/json">([\s\S]*?)<\/script>/)?.[1];
+  assert.deepEqual(JSON.parse(bootstrap).catalog, validInput.catalog);
+  assert.match(html, /Research tools/);
+});
+
+test("generator preserves an explicitly supplied catalog instead of replacing it", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-loa-manual-catalog-"));
+  const inputPath = path.join(dir, "manual.json");
+  fs.writeFileSync(inputPath, JSON.stringify(validInput));
+  let discoveryCalls = 0;
+
+  await generateLoaArtifact(inputPath, undefined, { discoverCatalog: () => {
+    discoveryCalls += 1;
+    return [];
+  } });
+
+  assert.equal(discoveryCalls, 0);
+});

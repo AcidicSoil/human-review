@@ -36,6 +36,7 @@ test("packaged Human Review skill carries its offline planning and LOA runtimes"
     "human-review-loa.mjs",
     "loa-generator.mjs",
     "loa-client.js",
+    "codex-catalog.mjs",
   ]) {
     assert.equal(fs.existsSync(path.join(skillDir, file)), true, `${file} is missing`);
   }
@@ -57,8 +58,8 @@ test("plugin manifest and marketplace declare the skills-only package surface", 
   assert.equal(manifest.interface.developerName, "AcidicSoil");
 
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  assert.equal(manifest.version, "0.6.3");
-  assert.equal(packageJson.version, "0.6.3");
+  assert.equal(manifest.version, "0.6.4");
+  assert.equal(packageJson.version, "0.6.4");
   assert.equal(packageJson.author, "AcidicSoil");
   assert.equal(packageJson.homepage, "https://github.com/AcidicSoil/human-review#readme");
   assert.deepEqual(packageJson.repository, {

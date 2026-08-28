@@ -33,12 +33,9 @@ For a structured List of Actions and component catalog, create the artifact in t
 node "$SKILL_DIR/human-review-loa.mjs" path/to/loa.json path/to/loa.loa.review.html
 ```
 
-The output path is optional. The input shape is `{ "loa": { "actions": [] }, "catalog": [] }`.
-Each action has a stable non-empty `id`, string `content`, and an unbounded `snapIns` array. The
-catalog is organized as category → plugin → skills. The artifact never loads or executes a
-plugin; it only lets the reviewer attach catalog refs, edit action content, remove or reorder
-actions, and preserve missing refs as unavailable. Click a component or drag it onto an action.
-Use the action move controls when drag-and-drop is unavailable.
+The output path is optional. For Codex, newly-created input may contain only `{ "loa": { "actions": [] } }`; when `catalog` is absent, the bundled runtime discovers Codex's installed/enabled plugins and nested skills automatically before rendering the Component Rail. Canonical skill refs use `skills://plugins/<plugin>/<skill>`.
+
+If the user explicitly supplies `catalog`, preserve it rather than replacing it. Each action has a stable non-empty `id`, string `content`, and an unbounded `snapIns` array. The catalog is organized as category → plugin → skills. The artifact never loads or executes a plugin; it only lets the reviewer attach catalog refs, edit action content, remove or reorder actions, and preserve missing refs as unavailable. Click a component or drag it onto an action. Use the action move controls when drag-and-drop is unavailable.
 
 Save reviewed HTML to retain the editable review state, or save clean LOA JSON to pass the
 canonical `{ "loa", "catalog" }` result to the next agent. Do not persist an event log.
