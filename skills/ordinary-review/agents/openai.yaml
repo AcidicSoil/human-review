@@ -1,0 +1,8 @@
+interface:
+  display_name: Ordinary Review
+  short_description: Review pages with live feedback
+  brand_color: "#E4572E"
+  default_prompt: Review this HTML, Markdown, or localhost page and apply my feedback.
+policy:
+  products: [CHAT, CODEX]
+  allow_implicit_invocation: true

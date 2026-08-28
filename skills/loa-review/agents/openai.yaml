@@ -1,0 +1,8 @@
+interface:
+  display_name: LOA Review
+  short_description: Compose and review action lists
+  brand_color: "#E4572E"
+  default_prompt: Turn this task or LOA into a reviewable action list with plugin and skill references.
+policy:
+  products: [CHAT, CODEX]
+  allow_implicit_invocation: true

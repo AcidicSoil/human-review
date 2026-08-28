@@ -1,6 +1,6 @@
 {
   "name": "human-review",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Review and edit agent-generated files and localhost pages in the browser, then send the whole batch back to your agent.",
   "author": {
     "name": "AcidicSoil",
@@ -11,8 +11,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Human Review",
-    "shortDescription": "Review files visually",
-    "longDescription": "Human Review lets you open HTML, Markdown, localhost pages, plans, and structured review artifacts in a browser. Edit content directly, leave comments, mark sections for revision, and send the complete feedback batch back to your agent. The workflow runs locally and preserves the existing Human Review CLI and offline planning and LOA artifact behavior.",
+    "shortDescription": "Review pages, plans, and LOAs",
+    "longDescription": "Human Review provides focused skills for ordinary page review, planning-document review, and structured LOA composition. Each workflow runs through the existing Human Review browser or offline artifact runtime, while the original human-review skill remains available for backwards compatibility.",
     "developerName": "AcidicSoil",
     "category": "Productivity",
     "capabilities": [
@@ -21,9 +21,9 @@
       "Review plans and structured Lists of Actions offline"
     ],
     "defaultPrompt": [
-      "Open this file for visual review and collect my edits and comments.",
-      "Create a review artifact for this plan and let me mark sections.",
-      "Review this localhost page and send one feedback batch to my agent."
+      "ordinary-review: Review this HTML, Markdown, or localhost page and apply my browser feedback.",
+      "planning-review: Turn this plan, spec, PRD, or roadmap into an editable Human Review artifact.",
+      "loa-review: Turn this task or LOA into a reviewable action list with plugin and skill references."
     ],
     "brandColor": "#E4572E",
     "brandColorDark": "#FF8A65",
