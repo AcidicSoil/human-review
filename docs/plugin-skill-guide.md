@@ -4,6 +4,10 @@ Human Review ships as a skills-only ChatGPT/Codex plugin. The plugin has three f
 
 ## Install the plugin
 
+Human Review supports two different plugin-install surfaces. Choose the one that matches where you use the plugin instead of mixing local Codex installation with workspace-managed ChatGPT/Codex installation.
+
+### Local Codex install
+
 Add this repository as a Codex plugin marketplace, then install Human Review:
 
 ```sh
@@ -11,7 +15,17 @@ codex plugin marketplace add AcidicSoil/human-review
 codex plugin add human-review@human-review
 ```
 
-For a local checkout, pass its absolute path to `codex plugin marketplace add` instead of `AcidicSoil/human-review`. Restart the ChatGPT desktop app after installation so the plugin inventory is refreshed.
+For a local checkout, pass its absolute path to `codex plugin marketplace add` instead of `AcidicSoil/human-review`. If Codex still shows the old inventory after installation, refresh its plugin data or restart Codex.
+
+### Workspace-managed ChatGPT/Codex install
+
+Workspace owners and admins should import the repository through **Workspace settings → Plugins → Add → Import marketplace**:
+
+- Source: `https://github.com/AcidicSoil/human-review`
+- Path: leave blank; the marketplace manifest is at the repository root under `.agents/plugins/marketplace.json`
+- Branch: leave blank to follow the default branch, or pin a branch/tag/commit intentionally
+
+After import, make **Human Review** available or installed for the intended workspace roles. In Codex, open **Sources → Use plugins** and select Human Review. In ChatGPT, select or @-mention Human Review when that surface exposes the plugin.
 
 If you only need the standalone Human Review skill rather than the plugin package, the existing global setup remains available:
 
