@@ -36,14 +36,24 @@ Setup installs the planning-artifact runtime **inside each Human Review skill di
 
 ### ChatGPT/Codex plugin
 
-This repository also contains a skills-only ChatGPT/Codex plugin. Add the repository as a marketplace:
+This repository also contains a skills-only ChatGPT/Codex plugin. There are two different installation surfaces; use the one that matches where you want Human Review available.
+
+For a **local Codex install**, add this repository as a marketplace and install Human Review:
 
 ```sh
 codex plugin marketplace add AcidicSoil/human-review
 codex plugin add human-review@human-review
 ```
 
-For a local checkout, pass its absolute path to `codex plugin marketplace add` instead. Restart the ChatGPT desktop app after installation.
+For a local checkout, pass its absolute path to `codex plugin marketplace add` instead of `AcidicSoil/human-review`. If Codex still shows the old inventory after installation, refresh its plugin data or restart Codex.
+
+For a **workspace-managed ChatGPT/Codex install**, a workspace owner or admin should open **Workspace settings → Plugins → Add → Import marketplace** and use:
+
+- Source: `https://github.com/AcidicSoil/human-review`
+- Path: leave blank; `.agents/plugins/marketplace.json` is already at the repository root
+- Branch: leave blank to follow `main`, or pin a branch/tag/commit intentionally
+
+After import, make **Human Review** available or installed for the intended roles. In Codex, open **Sources → Use plugins** and select Human Review. In ChatGPT, select or @-mention Human Review when that surface exposes the plugin.
 
 ### Use the plugin by skill
 
