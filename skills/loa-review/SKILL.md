@@ -29,4 +29,4 @@ node "$SKILLS_ROOT/human-review/human-review-loa.mjs" path/to/loa.json path/to/l
 
 The bundled runner resolves the Codex catalog itself when `catalog` is absent. Open/return the self-contained artifact for review.
 
-The review surface may add/edit/remove/reorder actions and attach multiple plugin/skill refs to each action. It never installs or executes those refs. Save reviewed HTML to preserve review state or Save clean LOA JSON for the canonical result.
+The review surface may add/edit/remove/reorder actions. Plugin cards are collapsible grouping headers, not add targets; reviewers attach individual nested skill refs to actions. Preserve any plugin-level refs already present in an imported LOA for compatibility, but do not create new plugin-level attachments from the rail. The artifact never installs or executes refs. Save reviewed HTML to preserve review state or Save clean LOA JSON for the canonical result.

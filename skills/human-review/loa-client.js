@@ -20,6 +20,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   let selectedActionId = state.loa.actions[0]?.id || null;
   let editingActionId = null;
   let railQuery = "";
+  const collapsedPluginRefs = new Set();
   let draggedActionId = null;
   let draggedSnapIn = null;
 
@@ -90,14 +91,20 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
     const rail = document.getElementById("hr-loa-rail");
     if (!rail) return;
     const query = railQuery.trim().toLowerCase();
-    const categories = state.catalog.map((category) => {
-      const plugins = (category.plugins || []).map((plugin) => {
+    const categories = state.catalog.map((category, categoryIndex) => {
+      const plugins = (category.plugins || []).map((plugin, pluginIndex) => {
         const pluginText = [category.category, plugin.displayName, plugin.ref].join(" ").toLowerCase();
         const skills = (plugin.skills || []).filter((skill) => !query || pluginText.includes(query) ||
           [skill.displayName, skill.ref].join(" ").toLowerCase().includes(query));
         if (query && !pluginText.includes(query) && !skills.length) return "";
-        const skillHtml = skills.map((skill) => componentButton(skill, "skill")).join("");
-        return "<article class=\"hr-loa-plugin\"><button class=\"hr-loa-component hr-loa-plugin-button\" draggable=\"true\" data-drag-ref=\"" + esc(plugin.ref) + "\" data-add-ref=\"" + esc(plugin.ref) + "\"><span>" + esc(plugin.displayName) + "</span><small>" + esc(plugin.ref) + "</small><b aria-hidden=\"true\">+</b></button>" + (skillHtml ? "<ul class=\"hr-loa-skills\">" + skillHtml + "</ul>" : "") + "</article>";
+        const groupId = "hr-loa-plugin-" + categoryIndex + "-" + pluginIndex;
+        const expanded = Boolean(skills.length) && (Boolean(query) || !collapsedPluginRefs.has(plugin.ref));
+        const skillHtml = skills.map((skill) => componentButton(skill)).join("");
+        const list = skillHtml
+          ? "<ul id=\"" + groupId + "\" class=\"hr-loa-skills\" data-plugin-skills=\"" + esc(plugin.ref) + "\"" + (expanded ? "" : " hidden") + ">" + skillHtml + "</ul>"
+          : "";
+        const disabled = skillHtml ? "" : " disabled";
+        return "<article class=\"hr-loa-plugin\" data-plugin-ref=\"" + esc(plugin.ref) + "\"><button type=\"button\" class=\"hr-loa-plugin-toggle\" data-plugin-toggle=\"" + esc(plugin.ref) + "\" aria-expanded=\"" + expanded + "\" aria-controls=\"" + groupId + "\"" + disabled + "><span class=\"hr-loa-plugin-meta\"><span class=\"hr-loa-plugin-name\">" + esc(plugin.displayName) + "</span><small>" + esc(plugin.ref) + "</small></span><span class=\"hr-loa-plugin-chevron\" aria-hidden=\"true\">" + (expanded ? "▾" : "▸") + "</span></button>" + list + "</article>";
       }).join("");
       return plugins ? "<section class=\"hr-loa-category\"><h3 class=\"hr-loa-category-name\">" + esc(category.category) + "</h3>" + plugins + "</section>" : "";
     }).join("");
@@ -108,7 +115,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
       search?.setSelectionRange(railQuery.length, railQuery.length);
     }
   };
-  const componentButton = (component, kind) => "<li><button class=\"hr-loa-component\" draggable=\"true\" data-drag-ref=\"" + esc(component.ref) + "\" data-add-ref=\"" + esc(component.ref) + "\"><span>" + esc(component.displayName) + "</span><small>" + esc(component.ref) + "</small><b aria-hidden=\"true\">+</b></button></li>";
+  const componentButton = (component) => "<li><button type=\"button\" class=\"hr-loa-component\" draggable=\"true\" data-drag-ref=\"" + esc(component.ref) + "\" data-add-ref=\"" + esc(component.ref) + "\"><span>" + esc(component.displayName) + "</span><small>" + esc(component.ref) + "</small><b aria-hidden=\"true\">+</b></button></li>";
 
   const renderActions = () => {
     const host = document.getElementById("hr-loa-actions");
@@ -159,7 +166,14 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   root.addEventListener("click", (event) => {
     const target = event.target.closest("button");
     const card = event.target.closest("[data-action-id]");
-    if (target?.dataset.addRef) {
+    if (target?.dataset.pluginToggle) {
+      event.preventDefault();
+      const ref = target.dataset.pluginToggle;
+      if (collapsedPluginRefs.has(ref)) collapsedPluginRefs.delete(ref);
+      else collapsedPluginRefs.add(ref);
+      renderRail();
+      announce((collapsedPluginRefs.has(ref) ? "Collapsed " : "Expanded ") + (target.querySelector(".hr-loa-plugin-name")?.textContent || "plugin") + ".");
+    } else if (target?.dataset.addRef) {
       event.preventDefault();
       addSnapInFromRef(target.dataset.addRef);
     } else if (target?.dataset.actionMoveUp !== undefined) {

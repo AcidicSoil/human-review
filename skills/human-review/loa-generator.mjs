@@ -33,10 +33,17 @@ button { font: inherit; }
 .hr-loa-rail h2, .hr-loa-actions h2 { margin: 0 0 12px; font-size: 12px; color: var(--hr-loa-muted); letter-spacing: .08em; text-transform: uppercase; }
 .hr-loa-category + .hr-loa-category { margin-top: 16px; }
 .hr-loa-category-name { margin: 0 0 7px; color: var(--hr-loa-muted); font-size: 12px; }
-.hr-loa-plugin { margin: 0; padding: 8px; border-radius: 8px; background: var(--hr-loa-panel-2); font-size: 13px; }
+.hr-loa-plugin { margin: 0; padding: 7px; border-radius: 9px; background: var(--hr-loa-panel-2); font-size: 13px; }
 .hr-loa-plugin + .hr-loa-plugin { margin-top: 7px; }
-.hr-loa-plugin-name { display: block; font-weight: 700; }
-.hr-loa-skills { margin: 6px 0 0; padding-left: 18px; color: var(--hr-loa-muted); font-size: 12px; }
+.hr-loa-plugin-toggle { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 4px 5px 6px; text-align: left; }
+.hr-loa-plugin-toggle:disabled { cursor: default; opacity: 1; }
+.hr-loa-plugin-toggle:disabled:hover { border-color: transparent; }
+.hr-loa-plugin-meta { min-width: 0; }
+.hr-loa-plugin-name { display: block; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.hr-loa-plugin-meta small { display: block; overflow: hidden; margin-top: 2px; color: var(--hr-loa-muted); font-size: 10px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.hr-loa-plugin-chevron { color: var(--hr-loa-muted); font-size: 12px; }
+.hr-loa-skills { margin: 3px 0 0; padding: 2px 0 0 10px; border-left: 1px solid var(--hr-loa-border); color: var(--hr-loa-muted); font-size: 12px; list-style: none; }
+.hr-loa-skills > li + li { margin-top: 2px; }
 .hr-loa-actions { padding: 18px; }
 .hr-loa-action { padding: 14px; border: 1px solid var(--hr-loa-border); border-radius: 10px; background: #1a232e; }
 .hr-loa-action + .hr-loa-action { margin-top: 10px; }
@@ -153,15 +160,21 @@ const safeJson = (value) => JSON.stringify(value)
 const inlineScript = (source) => String(source || "").replace(/<\/script/gi, "<\\/script");
 
 function renderCatalog(catalog) {
-  return catalog.map((category) => `
+  return catalog.map((category, categoryIndex) => `
     <section class="hr-loa-category">
       <h3 class="hr-loa-category-name">${escapeHtml(category.category)}</h3>
-      ${category.plugins.map((plugin) => `
-        <article class="hr-loa-plugin" data-ref="${escapeHtml(plugin.ref)}" draggable="true">
-          <span class="hr-loa-plugin-name">${escapeHtml(plugin.displayName)}</span>
-          ${plugin.skills.length ? `<ul class="hr-loa-skills">${plugin.skills.map((skill) => `<li data-ref="${escapeHtml(skill.ref)}" draggable="true">${escapeHtml(skill.displayName)}</li>`).join("")}</ul>` : ""}
+      ${category.plugins.map((plugin, pluginIndex) => {
+        const groupId = `hr-loa-plugin-${categoryIndex}-${pluginIndex}`;
+        return `
+        <article class="hr-loa-plugin" data-plugin-ref="${escapeHtml(plugin.ref)}">
+          <button type="button" class="hr-loa-plugin-toggle" data-plugin-toggle="${escapeHtml(plugin.ref)}" aria-expanded="${plugin.skills.length > 0}" aria-controls="${groupId}"${plugin.skills.length ? "" : " disabled"}>
+            <span class="hr-loa-plugin-meta"><span class="hr-loa-plugin-name">${escapeHtml(plugin.displayName)}</span><small>${escapeHtml(plugin.ref)}</small></span>
+            <span class="hr-loa-plugin-chevron" aria-hidden="true">${plugin.skills.length ? "▾" : ""}</span>
+          </button>
+          ${plugin.skills.length ? `<ul id="${groupId}" class="hr-loa-skills" data-plugin-skills="${escapeHtml(plugin.ref)}">${plugin.skills.map((skill) => `<li><button type="button" class="hr-loa-component" draggable="true" data-drag-ref="${escapeHtml(skill.ref)}" data-add-ref="${escapeHtml(skill.ref)}"><span>${escapeHtml(skill.displayName)}</span><small>${escapeHtml(skill.ref)}</small><b aria-hidden="true">+</b></button></li>`).join("")}</ul>` : ""}
         </article>
-      `).join("")}
+      `;
+      }).join("")}
     </section>
   `).join("");
 }

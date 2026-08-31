@@ -253,7 +253,8 @@ test("embedded runtime supports component attachment, action editing, and keyboa
   const dom = new JSDOM(createLoaReviewHtml(input), { runScripts: "dangerously", url: "file:///tmp/loa.html" });
   const cards = () => [...dom.window.document.querySelectorAll("[data-action-id]")];
   assert.match(cards()[0].textContent, /missing\.ref.*unavailable/);
-  const skill = dom.window.document.querySelectorAll("[data-add-ref]")[1];
+  const skill = dom.window.document.querySelector('[data-add-ref="skill"]');
+  assert.ok(skill);
   skill.click();
   skill.click();
   assert.equal(cards()[0].querySelectorAll(".hr-loa-snap-in").length, 2);
@@ -263,6 +264,56 @@ test("embedded runtime supports component attachment, action editing, and keyboa
   assert.match(cards()[0].textContent, /Updated/);
   cards()[0].querySelector("[data-action-move-down]").click();
   assert.deepEqual(cards().map((card) => card.dataset.actionId), ["second", "first", "third"]);
+});
+
+test("component rail exposes leaf skills only and plugin groups collapse independently", async (t) => {
+  let JSDOM;
+  try {
+    ({ JSDOM } = await import("jsdom"));
+  } catch {
+    t.skip("jsdom is unavailable");
+    return;
+  }
+  const input = {
+    loa: { actions: [{ id: "compose", content: "Compose", snapIns: [] }] },
+    catalog: [{
+      category: "Developer Tools",
+      plugins: [{
+        ref: "github",
+        displayName: "GitHub",
+        skills: [
+          { ref: "skills://plugins/github/github", displayName: "github" },
+          { ref: "skills://plugins/github/yeet", displayName: "yeet" },
+        ],
+      }],
+    }],
+  };
+  const dom = new JSDOM(createLoaReviewHtml(input), { runScripts: "dangerously", url: "file:///tmp/loa.html" });
+  const doc = dom.window.document;
+
+  assert.equal(doc.querySelector('[data-add-ref="github"]'), null);
+  assert.equal(doc.querySelectorAll("[data-add-ref]").length, 2);
+  const toggle = doc.querySelector('[data-plugin-toggle="github"]');
+  assert.ok(toggle);
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+
+  doc.querySelector('[data-add-ref="skills://plugins/github/yeet"]').click();
+  const bootstrap = JSON.parse(doc.getElementById("hr-loa-bootstrap").textContent);
+  assert.deepEqual(bootstrap.loa.actions[0].snapIns, [{
+    kind: "skill",
+    ref: "skills://plugins/github/yeet",
+    pluginRef: "github",
+    displayName: "yeet",
+  }]);
+
+  toggle.click();
+  const collapsedToggle = doc.querySelector('[data-plugin-toggle="github"]');
+  assert.equal(collapsedToggle.getAttribute("aria-expanded"), "false");
+  assert.ok(doc.querySelector('[data-plugin-skills="github"]').hidden);
+
+  collapsedToggle.click();
+  assert.equal(doc.querySelector('[data-plugin-toggle="github"]').getAttribute("aria-expanded"), "true");
+  assert.equal(doc.querySelector('[data-plugin-skills="github"]').hidden, false);
 });
 
 test("generator auto-populates a missing catalog before rendering the component rail", async () => {

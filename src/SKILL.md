@@ -35,7 +35,7 @@ human-review-loa path/to/loa.json path/to/loa.loa.review.html
 
 The output path is optional. For Codex, newly-created input may contain only `{ "loa": { "actions": [] } }`; when `catalog` is absent, the bundled runtime discovers Codex's installed/enabled plugins and nested skills automatically before rendering the Component Rail. Canonical skill refs use `skills://plugins/<plugin>/<skill>`.
 
-If the user explicitly supplies `catalog`, preserve it rather than replacing it. Each action has a stable non-empty `id`, string `content`, and an unbounded `snapIns` array. The catalog is organized as category → plugin → skills. The artifact never loads or executes a plugin; it only lets the reviewer attach catalog refs, edit action content, remove or reorder actions, and preserve missing refs as unavailable. Click a component or drag it onto an action. Use the action move controls when drag-and-drop is unavailable.
+If the user explicitly supplies `catalog`, preserve it rather than replacing it. Each action has a stable non-empty `id`, string `content`, and an unbounded `snapIns` array. The catalog is organized as category → plugin → skills. Plugin cards are collapsible grouping headers and are not add targets; click or drag an individual nested skill onto an action. Preserve plugin-level refs already present in imported LOAs, but do not create new plugin-level attachments from the rail. The artifact never loads or executes a plugin, and it preserves missing refs as unavailable. Use the action move controls when drag-and-drop is unavailable.
 
 Save reviewed HTML to retain the editable review state, or save clean LOA JSON to pass the
 canonical `{ "loa", "catalog" }` result to the next agent. Do not persist an event log.
