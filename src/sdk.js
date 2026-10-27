@@ -6,9 +6,17 @@
  * talks to the server — everything crosses to the chrome page by postMessage.
  */
 import { buildContext, findQuote } from "./anchor-text.js";
-import { hashClickAction, navigationHref } from "./click-target.js";
+import { hashClickAction, inPageControl, navigationHref } from "./click-target.js";
 import { linkStyleFixup, listCommandFor, listStyleFixup, normalizeHref } from "./editing.js";
 import { keepBodyEditable, serializeDocument, UI_ATTR, MARK_ATTR } from "./serialize.js";
+
+/**
+ * True when an "Enter" keydown is really an IME confirming its composition
+ * (e.g. finalizing kanji conversion), not the user asking to submit.
+ */
+function isImeCommitEnter(event) {
+  return Boolean(event.isComposing || event.keyCode === 229);
+}
 
 const SAVE_DEBOUNCE_MS = 700;
 const EDIT_FLUSH_MS = 500;
@@ -92,9 +100,25 @@ shadow.innerHTML = `
     .mover:hover { color: #1b1a16; border-color: #c2beb4; }
     .mover:active { cursor: grabbing; }
     .dropline {
-      position: fixed; z-index: 2147483646; height: 0; display: none;
-      border-top: 2px solid #1b1a16; border-radius: 1px; pointer-events: none;
+      position: fixed; z-index: 2147483646; height: 3px; display: none;
+      background: #1f6feb; border-radius: 2px; pointer-events: none;
+      box-shadow: 0 0 0 2px rgba(255,255,255,.9);
     }
+    .dropline::before, .dropline::after {
+      content: ""; position: absolute; top: -3px; width: 9px; height: 9px;
+      border-radius: 50%; background: #1f6feb; box-shadow: 0 0 0 2px rgba(255,255,255,.9);
+    }
+    .dropline::before { left: -4px; }
+    .dropline::after { right: -4px; }
+    .dropTarget { border: 1px dashed #1f6feb; background: rgba(31,111,235,.05); }
+    .dragLabel {
+      position: fixed; z-index: 2147483647; display: none; max-width: 360px; padding: 4px 9px;
+      border-radius: 6px; background: #1b1a16; color: #fbfaf7; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+      font: 11.5px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      box-shadow: 0 4px 14px rgba(27,26,22,.22);
+    }
+    .dragLabel b { color: #9cc2ff; font-weight: 600; }
   </style>
   <div class="box outline" id="outline"></div>
   <div class="box active" id="activeBox"></div>
@@ -109,7 +133,9 @@ shadow.innerHTML = `
     <button class="chip danger" id="linkRemove" title="Remove link" aria-label="Remove link">&#10005;</button>
   </div>
   <div class="mover" id="mover" title="Drag to move this block">&#10303;</div>
+  <div class="box dropTarget" id="dropTarget"></div>
   <div class="dropline" id="dropline"></div>
+  <div class="dragLabel" id="dragLabel"></div>
 `;
 
 const els = {};
@@ -127,6 +153,8 @@ const mountOverlay = () => {
   els.linkRemove = shadow.getElementById("linkRemove");
   els.mover = shadow.getElementById("mover");
   els.dropline = shadow.getElementById("dropline");
+  els.dropTarget = shadow.getElementById("dropTarget");
+  els.dragLabel = shadow.getElementById("dragLabel");
 };
 
 function showMover(el) {
@@ -146,16 +174,35 @@ function showMover(el) {
   els.mover.style.top = `${Math.max(4, r.top + 1)}px`;
 }
 
-function showDropline(drop) {
+/**
+ * Where a dragged block will land: a bold line on the edge it drops against,
+ * a dashed outline on the block that edge belongs to, and a label by the
+ * pointer saying the same in words. Three cues, because a thin line alone
+ * vanishes against borders and bullets.
+ */
+function showDropline(drop, pointer, movingLabel) {
   if (!drop || !drop.ref.isConnected) {
     els.dropline.style.display = "none";
+    els.dropTarget.style.display = "none";
+    els.dragLabel.style.display = "none";
     return;
   }
   const r = drop.ref.getBoundingClientRect();
   els.dropline.style.display = "block";
   els.dropline.style.left = `${r.left}px`;
   els.dropline.style.width = `${r.width}px`;
-  els.dropline.style.top = `${(drop.before ? r.top : r.bottom) - 1}px`;
+  els.dropline.style.top = `${(drop.before ? r.top : r.bottom) - 2}px`;
+  place(els.dropTarget, drop.ref, 3);
+  if (!pointer) return;
+  els.dragLabel.textContent = "";
+  const verb = document.createTextNode(`Move “${clip(movingLabel, 28)}” ${drop.before ? "above" : "below"} `);
+  const target = document.createElement("b");
+  target.textContent = `“${clip(drop.ref.textContent, 32)}”`;
+  els.dragLabel.append(verb, target);
+  els.dragLabel.style.display = "block";
+  const below = pointer.y + 44 < window.innerHeight;
+  els.dragLabel.style.left = `${Math.max(8, Math.min(pointer.x + 14, window.innerWidth - 372))}px`;
+  els.dragLabel.style.top = `${below ? pointer.y + 18 : pointer.y - 34}px`;
 }
 
 function place(box, el, pad = 2) {
@@ -356,6 +403,18 @@ const clip = (text, limit = 40) => {
  */
 const pinnedLabels = new WeakMap();
 
+/**
+ * Sibling order as the page loaded. Ordinals in labels ("p 3") come from
+ * here, so deleting a paragraph does not renumber the ones after it and hand
+ * two different blocks the same label within one review.
+ */
+const bootChildren = new WeakMap();
+function snapshotOrder() {
+  for (const el of [document.body, ...document.body.querySelectorAll("*")]) {
+    if (el.children.length > 1 && !isOurs(el)) bootChildren.set(el, [...el.children]);
+  }
+}
+
 /** The block a hover/edit belongs to, plus a human label for the edit list. */
 function targetFor(node) {
   const el = node && node.nodeType === 1 ? node : node && node.parentElement;
@@ -375,11 +434,16 @@ function targetFor(node) {
   }
 
   if (!pinnedLabels.has(block)) {
-    const heading = precedingHeading(block);
+    // A heading names itself; the heading before it would mislabel the edit.
+    const heading = /^h[1-6]$/i.test(block.tagName) ? "" : precedingHeading(block);
     const tag = block.tagName.toLowerCase();
     // Siblings of the same tag would otherwise share a label and collapse into
-    // one edit row, so number them.
-    const twins = block.parentElement ? [...block.parentElement.children].filter((c) => c.tagName === block.tagName) : [];
+    // one edit row, so number them — by their order at load, not right now.
+    const parent = block.parentElement;
+    const live = parent ? [...parent.children] : [];
+    const booted = parent ? bootChildren.get(parent) : null;
+    const siblings = booted && booted.includes(block) ? booted : live;
+    const twins = siblings.filter((c) => c.tagName === block.tagName);
     const ordinal = twins.length > 1 ? ` ${twins.indexOf(block) + 1}` : "";
     pinnedLabels.set(block, heading ? `${clip(heading, 26)} · ${tag}${ordinal}` : clip(block.textContent, 40) || tag);
   }
@@ -711,6 +775,7 @@ function boot() {
   // real app stays directly editable, not just its initial HTML response.
   keepBodyEditable(document.body);
   document.body.spellcheck = false;
+  snapshotOrder();
   baseline = serialize();
   bootSnapshot = baseline;
   watchSelfRendering();
@@ -727,6 +792,26 @@ function boot() {
       post("eh:dismiss", {});
     }, 0);
   });
+
+  // A selection made with the keyboard (Shift+arrows, Shift+Home/End) never
+  // produces a mouseup, so settle it when the key is released instead. The
+  // wait lets a selection being extended settle once, not on every keystroke.
+  let keySelectTimer = null;
+  document.addEventListener(
+    "keyup",
+    (event) => {
+      if (isOurs(event.target) || resizing || moving || linkState) return;
+      const extending = event.shiftKey && /^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/.test(event.key);
+      const selectAll = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a";
+      if (event.key !== "Shift" && !extending && !selectAll) return;
+      clearTimeout(keySelectTimer);
+      keySelectTimer = setTimeout(() => {
+        if (Date.now() < suppressUntil || composeOpen) return;
+        settleSelection();
+      }, 250);
+    },
+    true
+  );
 
   document.addEventListener(
     "click",
@@ -761,7 +846,10 @@ function boot() {
       }
 
       // Plain clicks belong to editing: never navigate, never fire artifact JS.
-      if (href || (event.target.closest && event.target.closest("button, [role='button'], summary"))) {
+      // A <summary>, tab, or other in-page toggle keeps working: collapsed
+      // content must stay reachable, and its text stays editable either way.
+      const button = event.target.closest && event.target.closest("button, [role='button']");
+      if (href || (button && !inPageControl(event.target))) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -790,7 +878,7 @@ function boot() {
       showMover(hoverMove);
     }
     showGrip(hoverMedia);
-    const interactive = event.target.closest && event.target.closest("a[href], [data-href], button, [role='button']");
+    const interactive = event.target.closest && event.target.closest("a[href], [data-href], button, [role='button']") && (navigationHref(event.target) || !inPageControl(event.target));
     const draggable = hoverMedia && hoverMedia.tagName === "IMG";
     showHint(interactive ? "⌘-click to open" : draggable ? "Drag to move" : "", event.clientX, event.clientY);
   });
@@ -855,6 +943,23 @@ function boot() {
     scheduleSave();
   });
 
+  /**
+   * Delete and move are the two gestures with no native undo, so the last
+   * one is kept restorable: the element itself, detached, plus where it was.
+   */
+  /**
+   * Every delete and move stays restorable for the life of the page: the
+   * element itself, detached or relocated, plus where it came from. The
+   * chrome's per-row Undo and ⌘Z both come here.
+   */
+  const undoStack = []; // [{ kind, el, parent, next, label, at }]
+  const remember = (entry) => {
+    undoStack.push({ ...entry, at: Date.now() });
+    if (undoStack.length > 50) undoStack.shift();
+  };
+  /** Timestamp of the last keystroke, so ⌘Z after typing stays the browser's own undo. */
+  let lastInputAt = 0;
+
   els.chipDelete.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -863,13 +968,43 @@ function boot() {
     const target = targetFor(hoverTarget);
     const label = target ? target.label : "Element";
     const before = hoverTarget.textContent;
+    remember({ kind: "deleted", el: hoverTarget, parent: hoverTarget.parentNode, prev: hoverTarget.previousSibling, next: hoverTarget.nextSibling, label });
     hoverTarget.remove();
     hoverTarget = null;
     place(els.outline, null);
     showChip(null);
     queueEdit({ label, kind: "deleted", before, after: "" });
     flushSave();
+    post("eh:undoable", { label, kind: "deleted" });
   });
+
+  const restoreBlock = (label, kind) => {
+    let index = -1;
+    for (let i = undoStack.length - 1; i >= 0; i -= 1) {
+      if (undoStack[i].label === label && undoStack[i].kind === kind) {
+        index = i;
+        break;
+      }
+    }
+    const undo = index === -1 ? null : undoStack[index];
+    if (!undo || !undo.parent || !undo.parent.isConnected) {
+      // Nothing to put back: the page reloaded since, or the spot is gone.
+      post("eh:undoFailed", { label, kind });
+      return false;
+    }
+    undoStack.splice(index, 1);
+    // Either neighbor may have been deleted or moved since; use whichever is
+    // still in place, and only fall back to the end when both are gone.
+    const next = undo.next && undo.next.parentNode === undo.parent ? undo.next : null;
+    const prev = undo.prev && undo.prev.parentNode === undo.parent ? undo.prev : null;
+    undo.parent.insertBefore(undo.el, next || (prev ? prev.nextSibling : null));
+    undo.el.style.opacity = "";
+    // The chrome drops the row on eh:undone; the block is back to its captured
+    // original, so there is nothing new to report — only the file to write again.
+    flushSave();
+    post("eh:undone", { label, kind });
+    return true;
+  };
 
   // beforeinput still sees the untouched wording, so capture it once per block.
   const originalText = new WeakMap();
@@ -880,6 +1015,69 @@ function boot() {
       originalHtml.set(el, blockHtml(el));
     }
   };
+
+  /**
+   * A list command replaces the paragraph with fresh <li>/<ul> elements. They
+   * inherit its label and captured original, so the edit row still reads
+   * "this paragraph became a list" instead of a row for an unknown block with
+   * no `before`.
+   */
+  const adoptIdentity = (source, created) => {
+    if (!source || !created || created === source.el) return;
+    // The input event fired inside execCommand, before this ran, and the
+    // fresh element named itself ("li 3", no `before`). Retract that row.
+    const stale = pinnedLabels.get(created);
+    if (stale && stale !== source.label) editQueue.delete(`${stale}\u0000edited`);
+    pinnedLabels.set(created, source.label);
+    if (!originalText.has(created) && originalText.has(source.el)) {
+      originalText.set(created, originalText.get(source.el));
+      originalHtml.set(created, originalHtml.get(source.el));
+    }
+  };
+
+  const afterListCommand = (source) => {
+    const sel = document.getSelection();
+    polishNewList(sel);
+    if (!source || source.authored) return;
+    const node = sel && sel.anchorNode;
+    const el = node && (node.nodeType === 1 ? node : node.parentElement);
+    const item = el && el.closest ? el.closest("li") : null;
+    const list = item ? item.closest("ul, ol") : null;
+    adoptIdentity(source, item);
+    adoptIdentity(source, list);
+    if (item) emitBlockEdit(item, source.label);
+  };
+
+  /**
+   * Every block a selection touches. Typing over a selection that runs from
+   * one paragraph into the next changes both — the second may vanish
+   * entirely — and each needs its own row.
+   */
+  const blocksInRange = (range) => {
+    const found = [];
+    const add = (node) => {
+      const target = targetFor(node);
+      if (target && !found.some((t) => t.el === target.el)) found.push(target);
+    };
+    add(range.startContainer);
+    add(range.endContainer);
+    if (range.collapsed) return found;
+    const root = range.commonAncestorContainer;
+    const scope = root.nodeType === 1 ? root : root.parentElement;
+    if (!scope) return found;
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (el) => (isOurs(el) || !range.intersectsNode(el) ? NodeFilter.FILTER_REJECT : isBlock(el) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+    });
+    let el = walker.nextNode();
+    let budget = 400;
+    while (el && budget > 0) {
+      add(el);
+      el = walker.nextNode();
+      budget -= 1;
+    }
+    return found;
+  };
+  let affected = null; // targets of a multi-block selection, until the input event reports them
 
   /** An edit row for a block changed outside the input-event flow (attribute
    * set, link removal, drag move) — the same shape the input listener emits. */
@@ -932,8 +1130,12 @@ function boot() {
       // From here on, DOM drift is the human typing, not the page rendering.
       userEdited = true;
       const sel = document.getSelection();
-      const target = targetFor(sel && sel.anchorNode ? sel.anchorNode : event.target);
+      const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+      const blocks = range ? blocksInRange(range) : [];
+      const target = blocks[0] || targetFor(event.target);
       if (target) captureOriginal(target.el);
+      for (const block of blocks) captureOriginal(block.el);
+      affected = blocks.length > 1 ? blocks : null;
     },
     true
   );
@@ -1058,6 +1260,7 @@ function boot() {
   els.linkInput.addEventListener("keydown", (event) => {
     event.stopPropagation();
     if (event.key === "Enter") {
+      if (isImeCommitEnter(event)) return;
       event.preventDefault();
       applyLink();
     } else if (event.key === "Escape") {
@@ -1085,6 +1288,18 @@ function boot() {
       const sel = document.getSelection();
       const anchor = sel ? sel.anchorNode : null;
 
+      // ⌘Z right after a block delete or move undoes that, not the last
+      // keystroke — unless typing came after it, which stays the browser's undo.
+      if (meta && !event.shiftKey && !event.altKey && (event.key === "z" || event.key === "Z")) {
+        const last = undoStack[undoStack.length - 1];
+        if (last && last.at > lastInputAt) {
+          event.preventDefault();
+          event.stopPropagation();
+          restoreBlock(last.label, last.kind);
+        }
+        return;
+      }
+
       // ⌘K links the selection, like Docs, Word, and Notion.
       if (meta && !event.shiftKey && !event.altKey && (event.key === "k" || event.key === "K")) {
         if (openLinkbox()) {
@@ -1108,7 +1323,7 @@ function boot() {
         userEdited = true;
         captureOriginal(target.el);
         document.execCommand(event.code === "Digit7" ? "insertOrderedList" : "insertUnorderedList");
-        polishNewList(document.getSelection());
+        afterListCommand(target);
         scheduleSave();
         return;
       }
@@ -1161,7 +1376,7 @@ function boot() {
         sel.addRange(lead);
         document.execCommand("delete");
         document.execCommand(command);
-        polishNewList(document.getSelection());
+        afterListCommand(target);
         scheduleSave();
       }
     },
@@ -1264,13 +1479,28 @@ function boot() {
   // identity (labels, captured originals, comment anchors) survives the move.
   let moving = null; // { el, label, drop: { ref, before } | null } while the handle is held
 
+  /** Within this many pixels of a container's outer edge, the drop targets the container. */
+  const CONTAINER_EDGE = 10;
+
   const dropPointFor = (x, y) => {
     const under = document.elementFromPoint(x, y);
     if (!under || isOurs(under)) return null;
     const block = innermostBlock(under);
     if (!block || block === moving.el || moving.el.contains(block)) return null;
-    const r = block.getBoundingClientRect();
-    return { ref: block, before: y < r.top + r.height / 2 };
+    // Near the top or bottom edge of a card or section, the whole container
+    // is the target, so a block can be dropped past it rather than only
+    // beside one of its children. The outermost qualifying ancestor wins.
+    let chosen = block;
+    let ancestor = block.parentElement;
+    while (ancestor && ancestor !== document.body && !isOurs(ancestor)) {
+      if (ancestor !== moving.el && !moving.el.contains(ancestor) && isBlock(ancestor)) {
+        const box = ancestor.getBoundingClientRect();
+        if (y - box.top <= CONTAINER_EDGE || box.bottom - y <= CONTAINER_EDGE) chosen = ancestor;
+      }
+      ancestor = ancestor.parentElement;
+    }
+    const r = chosen.getBoundingClientRect();
+    return { ref: chosen, before: y < r.top + r.height / 2 };
   };
 
   els.mover.addEventListener("pointerdown", (event) => {
@@ -1279,11 +1509,16 @@ function boot() {
     event.preventDefault();
     event.stopPropagation();
     const target = targetFor(el);
-    moving = { el, label: target ? target.label : "Block", drop: null };
+    moving = { el, label: target ? target.label : "Block", drop: null, pointer: { x: event.clientX, y: event.clientY } };
     captureOriginal(moving.el);
+    // Dimming the block is our doing, not the page rendering itself: say so
+    // before touching it, or a move as the first action reads as self-render
+    // and switches saves off for the rest of the review.
+    userEdited = true;
     moving.el.style.opacity = "0.4";
     place(els.outline, null);
     showChip(null);
+    requestAnimationFrame(autoScroll);
     try {
       els.mover.setPointerCapture(event.pointerId);
     } catch {
@@ -1291,11 +1526,35 @@ function boot() {
     }
   });
 
+  /**
+   * Near the top or bottom edge the page scrolls on its own, so a block can
+   * travel further than one screen. Runs per frame while the handle is held.
+   */
+  const EDGE = 56;
+  const autoScroll = () => {
+    if (!moving) return;
+    const { x, y } = moving.pointer;
+    let step = 0;
+    if (y < EDGE) step = -Math.ceil((EDGE - y) / 4);
+    else if (y > window.innerHeight - EDGE) step = Math.ceil((y - (window.innerHeight - EDGE)) / 4);
+    if (step) {
+      window.scrollBy(0, step);
+      const next = dropPointFor(x, y);
+      if (next) moving.drop = next;
+      showDropline(moving.drop, moving.pointer, moving.label);
+    }
+    requestAnimationFrame(autoScroll);
+  };
+
   window.addEventListener("pointermove", (event) => {
     if (!moving) return;
     event.preventDefault();
-    moving.drop = dropPointFor(event.clientX, event.clientY);
-    showDropline(moving.drop);
+    moving.pointer = { x: event.clientX, y: event.clientY };
+    // Over a margin or gutter there is no block under the pointer; keep the
+    // last real target rather than blinking the indicator off and on.
+    const next = dropPointFor(event.clientX, event.clientY);
+    if (next) moving.drop = next;
+    showDropline(moving.drop, moving.pointer, moving.label);
   });
 
   window.addEventListener("pointerup", () => {
@@ -1311,6 +1570,7 @@ function boot() {
     const next = drop.before ? drop.ref : drop.ref.nextElementSibling;
     if (next === el || (drop.before ? drop.ref.previousElementSibling : drop.ref) === el) return;
     userEdited = true;
+    remember({ kind: "moved", el, parent: el.parentNode, prev: el.previousSibling, next: el.nextSibling, label });
     drop.ref.parentNode.insertBefore(el, next);
     const prev = el.previousElementSibling;
     const following = el.nextElementSibling;
@@ -1325,6 +1585,7 @@ function boot() {
       moved_before: following ? clip(following.textContent, 90) : "",
     });
     flushSave();
+    post("eh:undoable", { label, kind: "moved" });
   });
 
   // ------------------------------------------------------------- image paste
@@ -1383,6 +1644,7 @@ function boot() {
 
   document.addEventListener("input", (event) => {
     if (isOurs(event.target)) return;
+    lastInputAt = Date.now();
     // A drop fires deleteByDrag/insertFromDrop input events whose selection
     // points anywhere; finalizeImageDrag writes the real rows instead.
     if (dragging) return;
@@ -1390,6 +1652,18 @@ function boot() {
     if (pending) {
       clearPending();
       post("eh:dismiss", {});
+    }
+    if (affected) {
+      // A selection spanning blocks: the first absorbed the rest, and any
+      // block that is gone now is a deletion in its own right.
+      const blocks = affected;
+      affected = null;
+      for (const block of blocks) {
+        if (block.el.isConnected) emitBlockEdit(block.el, block.label);
+        else queueEdit({ label: block.label, kind: "deleted", before: originalText.get(block.el), after: "", before_html: originalHtml.get(block.el), after_html: "" });
+      }
+      scheduleSave();
+      return;
     }
     const sel = document.getSelection();
     const node = sel && sel.anchorNode ? sel.anchorNode : event.target;
@@ -1499,6 +1773,9 @@ function boot() {
         break;
       case "eh:assetFailed":
         pendingPastes.delete(msg.id);
+        break;
+      case "eh:undo":
+        restoreBlock(String(msg.label || ""), String(msg.kind || ""));
         break;
       default:
         break;

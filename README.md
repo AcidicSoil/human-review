@@ -89,6 +89,10 @@ Review a page running on localhost:
 
 Human Review opens the file in your browser. Make direct edits, leave comments, and click Send. Your agent receives all your feedback in one batch, updates the source, and refreshes the page for another review.
 
+In Claude Code, the agent waits in the background and picks up your feedback the moment you hit Send. In Codex and other agents, it waits during its turn; if the turn already ended, send a message and it picks the feedback up. Closing the tab or clicking End review releases the agent either way. Feedback you never sent is kept, and the next time you open that page you can restore or discard it.
+
+Note: For HTML files, direct edits and resizes save automatically, so closing the tab doesn't undo them — Discard on your next open, or Revert all during the review, puts the file back. For Markdown and localhost pages, click Send so your agent can apply them to the source.
+
 The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; selection comments, block comments, drag handles, links, lists, image editing, and the polling workflow continue to work there.
 
 ## LOA component review
@@ -211,6 +215,9 @@ When the current reviewed text itself is the desired clean deliverable, use **Sa
 - **Review localhost routes** without writing rendered responses back into app source.
 - **Send ordinary review feedback live** through the existing agent polling loop.
 - **Return planning feedback as one reviewed HTML artifact** with the editor state embedded.
+- **Keep unsent review feedback** for the next review session.
+- **Undo moved or deleted blocks** during ordinary review.
+- **Reword previously sent comments** and resend them.
 
 ## What’s inside
 

@@ -140,37 +140,118 @@ Do not ask the user to restate edits, comments, or section actions in chat. The 
 
 ## Ordinary review loop
 
-For normal HTML or Markdown:
+Open the review page for an HTML/Markdown file or local route:
 
 ```sh
 npx -y human-review path/to/file.html
-npx -y human-review poll path/to/file.html --timeout 600
-```
-
-For a local application route:
-
-```sh
 npx -y human-review http://localhost:3000/wiki
-npx -y human-review poll http://localhost:3000/wiki --timeout 600
 ```
 
-After applying feedback, acknowledge and wait again:
+Wait for the user to click Send or close the review:
 
 ```sh
-npx -y human-review poll path/to/file.html --ack --timeout 600
+npx -y human-review poll path/to/file.html
 ```
 
-If a poll returns `{"status":"timeout"}`, run it again. If it returns `{"status":"closed"}`, stop polling. To inspect pending state without blocking:
+- **Claude Code:** run the poll in the background so it can wake the agent when feedback arrives.
+- **Codex, Cursor, other agents:** run the poll in the foreground within the active turn. A finished turn cannot wake itself; the user must send a new message. If the tool limits command duration, use `--timeout` just under that limit and repeat while the review stays open.
+- **Feedback:** apply every page in the returned batch. Re-read autosaved HTML before changing it, then acknowledge with `poll <target> --ack` and start the next wait.
+- **Closed:** stop polling; if `unsent` is nonzero, tell the user their feedback is saved.
+- **Superseded:** stop this poll. **Timeout:** check status and continue waiting if still open.
+
+Check pending feedback without blocking:
 
 ```sh
 npx -y human-review status path/to/file.html
 ```
 
-### Ordinary review rules
+## What you get
 
-- `edits[].after` is wording the user already changed. Carry it across exactly and do not revert it.
-- Preserve formatting represented in `after_html`.
-- Markdown is reviewed rendered; apply changes to Markdown source.
-- A `kind: "url"` page is a localhost route. Update its actual component/template source, never the rendered HTTP response.
-- Preserve pasted assets and moved blocks.
-- Apply every page in the returned batch.
+One batch covers every page the user visited, grouped by file or localhost URL.
+
+```json
+{
+  "status": "feedback",
+  "pages": [
+    {
+      "file": "/abs/path/to/page.html",
+      "edits_saved": true,
+      "comments": [
+        { "id": "c_1", "kind": "selection", "quote": "the exact text they selected",
+          "anchor": { "prefix": "...", "quote": "...", "suffix": "..." },
+          "feedback": "what they want changed" }
+      ],
+      "edits": [
+        { "label": "Problem body", "kind": "edited",
+          "before": "the original wording",
+          "after": "their exact new wording",
+          "after_html": "their exact new wording with <strong>formatting</strong>" }
+      ]
+    }
+  ],
+  "overall_note": "feedback not tied to any one page"
+}
+```
+
+## Rules
+
+- **`edits` are changes the user already made.** `after` is their exact wording —
+  carry it across verbatim and never revert it. If the HTML was generated from
+  something else (MDX, Markdown, a template), apply `after` to the **source** too,
+  or their fix disappears on the next build.
+- **`edits_saved: true` means those edits are already in the file on disk.**
+  Plain HTML files autosave as the user types, so your copy of the file is
+  stale. Re-read the file before touching it and make targeted changes only;
+  never regenerate it from what you wrote earlier, or their work disappears.
+  `edits_saved: false` (Markdown, localhost pages, self-rendering HTML) means the
+  edits exist only in this batch — apply them to the source yourself.
+- An edit with `kind: "deleted"` means the user removed that whole block:
+  delete it from the source too, without asking why.
+- An edit marked `truncated: true` had its text cut at 200k characters; read
+  the block from the page itself rather than from `after_html`.
+- When `before_html`/`after_html` are present, the user changed formatting, not
+  just words — bold, italic, underline, links. Use the HTML version to carry the
+  formatting into the source, translated to its syntax (e.g. `<strong>` → `**`
+  in Markdown/MDX).
+- A page with `kind: "url"` was edited directly in the review UI. Its `file`
+  and `url` fields name the localhost route, not a writable file. Find the
+  matching project source (such as MDX, TSX, or a template), apply every edit
+  and deletion there, then acknowledge so the route reloads. Never write the
+  rendered HTTP response back into the app.
+- When an edit's `after_html` contains `<img src="assets/...">`, the user pasted
+  an image: the file already exists in an `assets/` folder next to the reviewed
+  file. Keep that relative path — in Markdown, reference it as
+  `![](assets/...)`. Never regenerate or inline the image.
+- On a localhost page, a pasted image arrives under `staged_assets`. Copy its
+  local `path` into the app's appropriate asset folder, replace the temporary
+  preview URL in `after_html`, and preserve the image at the user's insertion
+  point. Never leave the temporary preview URL in source.
+- An edit with `kind: "moved"` means the user relocated that whole block.
+  Reposition it in the source without rewriting its content: it now sits right
+  after the block whose text starts with `moved_after`, and right before the
+  block whose text starts with `moved_before` (both are clipped to 90
+  characters and may end in `…`). An empty `moved_after` means it is now the
+  first block in its container.
+- Find each comment by its `quote`. It is the **rendered** text the user
+  selected, so in Markdown or templated HTML it may span formatting syntax or
+  tags; `anchor.prefix` and `anchor.suffix` give the surrounding text to
+  disambiguate.
+- `kind: "element"` points at a whole block, so `quote` is its label, not body text.
+- Copy any `staged_assets` files before you ack: `--ack` deletes them.
+- A batch with only an `overall_note` has an empty `pages` array.
+- Fix every page in `pages`, not just the first.
+- **Do not write a reply.** There is no chat. The user sees your work when the page
+  reloads, which happens on its own the moment you save the file.
+
+## Better edit labels (optional)
+
+Name the sections you author and the user's edit list uses your names instead of
+guessing from the DOM:
+
+```html
+<p data-block="Problem body">…</p>
+<div data-container="Metrics callout">…</div>
+```
+
+`data-block` names a region for the edit list. `data-container` also makes the block
+clickable as a comment target.

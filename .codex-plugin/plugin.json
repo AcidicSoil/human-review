@@ -1,6 +1,6 @@
 {
   "name": "human-review",
-  "version": "0.6.4",
+  "version": "0.8.2",
   "description": "Review and edit agent-generated files and localhost pages in the browser, then send the whole batch back to your agent.",
   "author": {
     "name": "AcidicSoil",

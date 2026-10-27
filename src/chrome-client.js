@@ -6,7 +6,16 @@
  */
 import { tidy } from "./anchor-text.js";
 import { pageUrl, replacePage } from "./chrome-session.js";
+import { normalizeHref } from "./editing.js";
 import { framePolicy } from "./frame-policy.js";
+
+/**
+ * True when an "Enter" keydown is really an IME confirming its composition
+ * (e.g. finalizing kanji conversion), not the user asking to submit.
+ */
+function isImeCommitEnter(event) {
+  return Boolean(event.isComposing || event.keyCode === 229);
+}
 
 const $ = (id) => document.getElementById(id);
 const frame = $("frame");
@@ -30,6 +39,8 @@ const state = {
   reloading: false,
   dynamic: false,
   framePolicy: null,
+  artifactToken: "",
+  leftover: null,
 };
 
 /**
@@ -40,7 +51,7 @@ const state = {
 function handoffPrompt(pollCommand) {
   const cmd = String(pollCommand || "").trim();
   if (!cmd) return "";
-  return `Run \`${cmd} --timeout 600\`, apply the feedback it returns, then keep polling with --ack until I end the review.`;
+  return `Start \`${cmd}\` in the background and end your turn; it exits when I hit Send. Apply the feedback it prints, then start it again with --ack.`;
 }
 
 // ------------------------------------------------------------------- server
@@ -69,9 +80,43 @@ const ARTIFACT_ORIGIN = `${location.protocol}//${ARTIFACT_HOST}:${location.port}
 const toFrame = (message) =>
   frame.contentWindow && frame.contentWindow.postMessage(message, state.framePolicy?.targetOrigin || ARTIFACT_ORIGIN);
 
+/**
+ * Point the frame at a page without adding a history entry of its own.
+ * Setting `src` records each artifact load in the window's history, so Back
+ * would step through frame loads instead of review pages.
+ */
+function showInFrame(url) {
+  try {
+    if (frame.contentWindow) {
+      frame.contentWindow.location.replace(url);
+      return;
+    }
+  } catch {}
+  frame.src = url;
+}
+
 function artifactUrl(key, bust = false) {
   const query = bust ? `?t=${Date.now()}` : "";
-  return `${ARTIFACT_ORIGIN}/artifact/${key}/index.html${query}`;
+  return `${ARTIFACT_ORIGIN}/artifact/${state.artifactToken}/${key}/index.html${query}`;
+}
+
+/**
+ * The server forgot this session — it restarted, or the tab was away longer
+ * than the session lives. Open a fresh session on the same target so the
+ * page keeps working instead of turning into a dead tab that looks alive.
+ */
+async function rebootstrap() {
+  const target = state.page ? state.page.url || state.page.file : "";
+  if (!target) return false;
+  try {
+    const fresh = await api("/api/session", { method: "POST", body: JSON.stringify({ target }) });
+    state.sessionId = fresh.sessionId;
+    state.artifactToken = fresh.artifactToken || state.artifactToken;
+    history.replaceState({ key: state.key }, "", `${fresh.path}?key=${encodeURIComponent(state.key)}`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -108,7 +153,7 @@ async function loadPage(key, { reload = true } = {}) {
   clearTimeout(retryTimer);
   if (reload) {
     state.reloading = true;
-    frame.src = artifactUrl(key);
+    showInFrame(artifactUrl(key));
   }
   render();
   // Coming back to a dev-server page shows the app's own copy again, without
@@ -118,6 +163,33 @@ async function loadPage(key, { reload = true } = {}) {
     toast(`This page renders from your dev server — ${edits} ${edits === 1 ? "edit is" : "edits are"} queued for the agent`);
   }
 }
+
+// ------------------------------------------------------------------ history
+
+/**
+ * Each page shown in this window is a history entry, so Back returns to the
+ * previous page of the review instead of leaving it. The server's idea of
+ * the active page follows along, so a reload lands on the same page.
+ */
+function pushHistory(key) {
+  try {
+    history.pushState({ key }, "", `/s/${state.sessionId}?key=${encodeURIComponent(key)}`);
+  } catch {}
+}
+
+window.addEventListener("popstate", async (event) => {
+  const key = event.state && event.state.key;
+  if (!key || key === state.key || document.querySelector(".ended")) return;
+  await flushFrame();
+  try {
+    await api(`/api/session/${state.sessionId}/goto`, { method: "POST", body: JSON.stringify({ key }) });
+  } catch (err) {
+    toast(err.message);
+    return;
+  }
+  state.scroll = { x: 0, y: 0 };
+  await loadPage(key);
+});
 
 // -------------------------------------------------------------------- clock
 
@@ -138,6 +210,7 @@ const clock = () => new Date().toLocaleTimeString([], { hour: "numeric", minute:
 function render() {
   const page = state.page;
   if (!page) return;
+  document.title = page.filename || 'human-review';
 
   const comments = page.comments || [];
   const edits = page.edits || [];
@@ -175,8 +248,20 @@ function render() {
     sep.textContent = "·";
     const when = document.createElement("span");
     when.className = "when";
-    when.textContent = ago(comment.createdAt);
+    when.textContent = ago(comment.updatedAt || comment.createdAt);
     who.append(sep, when);
+
+    if (comment.sent) {
+      const badge = document.createElement("span");
+      badge.className = "badge sent";
+      badge.textContent = "sent";
+      who.append(badge);
+    } else if (comment.updatedAt) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = "edited";
+      who.append(badge);
+    }
 
     if (state.orphans.has(comment.id)) {
       const badge = document.createElement("span");
@@ -194,6 +279,15 @@ function render() {
       setActive(comment.id, true);
     });
 
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "jump edit-comment";
+    edit.textContent = "Edit";
+    edit.addEventListener("click", (event) => {
+      event.stopPropagation();
+      editComment(card, body, comment);
+    });
+
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "remove";
@@ -206,8 +300,6 @@ function render() {
       state.page = (await api(`/api/page/${state.key}/comment/${comment.id}`, { method: "DELETE" })).page;
       render();
     });
-
-    head.append(who, jump, remove);
 
     const quote = document.createElement("p");
     quote.className = "quote";
@@ -222,6 +314,7 @@ function render() {
       editComment(card, body, comment);
     });
 
+    head.append(who, jump, edit, remove);
     card.append(head, quote, body);
     card.addEventListener("click", () => setActive(comment.id, false));
     list.append(card);
@@ -238,7 +331,7 @@ function render() {
     const shown = state.editsExpanded ? edits : edits.slice(0, LIMIT);
     for (const edit of shown) {
       const row = document.createElement("div");
-      row.className = `edit-row${edit.kind === "deleted" ? " deleted" : ""}`;
+      row.className = `edit-row${edit.kind === "deleted" ? " deleted" : ""}${edit.sent ? " sent" : ""}`;
       const pip = document.createElement("span");
       pip.className = "pip";
       const label = document.createElement("span");
@@ -246,8 +339,20 @@ function render() {
       label.textContent = edit.label;
       const kind = document.createElement("span");
       kind.className = "kind";
-      kind.textContent = edit.kind;
+      kind.textContent = edit.sent ? `${edit.kind} · sent` : edit.kind;
       row.append(pip, label, kind);
+      if (!edit.sent && (edit.kind === "deleted" || edit.kind === "moved")) {
+        const undo = document.createElement("button");
+        undo.type = "button";
+        undo.className = "row-undo";
+        undo.textContent = "Undo";
+        undo.title = edit.kind === "moved" ? "Put this block back where it was" : "Restore this block";
+        undo.addEventListener("click", (event) => {
+          event.stopPropagation();
+          undoBlock(edit.label, edit.kind);
+        });
+        row.append(undo);
+      }
       rows.append(row);
     }
     if (edits.length > LIMIT) {
@@ -290,34 +395,43 @@ function render() {
           body: JSON.stringify({ key: other.key }),
         });
         state.scroll = { x: 0, y: 0 };
+        pushHistory(other.key);
         await loadPage(other.key);
       });
       list.append(row);
     }
   }
 
-  // --- send
+  // --- send: only what the agent does not have yet counts. Items from a
+  // batch that is delivered or queued stay listed until the ack, marked sent.
   const otherTotal = others.reduce((sum, o) => sum + o.count, 0);
-  const total = comments.length + edits.length + otherTotal;
+  const unsent = page.unsent || { comments: comments.length, edits: edits.length };
+  const total = unsent.comments + unsent.edits + otherTotal;
   // An overall note is sendable on its own — the server already accepts
   // note-only batches; the button must not stay dead while one is typed.
   const hasNote = $("note").value.trim().length > 0;
   const send = $("send");
   const delivered = state.agent === "working";
+  const queued = state.agent === "queued";
   const stranded = state.agent === "stranded";
-  const busy = delivered || stranded || state.sent;
-  send.disabled = (total === 0 && !hasNote) || busy;
-  send.textContent = delivered
-    ? "Feedback delivered"
-    : stranded
-      ? "Sent — agent is not listening"
-      : state.sent
-        ? "Sent — waiting for agent"
-        : total
-          ? `Send ${total} to agent`
-          : hasNote
-            ? "Send note to agent"
-            : "Nothing to send yet";
+  // While the agent works, anything new can still be sent: it queues behind
+  // the batch in flight and ships with the agent's next poll.
+  const nothingNew = total === 0 && !hasNote;
+  const busy = stranded || state.sent || (queued && nothingNew);
+  send.disabled = nothingNew || busy;
+  send.textContent = stranded
+    ? "Sent — agent is not listening"
+    : state.sent || (nothingNew && (delivered || queued))
+      ? queued
+        ? "Sent — queued for the agent"
+        : delivered
+          ? "Feedback delivered"
+          : "Sent — waiting for agent"
+      : total
+        ? `Send ${total} to agent`
+        : hasNote
+          ? "Send note to agent"
+          : "Nothing to send yet";
   if (!send.disabled) {
     const key = document.createElement("span");
     key.className = "key";
@@ -327,8 +441,23 @@ function render() {
 
   // After sending, say what happens next. If nothing is polling, the loop would
   // otherwise dead-end silently, so hand over the exact command to run.
-  $("agentLine").hidden = !delivered;
-  $("agentText").textContent = "Feedback delivered — page reloads when fixes land";
+  $("agentLine").hidden = !(delivered || queued);
+  $("agentText").textContent = queued
+    ? "Agent is still on your last batch — this one ships with its next poll"
+    : "Feedback delivered — page reloads when fixes land";
+
+  // --- feedback left over from an earlier review of this page
+  const leftover = state.leftover;
+  const leftoverBox = $("leftover");
+  const leftoverTotal = leftover ? leftover.comments + leftover.edits : 0;
+  leftoverBox.hidden = !leftoverTotal;
+  if (leftoverTotal) {
+    const parts = [];
+    if (leftover.comments) parts.push(`${leftover.comments} ${leftover.comments === 1 ? "comment" : "comments"}`);
+    if (leftover.edits) parts.push(`${leftover.edits} ${leftover.edits === 1 ? "edit" : "edits"}`);
+    const savedNote = page.kind === "file" && !page.markdown ? " Text edits are already in the file; Discard puts the agent's version back." : "";
+    $("leftoverText").textContent = `${parts.join(" and ")} from your last review never went to the agent.${savedNote}`;
+  }
 
   // Server-authoritative, so it survives a browser refresh.
   $("handoff").hidden = !stranded;
@@ -379,11 +508,19 @@ function editComment(card, body, comment) {
     const feedback = input.value.trim();
     if (!feedback || feedback === comment.feedback) return render();
     try {
-      state.page = (await api(`/api/page/${state.key}/comment/${comment.id}`, {
+      const result = await api(`/api/page/${state.key}/comment/${comment.id}`, {
         method: "PATCH",
         body: JSON.stringify({ feedback }),
-      })).page;
-      state.sent = false;
+      });
+      state.page = result.page;
+      if (result.delivery === "updated-pending") toast("Updated the feedback waiting for your agent");
+      else if (result.delivery === "resend") {
+        state.sent = false;
+        toast("The agent already has the old wording — this version ships with your next Send");
+        // The retired id no longer marks anything; the new one takes over.
+        toFrame({ type: "eh:remove", id: comment.id });
+        toFrame({ type: "eh:anchors", comments: state.page.comments });
+      } else state.sent = false;
     } catch (err) {
       toast(err.message);
     }
@@ -392,6 +529,7 @@ function editComment(card, body, comment) {
   input.addEventListener("keydown", (event) => {
     event.stopPropagation();
     if (event.key === "Enter" && !event.shiftKey) {
+      if (isImeCommitEnter(event)) return;
       event.preventDefault();
       commit();
     }
@@ -407,12 +545,45 @@ function editComment(card, body, comment) {
   input.setSelectionRange(input.value.length, input.value.length);
 }
 
-function toast(message) {
+function toast(message, { action = "", onAction = null, ms = 3200 } = {}) {
   const el = document.createElement("div");
   el.className = "toast";
   el.textContent = message;
+  if (action && onAction) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "toast-action";
+    button.textContent = action;
+    button.addEventListener("click", () => {
+      el.remove();
+      onAction();
+    });
+    el.append(button);
+  }
   document.body.append(el);
-  setTimeout(() => el.remove(), 3200);
+  setTimeout(() => el.remove(), ms);
+}
+
+/**
+ * Edit rows post asynchronously; an undo must land after the row it reverses,
+ * or the DELETE clears nothing and the row ships anyway.
+ */
+let editChain = Promise.resolve();
+
+/** Ask the editor to put the block back; the row is dropped once it confirms (eh:undone). */
+function undoBlock(label, kind) {
+  toFrame({ type: "eh:undo", label, kind });
+}
+
+function dropEditRow(label, kind) {
+  editChain = editChain.then(async () => {
+    try {
+      state.page = (await api(`/api/page/${state.key}/edit`, { method: "DELETE", body: JSON.stringify({ label, kind }) })).page;
+      render();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
 }
 
 function setActive(id, scroll) {
@@ -553,22 +724,39 @@ window.addEventListener("message", async (event) => {
       toast("That comment is not visible in this view");
       break;
     case "eh:edit":
-      state.page = (await api(`/api/page/${state.key}/edit`, {
-        method: "POST",
-        body: JSON.stringify({
-          label: msg.label,
-          kind: msg.kind,
-          before: msg.before,
-          after: msg.after,
-          before_html: msg.before_html,
-          after_html: msg.after_html,
-          moved_after: msg.moved_after,
-          moved_before: msg.moved_before,
-          staged_assets: msg.staged_assets,
-        }),
-      })).page;
-      state.sent = false;
-      render();
+      editChain = editChain.then(async () => {
+        state.page = (await api(`/api/page/${state.key}/edit`, {
+          method: "POST",
+          body: JSON.stringify({
+            label: msg.label,
+            kind: msg.kind,
+            before: msg.before,
+            after: msg.after,
+            before_html: msg.before_html,
+            after_html: msg.after_html,
+            moved_after: msg.moved_after,
+            moved_before: msg.moved_before,
+            staged_assets: msg.staged_assets,
+          }),
+        })).page;
+        state.sent = false;
+        render();
+      });
+      await editChain.catch((err) => toast(err.message));
+      break;
+    case "eh:undoable":
+      toast(msg.kind === "moved" ? `Moved “${tidy(msg.label, 40)}” — ⌘Z or Undo to put it back` : `Deleted “${tidy(msg.label, 40)}” — ⌘Z or Undo to restore`, {
+        action: "Undo",
+        ms: 8000,
+        onAction: () => undoBlock(msg.label, msg.kind),
+      });
+      break;
+    case "eh:undone":
+      document.querySelectorAll(".toast").forEach((el) => el.remove());
+      dropEditRow(String(msg.label || ""), String(msg.kind || ""));
+      break;
+    case "eh:undoFailed":
+      toast(msg.kind === "moved" ? "Can't put that one back after a reload — drag it where you want it" : "Can't restore that one after a reload");
       break;
     case "eh:asset":
       try {
@@ -598,7 +786,11 @@ window.addEventListener("message", async (event) => {
       renderSave();
       break;
     case "eh:dynamic":
-      state.dynamic = true;
+      if (!state.dynamic) {
+        state.dynamic = true;
+        // The batch says whether edits are on disk; a self-rendering page's are not.
+        api(`/api/page/${state.key}/mode`, { method: "POST", body: JSON.stringify({ dynamic: true }) }).catch(() => {});
+      }
       renderSave();
       break;
     case "eh:flushed":
@@ -607,9 +799,14 @@ window.addEventListener("message", async (event) => {
     case "eh:scroll":
       state.scroll = { x: msg.x, y: msg.y };
       break;
-    case "eh:external":
-      window.open(msg.href, "_blank", "noopener");
+    case "eh:external": {
+      // This side is what actually calls window.open, so it re-checks the
+      // scheme rather than trusting the frame: a javascript: or data: URL
+      // arriving here would run on this origin, next to the token.
+      const external = normalizeHref(msg.href);
+      if (external) window.open(external, "_blank", "noopener");
       break;
+    }
     case "eh:navigate":
       try {
         const result = await api(`/api/session/${state.sessionId}/navigate`, {
@@ -617,6 +814,7 @@ window.addEventListener("message", async (event) => {
           body: JSON.stringify({ href: msg.href }),
         });
         state.scroll = { x: 0, y: 0 };
+        pushHistory(result.key);
         await loadPage(result.key);
       } catch (err) {
         toast(err.message);
@@ -634,13 +832,16 @@ $("composeCancel").addEventListener("click", cancelCompose);
 
 // Clicking anywhere on the card is the "I meant to comment" gesture.
 $("compose").addEventListener("mousedown", (event) => {
-  if (event.target.closest("button")) return;
+  // The textarea handles its own clicks — swallowing them would pin the caret
+  // to the end and make repositioning it impossible.
+  if (event.target.closest("button, textarea")) return;
   event.preventDefault();
   $("composeText").focus();
 });
 
 $("composeText").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
+    if (isImeCommitEnter(event)) return;
     event.preventDefault();
     commitCompose();
   }
@@ -682,8 +883,27 @@ $("revert").addEventListener("click", async () => {
   }
 });
 
+$("leftoverKeep").addEventListener("click", () => {
+  state.leftover = null;
+  render();
+});
+
+$("leftoverDiscard").addEventListener("click", async () => {
+  try {
+    await api(`/api/page/${state.key}/discard`, { method: "POST" });
+    state.leftover = null;
+    await loadPage(state.key);
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
+/** Once the review is over or the tab is leaving, nothing may open a new session. */
+let finished = false;
+
 /** The session is over: freeze the page and say so. Feedback is already safe. */
-function showEnded() {
+function showEnded(message) {
+  finished = true;
   if (document.querySelector(".ended")) return;
   if (events) events.close();
   clearTimeout(retryTimer);
@@ -692,10 +912,25 @@ function showEnded() {
   const title = document.createElement("h2");
   title.textContent = "Review ended";
   const line = document.createElement("p");
-  line.textContent = "Unsent feedback is saved and ships next time you review this page. You can close this tab.";
+  line.textContent = message || "Unsent feedback is kept; next time you open this page you can restore or discard it. You can close this tab.";
   overlay.append(title, line);
   document.body.append(overlay);
 }
+
+// A closing tab says so, and the review ends unless it comes right back (a
+// reload). keepalive lets the request outlive the page; sendBeacon cannot
+// carry the token header.
+window.addEventListener("pagehide", () => {
+  finished = true;
+  if (events) events.close();
+  try {
+    fetch(`/api/session/${state.sessionId}/away`, {
+      method: "POST",
+      keepalive: true,
+      headers: { "x-human-review-token": state.token },
+    }).catch(() => {});
+  } catch {}
+});
 
 $("endReview").addEventListener("click", async () => {
   const page = state.page;
@@ -765,6 +1000,7 @@ function applyTheme(dark) {
 document.addEventListener("keydown", (event) => {
   const meta = event.metaKey || event.ctrlKey;
   if (meta && event.key === "Enter") {
+    if (isImeCommitEnter(event)) return;
     event.preventDefault();
     if (!$("send").disabled) $("send").click();
     return;
@@ -786,8 +1022,15 @@ let events = null;
 function connect() {
   const source = new EventSource(`/events/${state.sessionId}`);
   events = source;
-  // Another window on this session hit End review.
-  source.addEventListener("ended", () => showEnded());
+  // Another window on this session hit End review, or the server gave up on
+  // a tab that never came back.
+  source.addEventListener("ended", (event) => {
+    let reason = "ended";
+    try {
+      reason = JSON.parse(event.data).reason || reason;
+    } catch {}
+    showEnded(reason === "window_closed" ? "This tab was away too long, so the review ended. Unsent feedback is kept; reopen the page to restore or discard it." : undefined);
+  });
   source.addEventListener("reload", () => {
     const hadEdits = state.page ? state.page.edits.length : 0;
     state.reloading = true;
@@ -795,7 +1038,7 @@ function connect() {
     // The file on disk changed: queued saves are based on the old version.
     state.baseHash = null;
     clearTimeout(retryTimer);
-    frame.src = artifactUrl(state.key, true);
+    showInFrame(artifactUrl(state.key, true));
     api(pageUrl(state.key, state.sessionId)).then((page) => {
       replacePage(state, page);
       state.save = "idle";
@@ -817,7 +1060,15 @@ function connect() {
     render();
   });
   source.onerror = () => {
-    /* EventSource reconnects on its own. */
+    // A dropped connection reconnects on its own. A refused one (the server
+    // forgot this session) never will, so open a fresh session instead.
+    if (source.readyState !== EventSource.CLOSED || finished) return;
+    source.close();
+    rebootstrap().then((ok) => {
+      if (finished) return;
+      if (ok) connect();
+      else showEnded("This review session expired. Run human-review on this page again to reopen it.");
+    });
   };
 }
 
@@ -830,8 +1081,17 @@ function connect() {
   } catch {}
 
   const bootstrap = await api(`/api/session/${state.sessionId}/page`).catch(() => null);
-  if (bootstrap && bootstrap.page) state.pollCommand = bootstrap.page.pollCommand;
-  const key = bootstrap ? bootstrap.key : new URLSearchParams(location.search).get("key");
-  await loadPage(key);
+  if (!bootstrap) {
+    showEnded("This review session has ended. Run human-review on the page again to reopen it.");
+    return;
+  }
+  if (bootstrap.page) state.pollCommand = bootstrap.page.pollCommand;
+  state.artifactToken = bootstrap.artifactToken || "";
+  const leftover = bootstrap.leftover || { comments: 0, edits: 0 };
+  state.leftover = leftover.comments + leftover.edits ? leftover : null;
+  try {
+    history.replaceState({ key: bootstrap.key }, "", `/s/${state.sessionId}?key=${encodeURIComponent(bootstrap.key)}`);
+  } catch {}
+  await loadPage(bootstrap.key);
   connect();
 })();

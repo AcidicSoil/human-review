@@ -454,3 +454,52 @@ body.collapsed .handle { right: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, .rail, .handle { animation: none !important; transition: none !important; }
 }
+
+/* An undo-able action: the toast carries the button. */
+.toast-action {
+  margin-left: 12px;
+  padding: 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast-action:hover { background: rgba(255, 255, 255, 0.14); }
+:root[data-theme="dark"] .toast-action { border-color: rgba(0, 0, 0, 0.25); }
+:root[data-theme="dark"] .toast-action:hover { background: rgba(0, 0, 0, 0.1); }
+
+/* Feedback left behind by a review that ended without a Send. */
+.leftover {
+  margin: 10px 12px 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--strong-border);
+  border-radius: 9px;
+  background: var(--soft);
+}
+.leftover p { margin: 0 0 8px; font-size: 12px; line-height: 1.45; color: var(--txt); }
+.leftover-actions { display: flex; gap: 6px; }
+.leftover-actions .btn-ghost { padding: 4px 10px; font-size: 12px; }
+
+.edit-comment { margin-left: 0; }
+
+/* Per-row undo for the two gestures with no native undo. */
+.edit-row .row-undo {
+  flex: none;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--mute-2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.edit-row .row-undo:hover { background: var(--soft); color: var(--strong-txt); border-color: var(--strong-border); }
+
+/* Feedback the agent already has stays listed until it acks, but reads as done. */
+.badge.sent { background: var(--soft); color: var(--green); }
+.edit-row.sent { opacity: .55; }
+.edit-row.sent .pip { background: var(--green); }
