@@ -23,9 +23,44 @@ export function keepBodyEditable(body) {
   return observer;
 }
 
+/** Reflect current native form values into a detached DOM clone, including root controls. */
+export function reflectFormControls(source, clone) {
+  // cloneNode() copies the initial HTML attributes, not the user's live form
+  // state. Reflect editable control values into the saved document.
+  const relevant = (node) => node.matches?.("select, textarea, input");
+  const liveControls = [...(relevant(source) ? [source] : []),
+                        ...source.querySelectorAll("select, textarea, input")];
+  const savedControls = [...(relevant(clone) ? [clone] : []),
+                         ...clone.querySelectorAll("select, textarea, input")];
+  liveControls.forEach((live, index) => {
+    const saved = savedControls[index];
+    if (!saved) return;
+    const tag = live.tagName.toLowerCase();
+    if (tag === "select") {
+      const sourceOptions = [...live.options];
+      const targetOptions = [...saved.options];
+      sourceOptions.forEach((option, i) => {
+        if (option.selected) targetOptions[i].setAttribute("selected", "");
+        else targetOptions[i].removeAttribute("selected");
+      });
+    } else if (tag === "textarea") {
+      saved.textContent = live.value;
+    } else {
+      const type = (live.getAttribute("type") || "text").toLowerCase();
+      if (type === "checkbox" || type === "radio") {
+        if (live.checked) saved.setAttribute("checked", "");
+        else saved.removeAttribute("checked");
+      } else if (!["file", "password", "hidden", "submit", "reset", "button", "image"].includes(type)) {
+        saved.setAttribute("value", live.value);
+      }
+    }
+  });
+}
+
 /** Serialize a document to the HTML that should live on disk. */
 export function serializeDocument(doc) {
   const clone = doc.documentElement.cloneNode(true);
+  reflectFormControls(doc.documentElement, clone);
   clone.querySelectorAll(`[${UI_ATTR}]`).forEach((n) => n.remove());
   clone.querySelectorAll("script[data-eh-sdk], style[data-eh-sdk]").forEach((n) => n.remove());
   clone.querySelectorAll(`mark[${MARK_ATTR}]`).forEach((mark) => {

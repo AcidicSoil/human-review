@@ -8,7 +8,7 @@
 import { buildContext, findQuote } from "./anchor-text.js";
 import { hashClickAction, inPageControl, navigationHref } from "./click-target.js";
 import { linkStyleFixup, listCommandFor, listStyleFixup, normalizeHref } from "./editing.js";
-import { keepBodyEditable, serializeDocument, UI_ATTR, MARK_ATTR } from "./serialize.js";
+import { keepBodyEditable, serializeDocument, reflectFormControls, UI_ATTR, MARK_ATTR } from "./serialize.js";
 
 /**
  * True when an "Enter" keydown is really an IME confirming its composition
@@ -505,6 +505,7 @@ const serialize = () => serializeDocument(document);
  */
 function blockHtml(el) {
   const clone = el.cloneNode(true);
+  reflectFormControls(el, clone);
   clone.querySelectorAll(`[${UI_ATTR}]`).forEach((n) => n.remove());
   clone.querySelectorAll(`mark[${MARK_ATTR}]`).forEach((mark) => {
     const parent = mark.parentNode;
@@ -1680,6 +1681,27 @@ function boot() {
     });
     scheduleSave();
   });
+
+  // Native select elements emit change (not contenteditable input); their
+  // live selected property is serialized separately from original HTML attrs.
+  // Mark the change as user-originated before MutationObserver can classify it
+  // as a dynamic page mutation and disable autosave.
+  document.addEventListener("change", (event) => {
+    if (isOurs(event.target)) return;
+    if (!event.target.matches?.("select, input, textarea")) return;
+    userEdited = true;
+    lastInputAt = Date.now();
+    const target = targetFor(event.target);
+    queueEdit({
+      label: target ? target.label : "Form control",
+      kind: "edited",
+      before: target ? originalText.get(target.el) : undefined,
+      after: target ? target.el.textContent : String(event.target.value ?? event.target.checked ?? ""),
+      before_html: target ? originalHtml.get(target.el) : undefined,
+      after_html: blockHtml(target ? target.el : event.target),
+    });
+    scheduleSave();
+  }, true);
 
   const reposition = () => {
     place(els.outline, hoverTarget);

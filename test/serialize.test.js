@@ -79,3 +79,19 @@ test("a script mutation shows up as divergence from the disk copy", { skip }, ()
   const disk = serializeDocument(new JSDOM(PAGE).window.document);
   assert.notEqual(live, disk);
 });
+
+test("native form values and selection are preserved in autosaved static HTML", { skip }, () => {
+  const dom = new JSDOM('<!doctype html><body><select><option value="keep" selected>Keep</option><option value="revise">Revise</option></select><textarea>Original</textarea><input value="first"><input type="checkbox"></body>');
+  const doc = dom.window.document;
+  const select = doc.querySelector("select");
+  select.value = "revise";
+  doc.querySelector("textarea").value = "A typed response";
+  doc.querySelector('input:not([type])').value = "changed";
+  doc.querySelector('input[type="checkbox"]').checked = true;
+  const saved = serializeDocument(doc);
+  const restored = new JSDOM(saved).window.document;
+  assert.equal(restored.querySelector("select").value, "revise");
+  assert.equal(restored.querySelector("textarea").value, "A typed response");
+  assert.equal(restored.querySelector('input:not([type])').value, "changed");
+  assert.equal(restored.querySelector('input[type="checkbox"]').checked, true);
+});

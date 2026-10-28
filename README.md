@@ -91,7 +91,7 @@ Human Review opens the file in your browser. Make direct edits, leave comments, 
 
 In Claude Code, the agent waits in the background and picks up your feedback the moment you hit Send. In Codex and other agents, it waits during its turn; if the turn already ended, send a message and it picks the feedback up. Closing the tab or clicking End review releases the agent either way. Feedback you never sent is kept, and the next time you open that page you can restore or discard it.
 
-Note: For HTML files, direct edits and resizes save automatically, so closing the tab doesn't undo them — Discard on your next open, or Revert all during the review, puts the file back. For Markdown and localhost pages, click Send so your agent can apply them to the source.
+Note: For HTML files, direct edits and resizes save automatically, so closing the tab doesn't undo them — Discard on your next open, or Revert all during the review, puts the file back. Native HTML form controls (dropdowns, checkboxes, radio buttons, text inputs and textareas) also autosave their selected/typed values; password and file input values are not copied into the saved artifact. Their changes are included in review feedback. For Markdown and localhost pages, click Send so your agent can apply them to the source.
 
 The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; selection comments, block comments, drag handles, links, lists, image editing, and the polling workflow continue to work there.
 

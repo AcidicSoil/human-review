@@ -323,3 +323,17 @@ test("a pasted image lands at the caret once the chrome confirms where it was sa
   assert.equal(row.before, "Before the image.");
   assert.match(row.after_html, /<img src="assets\/design-paste-1\.png"/);
 });
+
+test("native dropdown change is an explicit saved human edit", { skip }, async () => {
+  const { window, document, posts, fromChrome } = await bootSdk('<h1>Review</h1><label>Decision<select><option value="keep" selected>Keep</option><option value="revise">Revise</option></select></label>');
+  const select = document.querySelector("select");
+  select.value = "revise";
+  select.dispatchEvent(new window.Event("change", { bubbles: true }));
+  fromChrome({ type: "eh:flush" });
+  const saved = posts.filter((message) => message.type === "eh:html").at(-1);
+  assert.ok(saved, "a form change must trigger autosave without contenteditable typing");
+  assert.equal(new JSDOM(saved.html).window.document.querySelector("select").value, "revise");
+  const edit = posts.filter((message) => message.type === "eh:edit").at(-1);
+  assert.ok(edit, "the selected value must be included in review feedback");
+  assert.match(edit.after_html, /<option value="revise" selected(?:="")?>/);
+});
