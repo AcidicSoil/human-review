@@ -124,6 +124,7 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
+  function renderEditor() {
   const shell = document.createElement("div");
   shell.className = "hr-shell";
   const toolbar = document.createElement("div");
@@ -184,4 +185,46 @@
   }
   shell.append(editor);
   app.replaceChildren(shell);
+  }
+
+  function snapshot() {
+    const sections = [...document.querySelectorAll(".hr-section[data-review-section]")];
+    const holder = document.createElement("main");
+    for (const section of sections) {
+      const output = document.createElement("section");
+      output.dataset.reviewSection = section.dataset.reviewSection;
+      output.dataset.container = section.dataset.container;
+      if (section.dataset.reviewActions) output.dataset.reviewActions = section.dataset.reviewActions;
+      output.innerHTML = section.querySelector(".hr-fallback-content")?.innerHTML || "";
+      holder.append(output);
+    }
+    return { ...bootstrap, version: 1, editor: "embedded-dom", sourceHtml: holder.innerHTML, document: null, discussions };
+  }
+  renderEditor();
+  let lastSnapshot = JSON.stringify(snapshot());
+  const emitChange = () => {
+    const next = snapshot();
+    const signature = JSON.stringify(next);
+    if (signature === lastSnapshot) return;
+    lastSnapshot = signature;
+    window.__hrReviewHost?.changed(next);
+  };
+  app.addEventListener("input", emitChange);
+  app.addEventListener("click", () => queueMicrotask(emitChange));
+  window.__hrReviewHost?.register({
+    mode: "planning",
+    restore(document) {
+      if (document.editor !== "embedded-dom" || typeof document.sourceHtml !== "string") return;
+      bootstrap.sourceHtml = document.sourceHtml;
+      discussions.splice(0, discussions.length, ...(Array.isArray(document.discussions) ? document.discussions : []));
+      renderEditor();
+      lastSnapshot = JSON.stringify(snapshot());
+    },
+    onConnect() { lastSnapshot = JSON.stringify(snapshot()); },
+    activate(anchor) {
+      if (anchor?.mode !== "planning") return;
+      const section = [...document.querySelectorAll(".hr-section")].find((node) => node.dataset.reviewSection === anchor.sectionId);
+      section?.scrollIntoView?.({ block: "center" });
+    },
+  });
 })();

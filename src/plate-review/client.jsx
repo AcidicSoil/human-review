@@ -520,6 +520,15 @@ function App() {
       : [{ type: "p", children: [{ text: "Loading…" }] }],
   });
   const initialized = React.useRef(false);
+  const restoring = React.useRef(false);
+  const planningSnapshot = React.useCallback(() => ({
+    ...bootstrap,
+    version: 1,
+    editor: "plate",
+    sourceHtml: null,
+    document: editor.children,
+    discussions: serializableDiscussions(editor.getOption(discussionPlugin, "discussions") || []),
+  }), [bootstrap, editor]);
 
   React.useEffect(() => {
     if (initialized.current) return;
@@ -531,8 +540,43 @@ function App() {
     }
   }, [bootstrap, editor]);
 
+  React.useEffect(() => {
+    window.__hrReviewHost?.register({
+      mode: "planning",
+      restore(document) {
+        if (document.editor !== "plate" || !Array.isArray(document.document)) return;
+        restoring.current = true;
+        editor.tf.setValue(document.document);
+        editor.setOption(discussionPlugin, "discussions", reviveDiscussions(document.discussions || []));
+        queueMicrotask(() => { restoring.current = false; });
+      },
+      activate(anchor) {
+        if (anchor?.mode !== "planning") return;
+        const section = [...document.querySelectorAll("[data-review-section]")].find((node) => node.dataset.reviewSection === anchor.sectionId);
+        section?.scrollIntoView?.({ block: "center" });
+      },
+    });
+  }, [editor]);
+  React.useEffect(() => {
+    const app = document.getElementById("hr-app");
+    if (!app) return;
+    let previous = JSON.stringify(planningSnapshot());
+    const observer = new MutationObserver(() => {
+      if (restoring.current) return;
+      const next = planningSnapshot();
+      const value = JSON.stringify(next);
+      if (value === previous) return;
+      previous = value;
+      window.__hrReviewHost?.changed(next);
+    });
+    observer.observe(app, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-review-actions"] });
+    return () => observer.disconnect();
+  }, [planningSnapshot]);
+
   return (
-    <Plate editor={editor}>
+    <Plate editor={editor} onChange={() => {
+      if (!restoring.current) window.__hrReviewHost?.changed(planningSnapshot());
+    }}>
       <div className="hr-shell">
         <Toolbar status={status} setStatus={setStatus} />
         <PlateContent className="hr-editor" aria-label="Planning document editor" />

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { REVIEW_HOST_SOURCE } from "../review-host.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -121,7 +122,8 @@ async function buildPlateBundle() {
 
 export function createReviewHtml({ sourceHtml, title, sourcePath, artifactName, bundle, editor, tools = "" }) {
   const bootstrap = { version: 1, editor, sourceHtml: bodyHtml(sourceHtml), sourcePath, artifactName, document: null, discussions: [] };
-  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<meta name="human-review-editor" content="${editor}">\n<title>${String(title).replace(/[<&]/g, "")}</title>\n<style id="hr-review-theme">${REVIEW_CSS}</style>\n</head>\n<body>\n<div id="hr-app"></div>\n<script id="hr-bootstrap" type="application/json">${safeJson(bootstrap)}</script>\n<script id="hr-editor-bundle">${inlineScript(bundle)}</script>\n<script id="hr-artifact-tools">${inlineScript(tools)}</script>\n</body>\n</html>\n`;
+  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<meta name="human-review-editor" content="${editor}">\n<title>${String(title).replace(/[<&]/g, "")}</title>\n<style id="hr-review-theme">${REVIEW_CSS}</style>\n</head>\n<body>\n<div id="hr-app"></div>\n<script id="hr-bootstrap" type="application/json">${safeJson(bootstrap)}</script>\n<script id="hr-host-bridge">${inlineScript(REVIEW_HOST_SOURCE)}</script>
+<script id="hr-editor-bundle">${inlineScript(bundle)}</script>\n<script id="hr-artifact-tools">${inlineScript(tools)}</script>\n</body>\n</html>\n`;
 }
 
 export async function generateReviewArtifact(inputFile, outputFile) {

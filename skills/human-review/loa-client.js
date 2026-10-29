@@ -29,7 +29,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
     if (live) live.textContent = message;
   };
   const syncBootstrap = () => { bootstrapNode.textContent = safeJson(state); };
-  const bump = () => syncBootstrap();
+  const bump = () => { syncBootstrap(); window.__hrReviewHost?.changed({ loa: state.loa, catalog: state.catalog }); };
   const actionIndex = (id) => state.loa.actions.findIndex((action) => action.id === id);
   const componentMap = () => {
     const map = new Map();
@@ -133,7 +133,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
         const unavailable = !item;
         return "<li class=\"hr-loa-snap-in" + (unavailable ? " is-unavailable" : "") + "\" data-ref=\"" + esc(ref) + "\"><span>" + esc(label) + (unavailable ? " · unavailable" : "") + "</span><button data-snap-in-remove=\"" + esc(ref) + "\" aria-label=\"Remove " + esc(label) + "\">×</button></li>";
       }).join("");
-      return "<article class=\"hr-loa-action\" role=\"option\" tabindex=\"0\" draggable=\"" + (!editing) + "\" aria-selected=\"" + selected + "\" data-action-id=\"" + esc(action.id) + "\"><div class=\"hr-loa-action-head\"><span class=\"hr-loa-action-index\">" + (index + 1) + "</span><code>" + esc(action.id) + "</code><div class=\"hr-loa-action-controls\"><button data-action-move-up aria-label=\"Move action up\" " + (index === 0 ? "disabled" : "") + ">↑</button><button data-action-move-down aria-label=\"Move action down\" " + (index === state.loa.actions.length - 1 ? "disabled" : "") + ">↓</button><button data-action-edit>Edit</button><button data-action-remove>Remove</button></div></div>" + content + "<ul class=\"hr-loa-snap-ins\">" + snaps + "</ul></article>";
+      return "<article class=\"hr-loa-action\" role=\"option\" tabindex=\"0\" draggable=\"" + (!editing) + "\" aria-selected=\"" + selected + "\" data-action-id=\"" + esc(action.id) + "\"><div class=\"hr-loa-action-head\"><span class=\"hr-loa-action-index\">" + (index + 1) + "</span><code>" + esc(action.id) + "</code><div class=\"hr-loa-action-controls\"><button data-action-move-up aria-label=\"Move action up\" " + (index === 0 ? "disabled" : "") + ">↑</button><button data-action-move-down aria-label=\"Move action down\" " + (index === state.loa.actions.length - 1 ? "disabled" : "") + ">↓</button><button data-action-edit>Edit</button>" + (window.__hrReviewHost?.connected ? "<button data-action-comment>Comment</button>" : "") + "<button data-action-remove>Remove</button></div></div>" + content + "<ul class=\"hr-loa-snap-ins\">" + snaps + "</ul></article>";
     }).join("");
     host.innerHTML = "<div class=\"hr-loa-actions-title\"><h2>List of actions</h2><button id=\"hr-loa-add-action\">+ Add action</button></div>" + (cards || "<p class=\"hr-loa-empty\">No actions yet. Add one to begin.</p>");
   };
@@ -200,6 +200,10 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
       event.stopPropagation();
       editingActionId = null;
       renderActions();
+    } else if (target?.dataset.actionComment !== undefined) {
+      event.stopPropagation();
+      const action = state.loa.actions.find((entry) => entry.id === card?.dataset.actionId);
+      if (action) window.__hrReviewHost?.comment({ mode: "loa", actionId: action.id }, action.content.slice(0, 240));
     } else if (target?.dataset.actionRemove !== undefined) {
       event.stopPropagation();
       const id = card?.dataset.actionId;
@@ -309,4 +313,16 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   root.replaceChildren(shell);
   renderRail();
   renderActions();
+  window.__hrReviewHost?.register({
+    mode: "loa",
+    restore(document) {
+      state = { ...state, loa: clone(document.loa), catalog: clone(document.catalog) };
+      selectedActionId = state.loa.actions[0]?.id || null;
+      editingActionId = null;
+      syncBootstrap();
+      renderRail(); renderActions();
+    },
+    activate(anchor) { if (anchor?.mode === "loa") focusAction(anchor.actionId); },
+    onConnect() { renderActions(); },
+  });
 })();`;

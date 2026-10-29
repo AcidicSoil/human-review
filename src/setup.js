@@ -52,10 +52,16 @@ export function shellQuote(arg) {
 
 export const readSkill = () => fs.readFileSync(path.join(here, "SKILL.md"), "utf8");
 
+function installReviewHostRuntime(skillDir) {
+  fs.copyFileSync(path.join(here, "review-host.js"), path.join(skillDir, "review-host.mjs"));
+}
+
 export function installPlanRuntime(skillDir) {
   fs.mkdirSync(skillDir, { recursive: true });
 
-  fs.copyFileSync(path.join(plateHere, "generator.js"), path.join(skillDir, "generator.mjs"));
+  installReviewHostRuntime(skillDir);
+  fs.writeFileSync(path.join(skillDir, "generator.mjs"), fs.readFileSync(path.join(plateHere, "generator.js"), "utf8")
+    .replaceAll('from "../review-host.js"', 'from "./review-host.mjs"'));
   fs.copyFileSync(path.join(plateHere, "fallback-client.js"), path.join(skillDir, "fallback-client.js"));
   fs.copyFileSync(path.join(plateHere, "artifact-tools.js"), path.join(skillDir, "artifact-tools.js"));
 
@@ -72,9 +78,11 @@ export function installPlanRuntime(skillDir) {
 
 export function installLoaRuntime(skillDir) {
   fs.mkdirSync(skillDir, { recursive: true });
+  installReviewHostRuntime(skillDir);
   const generator = fs.readFileSync(path.join(loaHere, "generator.js"), "utf8")
     .replaceAll("from \"./runtime.js\"", "from \"./loa-client.js\"")
-    .replaceAll("from \"./catalog.js\"", "from \"./codex-catalog.mjs\"");
+    .replaceAll("from \"./catalog.js\"", "from \"./codex-catalog.mjs\"")
+    .replaceAll('from "../review-host.js"', 'from "./review-host.mjs"');
   fs.writeFileSync(path.join(skillDir, "loa-generator.mjs"), generator);
   fs.copyFileSync(path.join(loaHere, "runtime.js"), path.join(skillDir, "loa-client.js"));
   fs.copyFileSync(path.join(loaHere, "catalog.js"), path.join(skillDir, "codex-catalog.mjs"));

@@ -352,6 +352,7 @@ export class Store {
     return this.update(key, (page) => {
       page.comments = [];
       page.edits = [];
+      delete page.structured;
     });
   }
 
@@ -424,6 +425,15 @@ export class Store {
       // >= not >: an edit stamped the same millisecond as the send may not
       // have shipped — resending it is harmless, dropping it loses work.
       page.edits = typeof sentAt === "number" ? page.edits.filter((e) => (e.updatedAt || e.at || 0) >= sentAt) : [];
+    });
+  }
+
+  /** Acknowledgment covers only the submitted revision. Newer edits stay pending. */
+  ackStructured(key, revision) {
+    return this.update(key, (page) => {
+      if (!page.structured) return;
+      page.structured.sentRevision = Math.max(page.structured.sentRevision || 0, revision);
+      if (page.structured.revision <= revision && page.structured.baseHash !== page.sourceHash) delete page.structured;
     });
   }
 

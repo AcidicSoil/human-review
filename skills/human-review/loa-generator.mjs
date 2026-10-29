@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LOA_CLIENT_SOURCE } from "./loa-client.js";
+import { REVIEW_HOST_SOURCE } from "./review-host.mjs";
 import { discoverCodexCatalog } from "./codex-catalog.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -238,6 +239,7 @@ export function createLoaReviewHtml({ loa, catalog, sourcePath, artifactName } =
   </div>
 </div>
 <script id="hr-loa-bootstrap" type="application/json">${safeJson(bootstrap)}</script>
+<script id="hr-host-bridge">${inlineScript(REVIEW_HOST_SOURCE)}</script>
 <script id="hr-loa-client">${inlineScript(LOA_CLIENT_SOURCE)}</script>
 </body>
 </html>

@@ -8,6 +8,8 @@ import { injectSdk, stripSdk } from "./html-transform.js";
 import { isMarkdown, renderMarkdownPage } from "./markdown.js";
 import { canonicalTarget, ensureStateDir, localUrl, SERVER_PROTOCOL, serverPath, stateDir, targetKey } from "./paths.js";
 import { invocation, shellQuote } from "./setup.js";
+import { detectReviewMode } from "./review-modes.js";
+import { parseStructuredSnapshot, STRUCTURED_FORMAT } from "./review-protocol.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -244,7 +246,9 @@ export function createServer() {
         sentAt = Math.max(sentAt, entry.sentAt || 0);
       }
     }
-    return { ids, sentAt };
+    const structuredRevision = [...batches.values()].flatMap((record) => [...(record.priorCleanup || []), ...record.cleanup])
+      .filter((item) => item.key === key).reduce((max, item) => Math.max(max, item.structuredRevision || 0), 0);
+    return { ids, sentAt, structuredRevision };
   }
 
   const isSentEdit = (edit, coverage) => (edit.updatedAt || edit.at || 0) < coverage.sentAt;
@@ -258,14 +262,16 @@ export function createServer() {
     }
     let comments = 0;
     let edits = 0;
+    let structured = 0;
     for (const k of keys) {
       const page = store.page(k);
       if (!page) continue;
       const coverage = coverageFor(k);
       comments += page.comments.filter((c) => !coverage.ids.has(c.id)).length;
       edits += page.edits.filter((e) => !isSentEdit(e, coverage)).length;
+      structured += Number((page.structured?.revision || 0) > Math.max(page.structured?.sentRevision || 0, coverage.structuredRevision));
     }
-    return { comments, edits };
+    return structured ? { comments, edits, structured } : { comments, edits };
   }
 
   const CLOSE_REASONS = {
@@ -323,6 +329,12 @@ export function createServer() {
       // Rows on a Markdown or self-rendering page are unsent feedback, not
       // something this write already contains; keep them.
       store.setPristine(key, html, { keepEdits: isMarkdown(page.file) || !!store.page(key)?.dynamic });
+      store.update(key, (record) => {
+        record.sourceHash = hash(html);
+        record.reviewMode = detectReviewMode(html);
+        if (record.structured?.revision <= (record.structured?.sentRevision || 0) &&
+            record.structured.baseHash !== record.sourceHash) delete record.structured;
+      });
       for (const session of sessionsForKey(key)) emit(session, "reload", { key });
     });
   }
@@ -350,7 +362,16 @@ export function createServer() {
     const keep = !!existing && existing.kind !== "url" && existing.edits.length > 0 && existing.savedHash === hash(html);
     const page = store.openPage(file, keep ? undefined : html);
     lastWritten.set(page.key, hash(html));
-    return page;
+    const mode = detectReviewMode(html);
+    if (page.reviewMode !== mode || page.sourceHash !== hash(html)) {
+      store.update(page.key, (record) => {
+        record.reviewMode = mode;
+        record.sourceHash = hash(html);
+        if (record.structured?.revision <= (record.structured?.sentRevision || 0) &&
+            record.structured.baseHash !== record.sourceHash) delete record.structured;
+      });
+    }
+    return store.page(page.key);
   }
 
   // ------------------------------------------------------------------ batch
@@ -381,7 +402,9 @@ export function createServer() {
       const coveredUntil = covered.reduce((max, entry) => Math.max(max, entry.sentAt || 0), 0);
       const comments = page.comments.filter((c) => !coveredIds.has(c.id));
       const edits = page.edits.filter((e) => (e.updatedAt || e.at || 0) >= coveredUntil);
-      if (!comments.length && !edits.length) continue;
+      const structuredCovered = Math.max(page.structured?.sentRevision || 0, ...already.filter((item) => item.key === key).map((item) => item.structuredRevision || 0));
+      const structured = page.structured?.revision > structuredCovered ? page.structured : null;
+      if (!comments.length && !edits.length && !structured) continue;
       const markdown = page.kind !== "url" && isMarkdown(page.file);
       out.push({
         key,
@@ -392,6 +415,7 @@ export function createServer() {
         // Direct edits to a plain HTML file are autosaved into it as they
         // happen; everywhere else they exist only in this batch.
         edits_saved: page.kind !== "url" && !markdown && !page.dynamic,
+        ...(structured ? { structured_review: { format: STRUCTURED_FORMAT, mode: structured.mode, document: structured.document, baseHash: structured.baseHash, revision: structured.revision } } : {}),
         comments: comments.map((c) => ({
           id: c.id,
           kind: c.kind,
@@ -423,7 +447,7 @@ export function createServer() {
       const page = store.page(key);
       if (!page) continue;
       const coverage = coverageFor(key);
-      const count = page.comments.filter((c) => !coverage.ids.has(c.id)).length + page.edits.filter((e) => !isSentEdit(e, coverage)).length;
+      const count = page.comments.filter((c) => !coverage.ids.has(c.id)).length + page.edits.filter((e) => !isSentEdit(e, coverage)).length + Number((page.structured?.revision || 0) > Math.max(coverage.structuredRevision, page.structured?.sentRevision || 0));
       if (!count) continue;
       out.push({
         key,
@@ -453,19 +477,20 @@ export function createServer() {
     const hasTruncated = pages.some((p) => p.edits.some((e) => e.truncated));
     const batch = {
       status: "feedback",
-      pages: pages.map(({ kind, file, url, markdown, edits_saved, comments, edits }) => ({
+      pages: pages.map(({ kind, file, url, markdown, edits_saved, comments, edits, structured_review }) => ({
         kind,
         file,
         ...(url ? { url } : {}),
         ...(markdown ? { markdown: true } : {}),
         edits_saved,
+        ...(structured_review ? { structured_review } : {}),
         comments,
         edits,
       })),
       overall_note: note || "",
       sent_at: new Date().toISOString(),
       next_step:
-        "Apply this feedback. Each entry in `pages` names the reviewed file or localhost URL. Items under `edits` are " +
+        "Apply this feedback. Each entry in `pages` names the reviewed file or localhost URL. If a page has structured_review, use its canonical document as the edited source, preserve stable IDs and references, and apply comments by their anchored IDs. Never replace the reviewed artifact from an older snapshot. Items under `edits` are " +
         "changes the human already made: `after` is their exact new wording, so carry it across verbatim, and " +
         "never revert it. When an edit carries `after_html`, the human changed formatting (bold, italic, links) — " +
         "use the HTML version, translated into the source's own syntax. " +
@@ -497,6 +522,7 @@ export function createServer() {
       cleanup: pages.map((p) => ({
         key: p.key,
         ids: p.comments.map((c) => c.id),
+        structuredRevision: p.structured_review?.revision || 0,
         staged: p.edits.flatMap((edit) => (edit.staged_assets || []).map((asset) => asset.path)),
         sentAt: Date.now(),
       })),
@@ -520,7 +546,10 @@ export function createServer() {
         fs.rmdirSync(path.dirname(resolved));
       } catch {}
     }
-    for (const { key, ids, sentAt } of cleanup) store.clearSent(key, ids, sentAt);
+    for (const { key, ids, sentAt, structuredRevision } of cleanup) {
+      store.clearSent(key, ids, sentAt);
+      if (structuredRevision) store.ackStructured(key, structuredRevision);
+    }
     for (const session of sessionsForEntry(entryKey)) emit(session, "refresh", {});
     // File targets reload through fs.watch. URL targets have no source file to
     // watch, so acknowledgement is the signal to fetch the rebuilt route.
@@ -675,12 +704,21 @@ export function createServer() {
       ...(page.kind === "url" ? { url: page.url } : {}),
       filename: page.kind === "url" ? new URL(page.url).pathname || page.url : path.basename(page.file),
       markdown: page.kind !== "url" && isMarkdown(page.file),
+      ...((page.reviewMode && page.reviewMode !== "dom") ? {
+        reviewMode: page.reviewMode,
+        sourceHash: page.sourceHash || null,
+        structured: page.structured || null,
+        structuredConflict: !!page.structured && page.structured.baseHash !== page.sourceHash,
+      } : {}),
       feedbackOnly: page.kind === "url",
       comments: page.comments.map((c) => ({ ...c, sent: coverage.ids.has(c.id) })),
       edits: page.edits.map((e) => ({ ...e, sent: isSentEdit(e, coverage) })),
       unsent: {
         comments: page.comments.filter((c) => !coverage.ids.has(c.id)).length,
         edits: page.edits.filter((e) => !isSentEdit(e, coverage)).length,
+        ...((page.reviewMode && page.reviewMode !== "dom") ? {
+          structured: Number((page.structured?.revision || 0) > Math.max(coverage.structuredRevision, page.structured?.sentRevision || 0)),
+        } : {}),
       },
       canRevert: page.kind !== "url" && typeof page.pristine === "string" && page.pristine.length > 0,
       pollCommand: `${cliInvocation} poll ${shellQuote(pollTarget)}`,
@@ -792,7 +830,7 @@ export function createServer() {
         const id = uid("s");
         // Feedback already on the page is from an earlier review that ended
         // without a Send; the browser offers to restore or discard it.
-        const leftover = { comments: page.comments.length, edits: page.edits.length };
+        const leftover = { comments: page.comments.length, edits: page.edits.length + Number((page.structured?.revision || 0) > (page.structured?.sentRevision || 0)) };
         sessions.set(id, {
           id,
           entryKey: page.key,
@@ -869,7 +907,7 @@ export function createServer() {
             headers["set-cookie"] = `__hr_page=${key}; Path=/; SameSite=Lax`;
           }
           res.writeHead(200, headers);
-          return res.end(injectSdk(html, key, sdkOptions));
+          return res.end(page.reviewMode && page.reviewMode !== "dom" ? html : injectSdk(html, key, sdkOptions));
         }
         if (page.kind === "url") {
           const stagedPrefix = "__human_review_paste__/";
@@ -938,6 +976,32 @@ export function createServer() {
           // The hash is the save precondition: a later save must name the
           // version it was based on, or it loses to a concurrent rewrite.
           return json(res, 200, { html: clean, hash: hash(clean) });
+        }
+
+        if (action === "structured" && req.method === "POST") {
+          const page = store.page(key);
+          if (page.reviewMode !== "loa" && page.reviewMode !== "planning") return json(res, 400, { error: "not a structured review" });
+          if (page.kind === "url") return json(res, 400, { error: "structured reviews require a file" });
+          let snapshot;
+          try { snapshot = parseStructuredSnapshot(await readBody(req), page.reviewMode); }
+          catch (err) { return json(res, 400, { error: err.message }); }
+          const previous = page.structured;
+          if (snapshot.baseHash !== page.sourceHash) return json(res, 409, { error: "Source changed; resolve the draft conflict before saving" });
+          if (previous && previous.baseHash === snapshot.baseHash && JSON.stringify(previous.document) === JSON.stringify(snapshot.document)) {
+            return json(res, 200, { page: pageState(key) });
+          }
+          if (snapshot.expectedRevision !== (previous?.revision || 0)) return json(res, 409, { error: "Review revision changed; reload the draft" });
+          store.update(key, (record) => {
+            record.structured = { mode: snapshot.mode, document: snapshot.document, baseHash: snapshot.baseHash, revision: (previous?.revision || 0) + 1, sentRevision: previous?.sentRevision || 0 };
+          });
+          return json(res, 200, { page: pageState(key) });
+        }
+
+        if (action === "structured" && req.method === "DELETE") {
+          if (store.page(key).reviewMode === "dom") return json(res, 400, { error: "not a structured review" });
+          store.update(key, (record) => { delete record.structured; });
+          for (const session of sessionsForKey(key)) emit(session, "refresh", {});
+          return json(res, 200, { page: pageState(key) });
         }
 
         if (action === "comment" && req.method === "POST") {

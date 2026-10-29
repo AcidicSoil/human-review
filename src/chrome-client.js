@@ -41,6 +41,7 @@ const state = {
   framePolicy: null,
   artifactToken: "",
   leftover: null,
+  reviewNonce: null,
 };
 
 /**
@@ -150,6 +151,7 @@ async function loadPage(key, { reload = true } = {}) {
   state.sent = false;
   state.dynamic = false;
   state.baseHash = null;
+  state.reviewNonce = null;
   clearTimeout(retryTimer);
   if (reload) {
     state.reloading = true;
@@ -322,11 +324,20 @@ function render() {
 
   // --- your edits
   const box = $("editsBox");
-  box.hidden = edits.length === 0;
-  if (edits.length) {
-    $("editCount").textContent = String(edits.length);
+  const structured = page.reviewMode !== "dom" && page.structured;
+  box.hidden = edits.length === 0 && !structured;
+  $("revert").hidden = edits.length === 0 && !page.structuredConflict;
+  $("revert").textContent = page.structuredConflict ? "Restore source" : "Revert all";
+  if (edits.length || structured) {
+    $("editCount").textContent = String(edits.length + Number(!!structured));
     const rows = $("editList");
     rows.textContent = "";
+    if (structured) {
+      const row = document.createElement("div");
+      row.className = "edit-row";
+      row.textContent = (page.reviewMode === "loa" ? "LOA" : "Planning") + " draft · revision " + structured.revision + (page.structuredConflict ? " · source changed" : "");
+      rows.append(row);
+    }
     const LIMIT = 5;
     const shown = state.editsExpanded ? edits : edits.slice(0, LIMIT);
     for (const edit of shown) {
@@ -406,7 +417,7 @@ function render() {
   // batch that is delivered or queued stay listed until the ack, marked sent.
   const otherTotal = others.reduce((sum, o) => sum + o.count, 0);
   const unsent = page.unsent || { comments: comments.length, edits: edits.length };
-  const total = unsent.comments + unsent.edits + otherTotal;
+  const total = unsent.comments + unsent.edits + (unsent.structured || 0) + otherTotal;
   // An overall note is sendable on its own — the server already accepts
   // note-only batches; the button must not stay dead while one is typed.
   const hasNote = $("note").value.trim().length > 0;
@@ -466,6 +477,11 @@ function render() {
 
 function renderSave() {
   const line = $("saveLine");
+  if (state.page?.reviewMode && state.page.reviewMode !== "dom") {
+    line.className = "save-line dynamic";
+    $("saveText").textContent = state.page.structuredConflict ? "Source changed: draft retained. Send to agent or restore the source." : "Structured draft stored locally for agent review";
+    return;
+  }
   if (state.page && state.page.kind === "url") {
     line.className = "save-line dynamic";
     $("saveText").textContent = "Localhost page — your direct edits go to the agent for source updates";
@@ -588,7 +604,10 @@ function dropEditRow(label, kind) {
 
 function setActive(id, scroll) {
   state.active = id;
-  toFrame({ type: "eh:activate", id, scroll: !!scroll });
+  if (state.page?.reviewMode && state.page.reviewMode !== "dom") {
+    const comment = state.page.comments.find((entry) => entry.id === id);
+    toFrame({ type: "hr:activate", nonce: state.reviewNonce, anchor: comment?.anchor });
+  } else toFrame({ type: "eh:activate", id, scroll: !!scroll });
   render();
 }
 
@@ -681,12 +700,47 @@ async function saveHtml(html, key) {
 
 // ------------------------------------------------------------ frame messages
 
+let structuredChain = Promise.resolve();
+
 window.addEventListener("message", async (event) => {
   if (!frame.contentWindow || event.source !== frame.contentWindow) return;
   if (!state.framePolicy || event.origin !== state.framePolicy.incomingOrigin) return;
   const msg = event.data || {};
 
   switch (msg.type) {
+    case "hr:ready": {
+      if (state.page?.reviewMode !== msg.mode || (msg.mode !== "loa" && msg.mode !== "planning")) return;
+      state.reviewNonce = crypto.randomUUID();
+      toFrame({ type: "hr:restore", mode: msg.mode, nonce: state.reviewNonce, structured: state.page.structured });
+      state.reloading = false;
+      break;
+    }
+    case "hr:change": {
+      if (msg.mode !== state.page?.reviewMode || msg.nonce !== state.reviewNonce || !msg.document) return;
+      const key = state.key;
+      structuredChain = structuredChain.then(async () => {
+        if (key !== state.key) return;
+        const result = await api(`/api/page/${key}/structured`, {
+          method: "POST",
+          body: JSON.stringify({
+            format: "human-review.snapshot/v1",
+            mode: msg.mode,
+            document: msg.document,
+            baseHash: state.page.structured?.baseHash || state.page.sourceHash,
+            expectedRevision: state.page.structured?.revision || 0,
+          }),
+        });
+        if (key !== state.key) return;
+        state.page = result.page;
+        state.sent = false;
+        render();
+      }).catch((error) => toast(error.message));
+      break;
+    }
+    case "hr:comment":
+      if (msg.nonce !== state.reviewNonce || msg.mode !== state.page?.reviewMode) return;
+      await openCompose({ kind: "element", quote: String(msg.quote || ""), anchor: msg.anchor });
+      break;
     case "eh:ready": {
       toFrame({ type: "eh:anchors", comments: state.page ? state.page.comments : [] });
       if (state.reloading) {
@@ -853,6 +907,7 @@ $("composeText").addEventListener("keydown", (event) => {
 
 $("send").addEventListener("click", async () => {
   try {
+    await structuredChain;
     await api(`/api/page/${state.key}/send`, {
       method: "POST",
       body: JSON.stringify({ sessionId: state.sessionId, note: $("note").value.trim() }),
@@ -866,6 +921,14 @@ $("send").addEventListener("click", async () => {
 });
 
 $("revert").addEventListener("click", async () => {
+  if (state.page?.structuredConflict) {
+    if (!window.confirm("Discard the old draft and reload the current source? Unsent structured edits will be lost.")) return;
+    try {
+      await api(`/api/page/${state.key}/structured`, { method: "DELETE" });
+      await loadPage(state.key);
+    } catch (err) { toast(err.message); }
+    return;
+  }
   const count = state.page.edits.length;
   if (!window.confirm(`Discard all ${count} of your edits?`)) return;
   // Stop the SDK's debounced save and our own retries first, so a queued save
