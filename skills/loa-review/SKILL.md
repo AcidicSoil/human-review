@@ -29,4 +29,16 @@ node "$SKILLS_ROOT/human-review/human-review-loa.mjs" path/to/loa.json path/to/l
 
 The bundled runner resolves the Codex catalog itself when `catalog` is absent. Open/return the self-contained artifact for review.
 
+When a local `human-review` session is available, prefer the live agent feedback loop:
+generate with `--no-open`, then run `human-review path/to/loa.loa.review.html` and
+`human-review poll path/to/loa.loa.review.html`. The reviewer edits actions,
+attaches skills, and comments on action cards, then clicks **Send**. Apply the
+received `pages[].structured_review.document` as canonical LOA data, with
+attached comments and the overall note. Poll again with `--ack` after
+applying. Never assume the snapshot is already written to the source JSON.
+
+If the host lacks the live server or execution access, return/open the
+standalone HTML editor. Its reviewed HTML and clean LOA JSON exports remain
+available without a network connection.
+
 The review surface may add/edit/remove/reorder actions. Plugin cards are collapsible grouping headers, not add targets; reviewers attach individual nested skill refs to actions. Preserve any plugin-level refs already present in an imported LOA for compatibility, but do not create new plugin-level attachments from the rail. The artifact never installs or executes refs. Save reviewed HTML to preserve review state or Save clean LOA JSON for the canonical result.

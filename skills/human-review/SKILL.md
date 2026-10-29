@@ -25,6 +25,18 @@ node "$SKILL_DIR/human-review-plan.mjs" path/to/plan.md path/to/plan.review.html
 
 The output path is optional. Without one, `plan.md` becomes `plan.review.html` next to the source.
 
+## Live structured review
+
+When a local Human Review server and shell execution are available, generate
+LOA or Planning artifacts with `--no-open`. Open the generated HTML using
+`human-review <artifact.review.html>`, then poll that same target with
+`human-review poll <artifact.review.html>`. Clicking **Send** returns canonical
+structured state in `pages[].structured_review`, review comments, and notes.
+Apply the canonical state to its source. Resume polling with `--ack` after
+applying. Structured edits are not generic HTML autosaves.
+
+Without the live server, keep the original offline HTML export workflows.
+
 ## LOA component review
 
 For a structured List of Actions and component catalog, create the artifact in the current turn:

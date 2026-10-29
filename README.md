@@ -95,6 +95,35 @@ Note: For HTML files, direct edits and resizes save automatically, so closing th
 
 The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; selection comments, block comments, drag handles, links, lists, image editing, and the polling workflow continue to work there.
 
+## Shared live review sessions
+
+LOA and Planning artifacts now support the ordinary Human Review feedback
+session. Generate an artifact without opening its offline file, then review it
+through the local server:
+
+```sh
+human-review-loa loa.json loa.loa.review.html --no-open
+human-review loa.loa.review.html
+human-review poll loa.loa.review.html
+```
+
+For Planning, use `human-review-plan plan.md plan.review.html --no-open`
+and pass `plan.review.html` to both `human-review` and `human-review poll`.
+
+The browser preserves the native LOA or Plate/fallback editor, stores unsent
+structured drafts locally, accepts anchored review comments, and passes a
+canonical `pages[].structured_review.document` through the original agent
+poll. Apply it to the canonical LOA JSON or planning source. After applying,
+resume polling with `--ack`. Sending does not automatically rewrite source
+files. An agent source rewrite refreshes the review. If the source changed
+while a draft remained, the reviewer can send the draft to the agent or
+choose **Restore source** to discard it. The original DOM review path is
+unchanged.
+
+The generated HTML remains editable offline through `file://` without the
+server. **Save reviewed HTML**, **Save clean LOA JSON**, and **Save PRD**
+retain their existing purposes.
+
 ## LOA component review
 
 A third review mode handles a machine-readable List of Actions (LOA) plus a plugin/skill

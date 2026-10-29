@@ -21,6 +21,15 @@ node "$SKILLS_ROOT/human-review/human-review-plan.mjs" path/to/plan.md path/to/p
 
 The output path is optional. Keep the artifact self-contained and offline-capable.
 
+When the local `human-review` command is available, generate with
+`--no-open`, then run `human-review path/to/plan.review.html` and
+`human-review poll path/to/plan.review.html`. The agent receives
+`pages[].structured_review.document` with the complete Plate or fallback
+planning state, alongside comments and the overall note. Apply direct
+edits before unresolved discussions and section actions. Poll with
+`--ack` only after applying the batch. If no live server exists,
+return the self-contained file and retain offline exports.
+
 Return/open the generated review artifact so the user can edit content, add discussions, mark sections for Revise/Expand/Touch up/Remove/Verify, save reviewed HTML, or export a clean PRD.
 
 When a reviewed artifact comes back, treat its embedded review state as the instruction set. Apply direct edits first, then unresolved discussions, then section actions; write the result back to the canonical planning source when known.

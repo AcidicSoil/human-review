@@ -1,6 +1,6 @@
 # Unified Human Review: shared review core
 
-Status: Proposed specification, approved architecture, implementation pending review
+Status: Architecture approved; shared core and adapters implemented on unified-review-core; visual redesign pending approval
 Date: 2026-10-29
 Repository: `/home/user/tools/human-review`
 Related prototypes: `design-ref/human-review-ui-concepts.figcraft` (visual exploration, not approved implementation)
@@ -11,7 +11,7 @@ Keep one Human Review session, feedback, persistence, polling, and acknowledgmen
 
 A reviewer can open a generated LOA or Planning artifact through the existing Human Review command, edit its native content, attach anchored comments, send a batch to an agent, see acknowledgment and reload, and continue reviewing. Existing standalone exports remain usable offline. The original DOM review behavior does not regress.
 
-This is a product and architecture specification, not authorization to implement.
+This specification is the approved implementation contract. The visual layout concepts remain separate and unapproved.
 
 ## Baseline verified in the fork
 
@@ -196,4 +196,4 @@ Definition of done: DOM regression checks pass; LOA and Planning both complete e
 - **Large LOAs:** A compact, indexed view must not hide actions or silently truncate exports.
 - **Standards:** Read-only preflight reported missing `.design/standards.json` and `DESIGN.md`. This checkout is outside the approved auto-creation root. Do not create either without a specific approval for this project and these files.
 - **Visual direction:** The FigCraft concepts were exploratory. Neither LOA layout is approved for production; functional parity comes before visual changes.
-- **Review gate:** Approval of this architecture authorizes the specification. Obtain approval of the completed specification and its UI composition before implementing production changes.
+- **Review gate:** The implementation specification was approved. A new visual composition still requires separate human approval.

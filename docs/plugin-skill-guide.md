@@ -57,6 +57,15 @@ Use this for plans, specifications, PRDs, roadmaps, or implementation proposals 
 
 Planning artifacts embed their editor runtime and support section navigation, review actions, discussions, reviewed-HTML export, and clean PRD export. They are designed to remain usable from `file://` without requiring a separate development server.
 
+### Live agent handoff
+
+If the host can run the local Human Review server, generate either structured
+artifact with `--no-open`, open it using `human-review <generated.html>`,
+and poll the same target. The reviewer clicks **Send**, and the agent receives
+a canonical `pages[].structured_review.document` plus feedback. Apply and
+acknowledge with `human-review poll <generated.html> --ack`. Otherwise use
+the offline artifact export as before.
+
 ### `loa-review`
 
 Use this when the deliverable is a structured List of Actions and you want actions to reference available plugins or skills.
