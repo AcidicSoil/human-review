@@ -20,7 +20,9 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   let selectedActionId = state.loa.actions[0]?.id || null;
   let editingActionId = null;
   let railQuery = "";
-  const collapsedPluginRefs = new Set();
+  let outlineQuery = "";
+  // Catalog entries stay collapsed until requested, including large inventories.
+  const collapsedPluginRefs = new Set(state.catalog.flatMap((category) => (category.plugins || []).map((plugin) => plugin.ref)));
   let draggedActionId = null;
   let draggedSnapIn = null;
 
@@ -108,7 +110,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
       }).join("");
       return plugins ? "<section class=\"hr-loa-category\"><h3 class=\"hr-loa-category-name\">" + esc(category.category) + "</h3>" + plugins + "</section>" : "";
     }).join("");
-    rail.innerHTML = "<h2>Components</h2><input id=\"hr-loa-search\" class=\"hr-loa-search\" type=\"search\" value=\"" + esc(railQuery) + "\" placeholder=\"Search plugins and skills\" aria-label=\"Search plugins and skills\">" + (categories || "<p class=\"hr-loa-empty\">No matching components.</p>");
+    rail.innerHTML = "<div class=\"hr-loa-pane-heading\"><div><span class=\"hr-loa-eyebrow\">INSPECTOR</span><h2>Skills & plugins</h2></div><span class=\"hr-loa-pane-count\">" + state.catalog.reduce((sum, category) => sum + (category.plugins || []).reduce((total, plugin) => total + (plugin.skills || []).length, 0), 0) + "</span></div><p class=\"hr-loa-inspector-hint\">Attach a skill to the selected action. Search or expand a plugin.</p><input id=\"hr-loa-search\" class=\"hr-loa-search\" type=\"search\" value=\"" + esc(railQuery) + "\" placeholder=\"Search plugins and skills\" aria-label=\"Search plugins and skills\">" + (categories || "<p class=\"hr-loa-empty\">No matching components.</p>");
     if (restoreSelection) {
       const search = document.getElementById("hr-loa-search");
       search?.focus();
@@ -117,25 +119,46 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   };
   const componentButton = (component) => "<li><button type=\"button\" class=\"hr-loa-component\" draggable=\"true\" data-drag-ref=\"" + esc(component.ref) + "\" data-add-ref=\"" + esc(component.ref) + "\"><span>" + esc(component.displayName) + "</span><small>" + esc(component.ref) + "</small><b aria-hidden=\"true\">+</b></button></li>";
 
+  const renderOutline = (restoreSelection = false) => {
+    const outline = document.getElementById("hr-loa-outline");
+    if (!outline) return;
+    const query = outlineQuery.trim().toLowerCase();
+    const visible = state.loa.actions
+      .map((action, index) => ({ action, index }))
+      .filter(({ action }) => !query || [action.id, action.content].join(" ").toLowerCase().includes(query));
+    outline.innerHTML = "<div class=\"hr-loa-pane-heading\"><div><span class=\"hr-loa-eyebrow\">NAVIGATE</span><h2>Action outline</h2></div><span class=\"hr-loa-pane-count\">" + state.loa.actions.length + "</span></div>" +
+      "<label class=\"hr-loa-sr-only\" for=\"hr-loa-action-search\">Find actions</label><input id=\"hr-loa-action-search\" type=\"search\" class=\"hr-loa-search\" autocomplete=\"off\" placeholder=\"Find actions…\" value=\"" + esc(outlineQuery) + "\">" +
+      "<p class=\"hr-loa-outline-hint\">" + visible.length + " of " + state.loa.actions.length + " actions</p>" +
+      "<nav class=\"hr-loa-outline-list\" aria-label=\"Action outline\">" +
+      (visible.map(({ action, index }) => "<button type=\"button\" class=\"hr-loa-outline-item\" data-outline-action=\"" + esc(action.id) + "\" aria-current=\"" + (action.id === selectedActionId ? "step" : "false") + "\"><span class=\"hr-loa-outline-index\">" + String(index + 1).padStart(2, "0") + "</span><span class=\"hr-loa-outline-summary\"><span>" + esc(action.content || "Untitled action") + "</span><small>" + esc(action.id) + "</small></span>" + ((action.snapIns || []).length ? "<span class=\"hr-loa-outline-pins\" aria-label=\"" + action.snapIns.length + " attached skills\">" + action.snapIns.length + "</span>" : "") + "</button>").join("") || "<p class=\"hr-loa-empty\">No matching actions.</p>") + "</nav>";
+    if (restoreSelection) {
+      const input = document.getElementById("hr-loa-action-search");
+      input?.focus();
+      input?.setSelectionRange(outlineQuery.length, outlineQuery.length);
+    }
+  };
   const renderActions = () => {
     const host = document.getElementById("hr-loa-actions");
     if (!host) return;
+    const components = componentMap();
     const cards = state.loa.actions.map((action, index) => {
       const selected = action.id === selectedActionId ? "true" : "false";
+      const expanded = selected === "true";
       const editing = action.id === editingActionId;
       const content = editing
         ? "<label class=\"hr-loa-edit-label\">Action content<textarea class=\"hr-loa-edit\" data-edit-input>" + esc(action.content) + "</textarea></label><div class=\"hr-loa-edit-actions\"><button data-edit-save>Save</button><button data-edit-cancel>Cancel</button></div>"
         : "<div class=\"hr-loa-action-content\">" + esc(action.content) + "</div>";
       const snaps = (action.snapIns || []).map((snapIn) => {
         const ref = refOf(snapIn);
-        const item = componentMap().get(ref);
+        const item = components.get(ref);
         const label = snapIn?.displayName || item?.displayName || ref;
         const unavailable = !item;
         return "<li class=\"hr-loa-snap-in" + (unavailable ? " is-unavailable" : "") + "\" data-ref=\"" + esc(ref) + "\"><span>" + esc(label) + (unavailable ? " · unavailable" : "") + "</span><button data-snap-in-remove=\"" + esc(ref) + "\" aria-label=\"Remove " + esc(label) + "\">×</button></li>";
       }).join("");
-      return "<article class=\"hr-loa-action\" role=\"option\" tabindex=\"0\" draggable=\"" + (!editing) + "\" aria-selected=\"" + selected + "\" data-action-id=\"" + esc(action.id) + "\"><div class=\"hr-loa-action-head\"><span class=\"hr-loa-action-index\">" + (index + 1) + "</span><code>" + esc(action.id) + "</code><div class=\"hr-loa-action-controls\"><button data-action-move-up aria-label=\"Move action up\" " + (index === 0 ? "disabled" : "") + ">↑</button><button data-action-move-down aria-label=\"Move action down\" " + (index === state.loa.actions.length - 1 ? "disabled" : "") + ">↓</button><button data-action-edit>Edit</button>" + (window.__hrReviewHost?.connected ? "<button data-action-comment>Comment</button>" : "") + "<button data-action-remove>Remove</button></div></div>" + content + "<ul class=\"hr-loa-snap-ins\">" + snaps + "</ul></article>";
+      return "<article class=\"hr-loa-action\" role=\"option\" tabindex=\"0\" draggable=\"" + (!editing) + "\" aria-selected=\"" + selected + "\" data-expanded=\"" + expanded + "\" data-action-id=\"" + esc(action.id) + "\"><div class=\"hr-loa-action-head\"><span class=\"hr-loa-action-index\">" + (index + 1) + "</span><code>" + esc(action.id) + "</code><div class=\"hr-loa-action-controls\"><button data-action-move-up aria-label=\"Move action up\" " + (index === 0 ? "disabled" : "") + ">↑</button><button data-action-move-down aria-label=\"Move action down\" " + (index === state.loa.actions.length - 1 ? "disabled" : "") + ">↓</button><button data-action-edit>Edit</button>" + (window.__hrReviewHost?.connected ? "<button data-action-comment>Comment</button>" : "") + "<button data-action-remove>Remove</button></div></div>" + content + "<ul class=\"hr-loa-snap-ins\">" + snaps + "</ul></article>";
     }).join("");
-    host.innerHTML = "<div class=\"hr-loa-actions-title\"><h2>List of actions</h2><button id=\"hr-loa-add-action\">+ Add action</button></div>" + (cards || "<p class=\"hr-loa-empty\">No actions yet. Add one to begin.</p>");
+    host.innerHTML = "<div class=\"hr-loa-actions-title\"><div><span class=\"hr-loa-eyebrow\">WORKBENCH</span><h2>Review actions <span class=\"hr-loa-count\">" + state.loa.actions.length + "</span></h2></div><button type=\"button\" id=\"hr-loa-add-action\">+ New action</button></div>" + "<p class=\"hr-loa-workbench-hint\">Select an action to edit, reorder, comment, or attach skills. Drag cards to reorder.</p>" + "<div class=\"hr-loa-action-list\" role=\"listbox\" aria-label=\"Review actions\">" + (cards || "<p class=\"hr-loa-empty\">No actions yet. Add one to begin.</p>") + "</div>";
+    renderOutline();
   };
 
   const saveBlob = (content, name, type) => {
@@ -166,7 +189,12 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   root.addEventListener("click", (event) => {
     const target = event.target.closest("button");
     const card = event.target.closest("[data-action-id]");
-    if (target?.dataset.pluginToggle) {
+    if (target?.dataset.outlineAction) {
+      selectedActionId = target.dataset.outlineAction;
+      editingActionId = null;
+      renderActions();
+      focusAction(selectedActionId);
+    } else if (target?.dataset.pluginToggle) {
       event.preventDefault();
       const ref = target.dataset.pluginToggle;
       if (collapsedPluginRefs.has(ref)) collapsedPluginRefs.delete(ref);
@@ -222,6 +250,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
       const id = "action-" + number;
       selectedActionId = id;
       editingActionId = id;
+      outlineQuery = "";
       setActions([...state.loa.actions, { id, content: "", snapIns: [] }], id);
       renderActions();
       document.querySelector("[data-edit-input]")?.focus();
@@ -236,7 +265,10 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
     }
   });
   root.addEventListener("input", (event) => {
-    if (event.target.id === "hr-loa-search") {
+    if (event.target.id === "hr-loa-action-search") {
+      outlineQuery = event.target.value;
+      renderOutline(true);
+    } else if (event.target.id === "hr-loa-search") {
       railQuery = event.target.value;
       renderRail(true);
     }
@@ -299,16 +331,17 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
     if (component) addSnap(actionId, component);
   }
 
-  const toolbar = document.createElement("div");
+  const toolbar = document.createElement("header");
   toolbar.className = "hr-loa-toolbar";
-  toolbar.innerHTML = "<span>LOA review</span><span class=\"hr-loa-spacer\"></span><button id=\"hr-loa-save-html\">Save reviewed HTML</button><button id=\"hr-loa-save-json\">Save clean LOA JSON</button>";
+  toolbar.innerHTML = "<div class=\"hr-loa-brand\"><span class=\"hr-loa-brand-mark\" aria-hidden=\"true\">L</span><div class=\"hr-loa-brand-copy\"><span class=\"hr-loa-eyebrow\">HUMAN REVIEW / STRUCTURED ACTIONS</span><h1 id=\"hr-loa-document-title\"></h1></div></div><div class=\"hr-loa-header-actions\"><span class=\"hr-loa-session-pill\">Offline-ready</span><button id=\"hr-loa-save-html\" type=\"button\">Save reviewed HTML</button><button id=\"hr-loa-save-json\" type=\"button\">Save clean LOA JSON</button></div>";
+  toolbar.querySelector("#hr-loa-document-title").textContent = state.loa.title || "List of actions";
   const live = document.createElement("div");
   live.id = "hr-loa-live";
   live.className = "hr-loa-live";
   live.setAttribute("aria-live", "polite");
   const layout = document.createElement("div");
   layout.className = "hr-loa-layout";
-  layout.innerHTML = "<aside id=\"hr-loa-rail\" class=\"hr-loa-rail\"></aside><main id=\"hr-loa-actions\" class=\"hr-loa-actions\"></main>";
+  layout.innerHTML = "<aside id=\"hr-loa-outline\" class=\"hr-loa-outline\" aria-label=\"Actions\"></aside><main id=\"hr-loa-actions\" class=\"hr-loa-actions\"></main><aside id=\"hr-loa-rail\" class=\"hr-loa-rail\" aria-label=\"Skill catalog\"></aside>";
   const shell = document.createElement("div"); shell.className = "hr-loa-shell"; shell.append(toolbar, live, layout);
   root.replaceChildren(shell);
   renderRail();
@@ -323,6 +356,10 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
       renderRail(); renderActions();
     },
     activate(anchor) { if (anchor?.mode === "loa") focusAction(anchor.actionId); },
-    onConnect() { renderActions(); },
+    onConnect() {
+      const pill = document.querySelector(".hr-loa-session-pill");
+      if (pill) pill.textContent = "Live review session";
+      renderActions();
+    },
   });
 })();`;

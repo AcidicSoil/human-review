@@ -19,12 +19,14 @@ test("LOA standalone editor announces itself and accepts a live host snapshot", 
   });
   try {
     assert.equal(messages.some((item) => item.type === "hr:ready" && item.mode === "loa"), true);
+    assert.equal(dom.window.document.querySelector(".hr-loa-session-pill").textContent, "Offline-ready");
     const restored = { loa: { actions: [{ id: "a1", content: "Agent draft", snapIns: [] }] }, catalog: [] };
     dom.window.dispatchEvent(new dom.window.MessageEvent("message", {
       source: parent,
       data: { type: "hr:restore", mode: "loa", nonce: "session-nonce", structured: { document: restored } },
     }));
     assert.match(dom.window.document.querySelector(".hr-loa-action-content").textContent, /Agent draft/);
+    assert.equal(dom.window.document.querySelector(".hr-loa-session-pill").textContent, "Live review session");
     dom.window.document.querySelector("[data-action-edit]").click();
     const input = dom.window.document.querySelector("[data-edit-input]");
     input.value = "Reviewer edit";

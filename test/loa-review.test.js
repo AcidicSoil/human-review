@@ -295,7 +295,10 @@ test("component rail exposes leaf skills only and plugin groups collapse indepen
   assert.equal(doc.querySelectorAll("[data-add-ref]").length, 2);
   const toggle = doc.querySelector('[data-plugin-toggle="github"]');
   assert.ok(toggle);
-  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+  assert.equal(toggle.getAttribute("aria-expanded"), "false", "catalog starts collapsed to keep large inventories navigable");
+  assert.equal(doc.querySelector('[data-plugin-skills="github"]').hidden, true);
+  toggle.click();
+  assert.equal(doc.querySelector('[data-plugin-toggle="github"]').getAttribute("aria-expanded"), "true");
 
   doc.querySelector('[data-add-ref="skills://plugins/github/yeet"]').click();
   const bootstrap = JSON.parse(doc.getElementById("hr-loa-bootstrap").textContent);
@@ -306,7 +309,7 @@ test("component rail exposes leaf skills only and plugin groups collapse indepen
     displayName: "yeet",
   }]);
 
-  toggle.click();
+  doc.querySelector('[data-plugin-toggle="github"]').click();
   const collapsedToggle = doc.querySelector('[data-plugin-toggle="github"]');
   assert.equal(collapsedToggle.getAttribute("aria-expanded"), "false");
   assert.ok(doc.querySelector('[data-plugin-skills="github"]').hidden);
