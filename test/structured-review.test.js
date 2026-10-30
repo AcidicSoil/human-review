@@ -12,9 +12,13 @@ const { createServer } = await import("../src/server.js");
 
 test("LOA changes persist and reach the original agent poll as structured feedback", async () => {
   const file = path.join(root, "review.loa.review.html");
+  const resourceSources = [{ id: "example", kind: "skills", displayName: "Example skills", skills: [
+    { ref: "example://skill/check", displayName: "Check" },
+  ] }];
   fs.writeFileSync(file, createLoaReviewHtml({
-    loa: { actions: [{ id: "a1", content: "Original action", snapIns: [] }] },
+    loa: { actions: [{ id: "a1", content: "Original action", snapIns: [], phase: "Review" }] },
     catalog: [],
+    resourceSources,
   }));
   const app = createServer();
   app.server.listen(0, "127.0.0.1");
@@ -37,7 +41,7 @@ test("LOA changes persist and reach the original agent poll as structured feedba
     const draft = {
       format: "human-review.snapshot/v1",
       mode: "loa",
-      document: { loa: { actions: [{ id: "a1", content: "Reviewed action", snapIns: [] }] }, catalog: [] },
+      document: { loa: { actions: [{ id: "a1", content: "Reviewed action", snapIns: [], phase: "Review" }] }, catalog: [], resourceSources },
       baseHash: before.data.sourceHash,
       expectedRevision: 0,
     };
@@ -53,6 +57,8 @@ test("LOA changes persist and reach the original agent poll as structured feedba
     assert.equal(poll.data.status, "feedback");
     assert.equal(poll.data.pages[0].structured_review.mode, "loa");
     assert.equal(poll.data.pages[0].structured_review.document.loa.actions[0].content, "Reviewed action");
+    assert.deepEqual(poll.data.pages[0].structured_review.document.resourceSources, resourceSources);
+    assert.equal(poll.data.pages[0].structured_review.document.loa.actions[0].phase, "Review");
     assert.equal(poll.data.overall_note, "Review the action");
     assert.equal((await api(`/api/page/${key}`)).data.unsent.structured, 0);
     const after = await api(`/api/page/${key}/structured`, { method: "POST", body: {

@@ -27,7 +27,7 @@ function actionIndex(state, actionId) {
   return state.loa.actions.findIndex((action) => action.id === actionId);
 }
 
-function catalogRefs(catalog) {
+function catalogRefs(catalog, resourceSources = []) {
   const refs = new Set();
   for (const category of Array.isArray(catalog) ? catalog : []) {
     for (const plugin of Array.isArray(category?.plugins) ? category.plugins : []) {
@@ -36,6 +36,10 @@ function catalogRefs(catalog) {
         if (typeof skill.ref === "string") refs.add(skill.ref);
       }
     }
+  }
+  for (const source of Array.isArray(resourceSources) ? resourceSources : []) {
+    const skills = source.kind === "skills" ? source.skills : (source.groups || []).flatMap((group) => group.skills || []);
+    for (const skill of skills || []) if (typeof skill.ref === "string") refs.add(skill.ref);
   }
   return refs;
 }
@@ -135,7 +139,7 @@ export function removeSnapIn(state, actionId, ref) {
 
 export function markUnavailableSnapIns(state) {
   assertState(state);
-  const refs = catalogRefs(state.catalog);
+  const refs = catalogRefs(state.catalog, state.resourceSources);
   return withActions(state, state.loa.actions.map((action) => ({
     ...action,
     snapIns: action.snapIns.map((snapIn) => {

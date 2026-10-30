@@ -54,6 +54,22 @@ button:disabled:hover { background: #252e3c; border-color: var(--hr-loa-border);
 .hr-loa-search { width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid #3b495e; outline: none; background: #0e1520; color: var(--hr-loa-text); font-size: 12px; }
 .hr-loa-search::placeholder { color: #8492a7; }
 .hr-loa-outline-list { display: flex; flex-direction: column; gap: 4px; }
+
+.hr-loa-resource-label { display: block; margin: 12px 1px 6px; color: var(--hr-loa-muted); font-size: 11px; font-weight: 650; }
+#hr-loa-resource-mode, #hr-loa-source-select { cursor: pointer; margin-bottom: 4px; }
+.hr-loa-tree-phase { border-radius: 9px; background: #192332; margin-bottom: 6px; padding: 4px; }
+.hr-loa-tree-phase-toggle { display: flex; align-items: center; gap: 9px; width: 100%; background: transparent; border: none; font-weight: 700; text-align: left; color: #d8e6f8; }
+.hr-loa-tree-phase-toggle:hover { background: #27394d; }
+.hr-loa-tree-phase-toggle small { margin-left: auto; color: #a7bdd8; font-variant-numeric: tabular-nums; }
+.hr-loa-tree-phase-children { display: flex; flex-direction: column; gap: 3px; }
+.hr-loa-tree-node { min-width: 0; }
+.hr-loa-tree-row { display: flex; align-items: flex-start; gap: 2px; min-width: 0; }
+.hr-loa-tree-row .hr-loa-outline-item { min-width: 0; flex: 1; padding: 8px 4px; }
+.hr-loa-tree-toggle, .hr-loa-tree-indent { width: 24px; min-width: 24px; height: 30px; flex: none; }
+.hr-loa-tree-toggle { padding: 4px; background: transparent; border: 0; color: var(--hr-loa-accent); }
+.hr-loa-tree-children { margin-left: 11px; border-left: 1px solid #435674; padding-left: 4px; }
+.hr-loa-tree-children .hr-loa-outline-index { color: #a8bedb; }
+
 .hr-loa-outline-item { display: flex; align-items: flex-start; text-align: left; gap: 10px; width: 100%; min-height: 57px; padding: 10px 8px; background: transparent; border-color: transparent; }
 .hr-loa-outline-item:hover { background: #202c3b; border-color: #3d4d62; }
 .hr-loa-outline-item[aria-current="step"] { background: var(--hr-loa-soft); border-color: #4a76af; }
@@ -180,6 +196,73 @@ function validateCatalog(catalog) {
   });
 }
 
+function validateResourceSources(sources) {
+  if (!Array.isArray(sources)) throw new TypeError("resourceSources must be an array.");
+  const ids = new Set();
+  return sources.map((source, index) => {
+    const where = `resourceSources[${index}]`;
+    if (!isRecord(source)) throw new TypeError(`${where} must be an object.`);
+    const id = requireString(source.id, `${where}.id`);
+    if (ids.has(id)) throw new TypeError(`Duplicate resource source ID: ${id}`);
+    ids.add(id);
+    if (source.kind !== "skills" && source.kind !== "skill-set") {
+      throw new TypeError(`${where}.kind must be skills or skill-set.`);
+    }
+    requireString(source.displayName, `${where}.displayName`);
+    const validateSkills = (items, location) => {
+      if (!Array.isArray(items)) throw new TypeError(`${location} must be an array.`);
+      const refs = new Set();
+      return items.map((item, n) => {
+        const at = `${location}[${n}]`;
+        if (!isRecord(item)) throw new TypeError(`${at} must be an object.`);
+        const ref = requireString(item.ref, `${at}.ref`);
+        requireString(item.displayName, `${at}.displayName`);
+        if (item.kind !== undefined && item.kind !== "skill") throw new TypeError(`${at}.kind must be skill.`);
+        if (refs.has(ref)) throw new TypeError(`Duplicate skill ref in ${location}: ${ref}`);
+        refs.add(ref);
+        return { ...item };
+      });
+    };
+    if (source.kind === "skills") {
+      return { ...source, id, skills: validateSkills(source.skills, `${where}.skills`) };
+    }
+    if (!Array.isArray(source.groups)) throw new TypeError(`${where}.groups must be an array.`);
+    const groups = new Set();
+    return { ...source, id, groups: source.groups.map((group, n) => {
+      const at = `${where}.groups[${n}]`;
+      if (!isRecord(group)) throw new TypeError(`${at} must be an object.`);
+      const groupId = requireString(group.id, `${at}.id`);
+      if (groups.has(groupId)) throw new TypeError(`Duplicate group ID: ${groupId}`);
+      groups.add(groupId);
+      requireString(group.displayName, `${at}.displayName`);
+      return { ...group, skills: validateSkills(group.skills, `${at}.skills`) };
+    }) };
+  });
+}
+
+function validateActionTree(actions) {
+  const byId = new Map(actions.map((action) => [action.id, action]));
+  const inProgress = new Set();
+  const phaseById = new Map();
+  const effectivePhase = (action) => {
+    if (phaseById.has(action.id)) return phaseById.get(action.id);
+    if (inProgress.has(action.id)) throw new TypeError(`Action parent cycle involving ${action.id}`);
+    inProgress.add(action.id);
+    let phase = action.phase || "Actions";
+    if (action.parentId !== undefined) {
+      const parent = byId.get(action.parentId);
+      if (!parent) throw new TypeError(`Unknown parentId for action ${action.id}: ${action.parentId}`);
+      const parentPhase = effectivePhase(parent);
+      if (action.phase && action.phase !== parentPhase) throw new TypeError(`Action phase conflicts with parent for ${action.id}`);
+      phase = parentPhase;
+    }
+    inProgress.delete(action.id);
+    phaseById.set(action.id, phase);
+    return phase;
+  };
+  for (const action of actions) effectivePhase(action);
+}
+
 export function validateLoaInput(input) {
   if (!isRecord(input)) throw new TypeError("LOA input must be an object.");
   if (!isRecord(input.loa)) throw new TypeError("loa must be an object.");
@@ -193,6 +276,8 @@ export function validateLoaInput(input) {
     if (actionIds.has(id)) throw new TypeError(`Duplicate action ID: ${id}.`);
     actionIds.add(id);
     if (typeof action.content !== "string") throw new TypeError(`${actionPath}.content must be a string.`);
+    if (action.phase !== undefined) requireString(action.phase, `${actionPath}.phase`);
+    if (action.parentId !== undefined) requireString(action.parentId, `${actionPath}.parentId`);
     if (!Array.isArray(action.snapIns)) throw new TypeError(`${actionPath}.snapIns must be an array.`);
 
     const snapIns = [];
@@ -208,10 +293,12 @@ export function validateLoaInput(input) {
     return { ...action, id, snapIns };
   });
 
+  validateActionTree(actions);
   return {
     ...input,
     loa: { ...input.loa, actions },
     catalog: validateCatalog(input.catalog),
+    ...(input.resourceSources === undefined ? {} : { resourceSources: validateResourceSources(input.resourceSources) }),
   };
 }
 
@@ -250,8 +337,12 @@ function renderCatalog(catalog) {
   `).join("");
 }
 
-function renderActions(actions, catalog) {
+function renderActions(actions, catalog, resourceSources = []) {
   const refs = new Set(catalog.flatMap((category) => category.plugins.flatMap((plugin) => [plugin.ref, ...plugin.skills.map((skill) => skill.ref)])));
+  for (const source of resourceSources) {
+    const skills = source.kind === "skills" ? source.skills : source.groups.flatMap((group) => group.skills);
+    for (const skill of skills) refs.add(skill.ref);
+  }
   return actions.map((action) => `
     <article class="hr-loa-action" data-action-id="${escapeHtml(action.id)}" draggable="true">
       <div class="hr-loa-action-id">${escapeHtml(action.id)}</div>
@@ -269,13 +360,14 @@ function titleFrom(loa, artifactName) {
   return isNonEmptyString(loa.title) ? loa.title : `${artifactName || "LOA"} review`;
 }
 
-export function createLoaReviewHtml({ loa, catalog, sourcePath, artifactName } = {}) {
-  const input = validateLoaInput({ loa, catalog });
+export function createLoaReviewHtml({ loa, catalog, resourceSources, sourcePath, artifactName } = {}) {
+  const input = validateLoaInput({ loa, catalog: catalog ?? [], ...(resourceSources === undefined ? {} : { resourceSources }) });
   const name = artifactName || "loa.review.html";
   const bootstrap = {
     version: 1,
     loa: input.loa,
     catalog: input.catalog,
+    ...(input.resourceSources === undefined ? {} : { resourceSources: input.resourceSources }),
     sourcePath,
     artifactName: name,
   };
@@ -303,7 +395,7 @@ export function createLoaReviewHtml({ loa, catalog, sourcePath, artifactName } =
       </aside>
       <main id="hr-loa-actions" class="hr-loa-actions">
         <h2>List of actions</h2>
-        ${renderActions(input.loa.actions, input.catalog)}
+        ${renderActions(input.loa.actions, input.catalog, input.resourceSources)}
       </main>
     </div>
   </div>
@@ -325,13 +417,14 @@ export async function generateLoaArtifact(inputFile, outputFile, { discoverCatal
   } catch (error) {
     throw new Error(`Invalid LOA JSON in ${input}: ${error.message}`);
   }
-  if (parsed.catalog === undefined) parsed = { ...parsed, catalog: discoverCatalog() };
+  if (parsed.catalog === undefined) parsed = { ...parsed, catalog: parsed.resourceSources === undefined ? discoverCatalog() : [] };
   const validated = validateLoaInput(parsed);
   const base = path.basename(input, path.extname(input)).replace(/\.loa$/i, "");
   const output = path.resolve(outputFile || path.join(path.dirname(input), `${base}.loa.review.html`));
   fs.writeFileSync(output, createLoaReviewHtml({
     loa: validated.loa,
     catalog: validated.catalog,
+    ...(validated.resourceSources === undefined ? {} : { resourceSources: validated.resourceSources }),
     sourcePath: input,
     artifactName: path.basename(output),
   }));
