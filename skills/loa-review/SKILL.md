@@ -13,7 +13,7 @@ If the user supplied only a natural-language task, derive a concise ordered `loa
 
 ## Component catalog
 
-Match the approved Component Rail prototype: the rail is populated before review with real installed plugin and nested skill refs. In Codex, omit `catalog` from newly-created LOA input and let the bundled Human Review runtime populate it automatically from Codex's installed/enabled plugin inventory.
+Use the action-first LOA workbench: the left outline navigates actions, the central panel edits and reorders actions, and the right inspector searches installed plugin groups and their nested skills. Plugin groups start collapsed to handle large inventories. The inspector is populated before review with real installed plugin and nested skill refs. In Codex, omit `catalog` from newly-created LOA input and let the bundled Human Review runtime populate it automatically from Codex's installed/enabled plugin inventory.
 
 Canonical skill refs use `skills://plugins/<plugin>/<skill>`. Plugin refs use the plugin name. Never invent a ref or replace a canonical ref with shorthand such as `plugin:skill`.
 

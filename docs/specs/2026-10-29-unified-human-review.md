@@ -1,9 +1,9 @@
 # Unified Human Review: shared review core
 
-Status: Architecture approved; shared core and adapters implemented on unified-review-core; visual redesign pending approval
+Status: Shared core integrated on main; LOA action-first visual redesign implemented on branch loa-action-workbench, awaiting integration
 Date: 2026-10-29
 Repository: `/home/user/tools/human-review`
-Related prototypes: `design-ref/human-review-ui-concepts.figcraft` (visual exploration, not approved implementation)
+Related designs: `design-ref/human-review-ui-concepts.figcraft` (original concepts), `design-ref/human-review-loa-workbench.png` (rendered action-first implementation)
 
 ## Decision and outcome
 
@@ -11,7 +11,7 @@ Keep one Human Review session, feedback, persistence, polling, and acknowledgmen
 
 A reviewer can open a generated LOA or Planning artifact through the existing Human Review command, edit its native content, attach anchored comments, send a batch to an agent, see acknowledgment and reload, and continue reviewing. Existing standalone exports remain usable offline. The original DOM review behavior does not regress.
 
-This specification is the approved implementation contract. The visual layout concepts remain separate and unapproved.
+This specification is the approved implementation contract. The action-first LOA workbench direction received separate visual approval. The prior library-first FigCraft alternative remains exploratory.
 
 ## Baseline verified in the fork
 
@@ -23,7 +23,7 @@ This specification is the approved implementation contract. The visual layout co
 - `src/plate-review/` owns the rich Planning editor, fallback, section navigation, comments, and exports.
 - `src/server.js` currently injects the generic DOM SDK into all HTML artifacts at the `/artifact/` route. Serving a LOA file through that route does not by itself turn LOA's internal state into agent feedback.
 - `human-review <file>`, `human-review poll <target> --ack`, `human-review-loa`, and `human-review-plan` are existing entry points.
-- The existing 145-action, 372-skill negative reference demonstrates that full expansion is not acceptable at scale. Neither FigCraft LOA concept has received visual approval.
+- The existing 145-action, 372-skill negative reference demonstrates that full expansion is not acceptable at scale. The action-first LOA redesign uses bounded, independently scrollable panels and collapsed plugin groups.
 
 Evidence: `src/server.js`, `src/state.js`, `src/chrome.html`, `src/chrome-client.js`, `src/sdk.js`, `src/loa-review/{generator,runtime,state}.js`, `src/plate-review/`, `README.md`, and `test/{agent-loop,poll-handoff,loa-review,plate-review}.test.js`.
 
@@ -195,5 +195,5 @@ Definition of done: DOM regression checks pass; LOA and Planning both complete e
 - **Concurrent authoring:** Acks and reloads cannot discard edits made after Send. Record base revisions and handle conflicts visibly.
 - **Large LOAs:** A compact, indexed view must not hide actions or silently truncate exports.
 - **Standards:** Read-only preflight reported missing `.design/standards.json` and `DESIGN.md`. This checkout is outside the approved auto-creation root. Do not create either without a specific approval for this project and these files.
-- **Visual direction:** The FigCraft concepts were exploratory. Neither LOA layout is approved for production; functional parity comes before visual changes.
-- **Review gate:** The implementation specification was approved. A new visual composition still requires separate human approval.
+- **Visual direction:** Action-first LOA layout was approved and implemented in `loa-action-workbench`. The library-first concept remains unapproved.
+- **Review gate:** Both shared-core architecture and the action-first LOA redesign were approved. Further unrelated visual changes still require review.

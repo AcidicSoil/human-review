@@ -124,6 +124,17 @@ The generated HTML remains editable offline through `file://` without the
 server. **Save reviewed HTML**, **Save clean LOA JSON**, and **Save PRD**
 retain their existing purposes.
 
+The LOA editor uses an action-first workbench: a searchable action outline on
+the left, the ordered editing surface in the center, and a searchable skills
+inspector on the right. Plugin groups start collapsed, so large catalogs do
+not expand by default. Selecting an action in the outline focuses that
+action's editor. Action editing, drag and keyboard reordering, skill attachment,
+comments in live sessions, missing-ref indicators, and offline exports all
+remain available. The three panels scroll independently on desktop; narrow
+screens stack them without losing actions or catalog entries.
+
+![Action-first LOA workbench with 145 actions and 372 available skills](design-ref/human-review-loa-workbench.png)
+
 ## LOA component review
 
 A third review mode handles a machine-readable List of Actions (LOA) plus a plugin/skill
