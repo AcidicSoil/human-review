@@ -124,35 +124,80 @@ The generated HTML remains editable offline through `file://` without the
 server. **Save reviewed HTML**, **Save clean LOA JSON**, and **Save PRD**
 retain their existing purposes.
 
-The LOA editor uses an action-first workbench: a searchable action outline on
-the left, the ordered editing surface in the center, and a searchable skills
-inspector on the right. Plugin groups start collapsed, so large catalogs do
-not expand by default. Selecting an action in the outline focuses that
-action's editor. Action editing, drag and keyboard reordering, skill attachment,
-comments in live sessions, missing-ref indicators, and offline exports all
-remain available. The three panels scroll independently on desktop; narrow
-screens stack them without losing actions or catalog entries.
+The LOA editor uses an action-first workbench: a collapsible **action tree**
+on the left, the ordered editor in the center, and a configurable **resource
+inspector** on the right. The inspector supports **Plugins**, **Skills**,
+**Skill sets**, and **None**. For named skill sources or sets, select exactly
+one to browse at a time. Hidden resources do not detach skills or mark them
+unavailable. Plugin groups start collapsed for large catalogs. Action editing,
+drag and keyboard reordering, skill attachment, live comments, offline exports,
+and existing agent feedback remain available. The three panels scroll
+independently on desktop and stack on narrow screens.
 
 ![Action-first LOA workbench with 145 actions and 372 available skills](design-ref/human-review-loa-workbench.png)
 
+![Optional resource inspector and nested action tree demo](design-ref/human-review-resource-tree-workbench.png)
+
 ## LOA component review
 
-A third review mode handles a machine-readable List of Actions (LOA) plus a plugin/skill
-catalog. It creates a self-contained artifact with a categorized component rail and an ordered
-action list:
+A third review mode handles a machine-readable List of Actions (LOA), with
+**optional** plugins, standalone skills, and skill sets. It generates a
+self-contained artifact with an action tree, editor, and resource inspector:
 
 ```sh
 human-review-loa loa.json loa.loa.review.html
 ```
 
-For Codex, the normal input can be just `{ "loa": { "actions": [] } }`. If `catalog` is omitted, Human Review reads Codex's installed/enabled plugin inventory, resolves each installed plugin's nested `SKILL.md` packages, and fills the Component Rail automatically. Skill refs use the prototype's canonical form, for example `skills://plugins/superpowers/test-driven-development`.
+For backward compatibility, input containing only `{ "loa": { "actions": [] } }`
+still uses the existing installed-plugin discovery when `catalog` is omitted.
+To opt out, explicitly provide `"catalog": []`, or provide
+`"resourceSources"` (which defaults the missing catalog to empty).
+
+For standalone skills or named skill sets, declare the exact sources and refs:
+
+```json
+{
+  "loa": {
+    "actions": [
+      { "id": "planning", "phase": "Plan", "content": "Plan implementation", "snapIns": [] },
+      { "id": "review", "parentId": "planning", "content": "Review plan", "snapIns": [] }
+    ]
+  },
+  "resourceSources": [
+    {
+      "id": "standalone",
+      "kind": "skills",
+      "displayName": "Sample standalone skills",
+      "skills": [{ "ref": "example://skill/check", "displayName": "Check" }]
+    },
+    {
+      "id": "delivery",
+      "kind": "skill-set",
+      "displayName": "Sample delivery workflow",
+      "groups": [
+        { "id": "plan", "displayName": "Plan", "skills": [
+          { "ref": "example://set/plan", "displayName": "Planning" }
+        ] }
+      ]
+    }
+  ]
+}
+```
+
+The `example://` refs are illustrative placeholders, **not** discovered or
+installed skills. Only explicitly supplied sources are rendered. There is no
+automatic filesystem discovery for standalone skills or skill sets. Use the
+resource selector to choose one source or disable the inspector; existing
+attachments remain intact. Optional `phase` and `parentId` fields create a
+real, collapsible tree. Legacy flat actions remain valid.
 
 An explicitly supplied `catalog` is still supported and is preserved as the manual override. Actions have stable IDs, editable content, and an unbounded `snapIns[]` array. Plugin cards are organizational groups rather than selectable components. Expand or collapse each plugin as needed, then click or drag an individual nested skill onto an action; duplicate refs on one action are ignored. Existing plugin-level refs in loaded LOAs remain visible for compatibility, but the rail creates new attachments at skill level only. Actions can be edited, removed, and reordered with the card drag surface, keyboard-accessible move controls, or the keyboard shortcuts. Existing refs missing from the current catalog remain visible as unavailable.
 
-The artifact never installs or executes a plugin or skill. **Save reviewed HTML** retains the
-canonical LOA and editable review state. **Save clean LOA JSON** exports only the `{ loa, catalog
-}` result for the next agent. The runtime is embedded, so the artifact works from `file://` without
-npm, a dev server, a CDN, or network access.
+The artifact never installs or executes a plugin or skill. **Save reviewed
+HTML** retains the editable review state and selected inspector view.
+**Save clean LOA JSON** exports `{ loa, catalog }` and, when supplied,
+`resourceSources`, for the next agent. The embedded runtime works from
+`file://` without npm, a development server, a CDN, or network access.
 
 ## Planning review artifacts
 

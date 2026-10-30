@@ -74,9 +74,9 @@ Use this when the deliverable is a structured List of Actions and you want actio
 @Human Review — loa-review: Build a reviewable LOA for shipping the settings feature. Populate the component rail from my installed Codex plugins and skills.
 ```
 
-When an explicit catalog is not supplied, the current LOA workflow can discover the installed/enabled Codex plugin inventory and resolve nested `SKILL.md` packages for the component rail. Existing references that are missing from the current catalog remain visible as unavailable rather than being silently removed.
+LOA's inspector can show plugins, explicitly declared standalone skills, one named skill set, or no resources. Supply `resourceSources` with `kind: "skills"` or `kind: "skill-set"` to embed explicit references and stage groups; no new filesystem source discovery is performed. Plugin discovery remains the backward-compatible fallback only when neither `catalog` nor `resourceSources` is supplied.
 
-The LOA artifact is a review/composition surface. It does not install or execute the plugins or skills placed on actions.
+Actions may declare `phase` and `parentId` for collapsible tree navigation. Source filtering never removes attached references; missing references remain visible as unavailable only when absent from every configured source. The LOA artifact does not install or execute the resources it displays.
 
 ## Compatibility and support skills
 

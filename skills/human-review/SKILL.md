@@ -45,12 +45,13 @@ For a structured List of Actions and component catalog, create the artifact in t
 node "$SKILL_DIR/human-review-loa.mjs" path/to/loa.json path/to/loa.loa.review.html
 ```
 
-The output path is optional. For Codex, newly-created input may contain only `{ "loa": { "actions": [] } }`; when `catalog` is absent, the bundled runtime discovers Codex's installed/enabled plugins and nested skills automatically before rendering the Component Rail. Canonical skill refs use `skills://plugins/<plugin>/<skill>`.
+The LOA inspector is optional and source-selectable: **Plugins**, standalone **Skills**, named **Skill sets**, and **None**. For plugin-only legacy input, a missing `catalog` triggers the existing Codex plugin discovery. To disable that, explicitly supply `"catalog": []` or supply `resourceSources`, which defaults the absent plugin catalog to empty.
 
-If the user explicitly supplies `catalog`, preserve it rather than replacing it. Each action has a stable non-empty `id`, string `content`, and an unbounded `snapIns` array. The catalog is organized as category → plugin → skills. Plugin cards are collapsible grouping headers and are not add targets; click or drag an individual nested skill onto an action. Preserve plugin-level refs already present in imported LOAs, but do not create new plugin-level attachments from the rail. The artifact never loads or executes a plugin, and it preserves missing refs as unavailable. Use the action move controls when drag-and-drop is unavailable.
+Non-plugin sources must be explicitly supplied in `resourceSources`: `{id,kind:"skills",displayName,skills:[{ref,displayName}]}` for individual skills, or `{id,kind:"skill-set",displayName,groups:[{id,displayName,skills:[{ref,displayName}]}]}` for named collections. Never invent installed sources or scan unspecified directories. When a user requests one set, only that named set is selected in the inspector. Hidden resources do not invalidate attached references.
 
-Save reviewed HTML to retain the editable review state, or save clean LOA JSON to pass the
-canonical `{ "loa", "catalog" }` result to the next agent. Do not persist an event log.
+Each action has a stable `id`, string `content`, and `snapIns[]`. Optional `phase` and `parentId` provide a real, collapsible action tree. Keep parent IDs valid and acyclic; do not infer hierarchy from prose. Legacy flat actions remain valid. Plugin cards are grouping headers; nested plugin skills are valid attach targets. Existing plugin refs remain loadable, but do not create new plugin-level attachments from the inspector.
+
+Save reviewed HTML to retain the editor and inspector state, or export clean LOA JSON containing `{ loa, catalog }` plus optional `resourceSources`. Never execute or install resources. Do not persist an event log.
 
 ### Never turn dependency availability into a user blocker
 
