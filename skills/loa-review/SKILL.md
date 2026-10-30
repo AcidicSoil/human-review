@@ -13,15 +13,27 @@ If the user supplied only a natural-language task, derive a concise ordered `loa
 
 ## Optional resource sources and action tree
 
-Use the action-first LOA workbench: the left tree navigates phases and parent-child actions, the central panel edits and reorders actions, and the right inspector shows a user-selected resource type. Resources are **optional**. Supported types: Plugins (legacy `catalog`), standalone Skills, named Skill sets, or None. Explicit `resourceSources` contains `{id,kind:"skills",displayName,skills:[{ref,displayName}]}` or `{id,kind:"skill-set",displayName,groups:[{id,displayName,skills:[{ref,displayName}]}]}`. These entries are supplied as data, never discovered from unspecified filesystem roots. The selected set is one named source, not a union of every set. No implicit grouping is invented.
+Use the action-first LOA workbench: the left tree navigates phases and parent-child actions, the central panel edits and reorders actions, and the right inspector shows a user-selected resource type. Resources are **optional**. Supported types: Plugins (legacy `catalog`), standalone Skills, legacy Skill collections, Sources, Workflows, or None. Explicit `resourceSources` contains `{id,kind:"skills",displayName,skills:[{ref,displayName}]}` or `{id,kind:"skill-set",displayName,groups:[{id,displayName,skills:[{ref,displayName}]}]}`. These entries are supplied as data, never discovered from unspecified filesystem roots. The selected collection is one named source, not an implicit workflow. No implicit grouping is invented.
 
 A root action may declare `phase`; a child may declare `parentId` referencing an existing action ID. Maintain those references when editing and reordering, reject cycles and missing parents, and preserve legacy flat actions. Never infer action hierarchy from prose.
 
-For legacy plugin-only input, **omit `catalog` and `resourceSources`** to retain installed/enabled plugin discovery. If `resourceSources` is supplied without `catalog`, use an empty plugin catalog. If the task requests no resources, explicitly supply empty `catalog: []` and `resourceSources: []` arrays.
+For legacy plugin-only input, **omit `catalog` and `resourceSources`** to retain installed/enabled plugin discovery. If `resourceSources` or `resourceManifest` is supplied without `catalog`, use an empty plugin catalog. If the task requests no resources, explicitly supply empty `catalog: []` and `resourceSources: []` arrays.
+
+For mixed packages use `resourceManifest` with format
+`human-review.resources/v1`: `sources:[{id,kind,displayName,refs}]`,
+`capabilities:[{ref,kind,displayName,invocation?,availability?}]`,
+optional `relationships:[{type,from,to}]`, and
+`workflows:[{id,displayName,steps:[{ref,after?}]}]`. Sources identify
+distribution; capabilities identify actual skills, agents, commands, rules,
+MCP integrations or hooks. Workflow steps are explicit, never inferred from
+folder structure. Provide only user-specified or source-verified refs.
+An individual skill can cover a full development lifecycle without becoming
+a workflow. The inspector can attach an entire source, a selected subset,
+or individual resources, and never executes them.
 
 Canonical skill refs use `skills://plugins/<plugin>/<skill>`. Plugin refs use the plugin name. Never invent a ref or replace a canonical ref with shorthand such as `plugin:skill`.
 
-If the user explicitly supplies `catalog` or `resourceSources`, preserve the supplied values. Never invent source entries or substitute plugin skills for standalone skills. Source selection filters visibility only; attached references remain valid if present in **any** embedded resource source. Only show a ref as unavailable when it is missing from every embedded source.
+If the user explicitly supplies `catalog` or `resourceSources`, preserve the supplied values. Never invent source entries or substitute plugin skills for standalone skills. Source selection filters visibility only; attached references remain valid if present in **any** embedded resource source. Show a ref as unavailable when missing from every embedded source or explicitly marked unavailable.
 
 For a new request, write input shaped like `{ "loa": { "actions": [] } }`; do not add an empty `catalog` merely to satisfy the generator.
 
@@ -31,7 +43,7 @@ Set `SKILLS_ROOT` to the parent directory of this skill directory, then generate
 node "$SKILLS_ROOT/human-review/human-review-loa.mjs" path/to/loa.json path/to/loa.loa.review.html
 ```
 
-The bundled runner resolves the Codex plugin catalog only when both `catalog` and `resourceSources` are absent. Open/return the self-contained artifact for review.
+The bundled runner resolves the Codex plugin catalog only when `catalog`, `resourceSources`, and `resourceManifest` are all absent. Open/return the self-contained artifact for review.
 
 When a local `human-review` session is available, prefer the live agent feedback loop:
 generate with `--no-open`, then run `human-review path/to/loa.loa.review.html` and

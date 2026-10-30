@@ -74,9 +74,9 @@ Use this when the deliverable is a structured List of Actions and you want actio
 @Human Review — loa-review: Build a reviewable LOA for shipping the settings feature. Populate the component rail from my installed Codex plugins and skills.
 ```
 
-LOA's inspector can show plugins, explicitly declared standalone skills, one named skill set, or no resources. Supply `resourceSources` with `kind: "skills"` or `kind: "skill-set"` to embed explicit references and stage groups; no new filesystem source discovery is performed. Plugin discovery remains the backward-compatible fallback only when neither `catalog` nor `resourceSources` is supplied.
+LOA supports **Sources**, **Workflows**, legacy **Plugins**, standalone **Skills**, legacy **Skill collections**, and **None**. Use versioned `resourceManifest` to distinguish package sources, typed capabilities, and explicitly declared workflows. Legacy `resourceSources` remains valid for individual skills or grouped skill collections. Neither format discovers new filesystem roots; plugin discovery remains a fallback only when `catalog`, `resourceSources`, and `resourceManifest` are all absent.
 
-Actions may declare `phase` and `parentId` for collapsible tree navigation. Source filtering never removes attached references; missing references remain visible as unavailable only when absent from every configured source. The LOA artifact does not install or execute the resources it displays.
+Actions may declare `phase` and `parentId` for collapsible tree navigation. Source filtering never removes attached references; missing references or explicitly unavailable capabilities remain visibly unavailable. The LOA artifact does not install or execute the resources it displays.
 
 ## Compatibility and support skills
 

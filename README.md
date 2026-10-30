@@ -127,7 +127,7 @@ retain their existing purposes.
 The LOA editor uses an action-first workbench: a collapsible **action tree**
 on the left, the ordered editor in the center, and a configurable **resource
 inspector** on the right. The inspector supports **Plugins**, **Skills**,
-**Skill sets**, and **None**. For named skill sources or sets, select exactly
+**Skill collections** (legacy), **Sources**, **Workflows**, and **None**. Select exactly
 one to browse at a time. Hidden resources do not detach skills or mark them
 unavailable. Plugin groups start collapsed for large catalogs. Action editing,
 drag and keyboard reordering, skill attachment, live comments, offline exports,
@@ -141,7 +141,7 @@ independently on desktop and stack on narrow screens.
 ## LOA component review
 
 A third review mode handles a machine-readable List of Actions (LOA), with
-**optional** plugins, standalone skills, and skill sets. It generates a
+**optional** plugins, standalone skills, libraries, and workflows. It generates a
 self-contained artifact with an action tree, editor, and resource inspector:
 
 ```sh
@@ -153,50 +153,56 @@ still uses the existing installed-plugin discovery when `catalog` is omitted.
 To opt out, explicitly provide `"catalog": []`, or provide
 `"resourceSources"` (which defaults the missing catalog to empty).
 
-For standalone skills or named skill sets, declare the exact sources and refs:
+Use `resourceManifest` for mixed libraries, plugin packages, and explicit
+workflows. A **skill** is one reusable capability even when it covers the entire
+delivery lifecycle; a **library** contains separately usable skills, and a
+**workflow** records explicit ordering. Packaging does not determine capability
+type. Nothing is installed or executed by the inspector.
 
 ```json
 {
   "loa": {
     "actions": [
-      { "id": "planning", "phase": "Plan", "content": "Plan implementation", "snapIns": [] },
-      { "id": "review", "parentId": "planning", "content": "Review plan", "snapIns": [] }
+      { "id": "plan", "phase": "Plan", "content": "Design solution", "snapIns": [] }
     ]
   },
-  "resourceSources": [
-    {
-      "id": "standalone",
-      "kind": "skills",
-      "displayName": "Sample standalone skills",
-      "skills": [{ "ref": "example://skill/check", "displayName": "Check" }]
-    },
-    {
-      "id": "delivery",
-      "kind": "skill-set",
-      "displayName": "Sample delivery workflow",
-      "groups": [
-        { "id": "plan", "displayName": "Plan", "skills": [
-          { "ref": "example://set/plan", "displayName": "Planning" }
-        ] }
-      ]
-    }
-  ]
+  "resourceManifest": {
+    "format": "human-review.resources/v1",
+    "sources": [
+      { "id": "engineering", "kind": "library", "displayName": "Engineering skills",
+        "refs": ["example://plan", "example://review"] },
+      { "id": "integration", "kind": "plugin", "displayName": "Integration",
+        "refs": ["example://mcp"] }
+    ],
+    "capabilities": [
+      { "ref": "example://plan", "kind": "skill", "displayName": "Plan" },
+      { "ref": "example://review", "kind": "skill", "displayName": "Review" },
+      { "ref": "example://mcp", "kind": "mcp", "displayName": "MCP integration" }
+    ],
+    "workflows": [
+      { "id": "delivery", "displayName": "Delivery", "steps": [
+        { "ref": "example://plan" },
+        { "ref": "example://review", "after": ["example://plan"] }
+      ] }
+    ]
+  }
 }
 ```
 
-The `example://` refs are illustrative placeholders, **not** discovered or
-installed skills. Only explicitly supplied sources are rendered. There is no
-automatic filesystem discovery for standalone skills or skill sets. Use the
-resource selector to choose one source or disable the inspector; existing
-attachments remain intact. Optional `phase` and `parentId` fields create a
-real, collapsible tree. Legacy flat actions remain valid.
+The example refs are illustrative, not installed capabilities. `Sources`
+lists only a selected package's declared members; `Workflows` lists only
+declared steps. Attach all, select a subset, or attach individually. Shared
+references are deduplicated per action. Source selection never removes existing
+attachments. `resourceSources` and `kind: "skill-set"` remain readable for
+legacy artifacts; the UI labels these **Skill collections**. No filesystem
+scanning occurs for either new format.
 
-An explicitly supplied `catalog` is still supported and is preserved as the manual override. Actions have stable IDs, editable content, and an unbounded `snapIns[]` array. Plugin cards are organizational groups rather than selectable components. Expand or collapse each plugin as needed, then click or drag an individual nested skill onto an action; duplicate refs on one action are ignored. Existing plugin-level refs in loaded LOAs remain visible for compatibility, but the rail creates new attachments at skill level only. Actions can be edited, removed, and reordered with the card drag surface, keyboard-accessible move controls, or the keyboard shortcuts. Existing refs missing from the current catalog remain visible as unavailable.
+An explicitly supplied `catalog` is still supported and is preserved as the manual override. Actions have stable IDs, editable content, and an unbounded `snapIns[]` array. Plugin cards are organizational groups rather than selectable components. Expand or collapse each plugin as needed, then click or drag an individual nested skill onto an action; duplicate refs on one action are ignored. Existing plugin-level refs in loaded LOAs remain visible for compatibility, but the rail creates new attachments at skill level only. Actions can be edited, removed, and reordered with the card drag surface, keyboard-accessible move controls, or the keyboard shortcuts. References missing from every configured source, or explicitly marked unavailable, remain visible.
 
 The artifact never installs or executes a plugin or skill. **Save reviewed
 HTML** retains the editable review state and selected inspector view.
-**Save clean LOA JSON** exports `{ loa, catalog }` and, when supplied,
-`resourceSources`, for the next agent. The embedded runtime works from
+**Save clean LOA JSON** exports `{ loa, catalog }` and supplied
+`resourceSources` / `resourceManifest`, for the next agent. The embedded runtime works from
 `file://` without npm, a development server, a CDN, or network access.
 
 ## Planning review artifacts
