@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { LOA_CLIENT_SOURCE } from "./loa-client.js";
 import { REVIEW_HOST_SOURCE } from "./review-host.mjs";
 import { discoverCodexCatalog } from "./codex-catalog.mjs";
+import { validateResourceManifest, SNAP_IN_KINDS } from "./resource-manifest.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +57,17 @@ button:disabled:hover { background: #252e3c; border-color: var(--hr-loa-border);
 .hr-loa-outline-list { display: flex; flex-direction: column; gap: 4px; }
 
 .hr-loa-resource-label { display: block; margin: 12px 1px 6px; color: var(--hr-loa-muted); font-size: 11px; font-weight: 650; }
+.hr-loa-resource-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.hr-loa-resource-row { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 10px 8px; background: #1c2633; border: 1px solid var(--hr-loa-border); border-radius: 9px; }
+.hr-loa-resource-row button { flex: none; padding: 5px 10px; }
+.hr-loa-resource-pick { flex: none; display: flex; align-items: center; min-height: 28px; cursor: pointer; }
+.hr-loa-resource-pick input { cursor: pointer; accent-color: #84b4ff; width: 15px; height: 15px; }
+.hr-loa-resource-detail { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 4px; }
+.hr-loa-resource-detail > span { font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.hr-loa-resource-detail > small { font-size: 10px; line-height: 1.45; color: var(--hr-loa-muted); overflow-wrap: anywhere; }
+.hr-loa-resource-bulk { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 13px; }
+.hr-loa-resource-bulk button { flex: 1; }
+
 #hr-loa-resource-mode, #hr-loa-source-select { cursor: pointer; margin-bottom: 4px; }
 .hr-loa-tree-phase { border-radius: 9px; background: #192332; margin-bottom: 6px; padding: 4px; }
 .hr-loa-tree-phase-toggle { display: flex; align-items: center; gap: 9px; width: 100%; background: transparent; border: none; font-weight: 700; text-align: left; color: #d8e6f8; }
@@ -158,7 +170,7 @@ function requireString(value, location) {
 function normalizeSnapIn(value, location) {
   if (!isRecord(value)) throw new TypeError(`${location} must be an object.`);
   const kind = requireString(value.kind, `${location}.kind`);
-  if (kind !== "plugin" && kind !== "skill") throw new TypeError(`${location}.kind must be plugin or skill.`);
+  if (!SNAP_IN_KINDS.includes(kind)) throw new TypeError(`${location}.kind is unsupported.`);
   const normalized = { ...value, kind, ref: requireString(value.ref, `${location}.ref`) };
   if (value.pluginRef !== undefined) normalized.pluginRef = requireString(value.pluginRef, `${location}.pluginRef`);
   if (value.displayName !== undefined) normalized.displayName = requireString(value.displayName, `${location}.displayName`);
@@ -299,6 +311,7 @@ export function validateLoaInput(input) {
     loa: { ...input.loa, actions },
     catalog: validateCatalog(input.catalog),
     ...(input.resourceSources === undefined ? {} : { resourceSources: validateResourceSources(input.resourceSources) }),
+    ...(input.resourceManifest === undefined ? {} : { resourceManifest: validateResourceManifest(input.resourceManifest) }),
   };
 }
 
@@ -337,12 +350,13 @@ function renderCatalog(catalog) {
   `).join("");
 }
 
-function renderActions(actions, catalog, resourceSources = []) {
+function renderActions(actions, catalog, resourceSources = [], manifest) {
   const refs = new Set(catalog.flatMap((category) => category.plugins.flatMap((plugin) => [plugin.ref, ...plugin.skills.map((skill) => skill.ref)])));
   for (const source of resourceSources) {
     const skills = source.kind === "skills" ? source.skills : source.groups.flatMap((group) => group.skills);
     for (const skill of skills) refs.add(skill.ref);
   }
+  for (const entry of manifest?.capabilities || []) refs.add(entry.ref);
   return actions.map((action) => `
     <article class="hr-loa-action" data-action-id="${escapeHtml(action.id)}" draggable="true">
       <div class="hr-loa-action-id">${escapeHtml(action.id)}</div>
@@ -360,14 +374,15 @@ function titleFrom(loa, artifactName) {
   return isNonEmptyString(loa.title) ? loa.title : `${artifactName || "LOA"} review`;
 }
 
-export function createLoaReviewHtml({ loa, catalog, resourceSources, sourcePath, artifactName } = {}) {
-  const input = validateLoaInput({ loa, catalog: catalog ?? [], ...(resourceSources === undefined ? {} : { resourceSources }) });
+export function createLoaReviewHtml({ loa, catalog, resourceSources, resourceManifest, sourcePath, artifactName } = {}) {
+  const input = validateLoaInput({ loa, catalog: catalog ?? [], ...(resourceSources === undefined ? {} : { resourceSources }), ...(resourceManifest === undefined ? {} : { resourceManifest }) });
   const name = artifactName || "loa.review.html";
   const bootstrap = {
     version: 1,
     loa: input.loa,
     catalog: input.catalog,
     ...(input.resourceSources === undefined ? {} : { resourceSources: input.resourceSources }),
+    ...(input.resourceManifest === undefined ? {} : { resourceManifest: input.resourceManifest }),
     sourcePath,
     artifactName: name,
   };
@@ -395,7 +410,7 @@ export function createLoaReviewHtml({ loa, catalog, resourceSources, sourcePath,
       </aside>
       <main id="hr-loa-actions" class="hr-loa-actions">
         <h2>List of actions</h2>
-        ${renderActions(input.loa.actions, input.catalog, input.resourceSources)}
+        ${renderActions(input.loa.actions, input.catalog, input.resourceSources, input.resourceManifest)}
       </main>
     </div>
   </div>
@@ -417,7 +432,7 @@ export async function generateLoaArtifact(inputFile, outputFile, { discoverCatal
   } catch (error) {
     throw new Error(`Invalid LOA JSON in ${input}: ${error.message}`);
   }
-  if (parsed.catalog === undefined) parsed = { ...parsed, catalog: parsed.resourceSources === undefined ? discoverCatalog() : [] };
+  if (parsed.catalog === undefined) parsed = { ...parsed, catalog: parsed.resourceSources === undefined && parsed.resourceManifest === undefined ? discoverCatalog() : [] };
   const validated = validateLoaInput(parsed);
   const base = path.basename(input, path.extname(input)).replace(/\.loa$/i, "");
   const output = path.resolve(outputFile || path.join(path.dirname(input), `${base}.loa.review.html`));
@@ -425,6 +440,7 @@ export async function generateLoaArtifact(inputFile, outputFile, { discoverCatal
     loa: validated.loa,
     catalog: validated.catalog,
     ...(validated.resourceSources === undefined ? {} : { resourceSources: validated.resourceSources }),
+    ...(validated.resourceManifest === undefined ? {} : { resourceManifest: validated.resourceManifest }),
     sourcePath: input,
     artifactName: path.basename(output),
   }));

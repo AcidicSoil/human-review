@@ -22,12 +22,18 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   let railQuery = "";
   let outlineQuery = "";
   const sources = () => Array.isArray(state.resourceSources) ? state.resourceSources : [];
+  const manifest = () => state.resourceManifest;
+  const manifestEntries = (mode) => mode === "sources" ? (manifest()?.sources || []) : (manifest()?.workflows || []);
+  const manifestCapabilities = () => new Map((manifest()?.capabilities || []).map((item) => [item.ref, item]));
+  let selectedResourceRefs = new Set();
   const supports = (kind) => kind === "plugins"
     ? state.catalog.some((category) => (category.plugins || []).length > 0)
-    : sources().some((source) => source.kind === kind);
-  const defaultMode = supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-set") ? "skill-set" : "none";
+    : kind === "sources" || kind === "workflows"
+      ? manifestEntries(kind).length > 0
+      : sources().some((source) => source.kind === kind);
+  const defaultMode = supports("sources") ? "sources" : supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-set") ? "skill-set" : supports("workflows") ? "workflows" : "none";
   let resourceMode = (state.inspectorView?.mode === "none" || supports(state.inspectorView?.mode)) ? state.inspectorView.mode : defaultMode;
-  let sourceId = state.inspectorView?.sourceId || sources().find((source) => source.kind === resourceMode)?.id || "";
+  let sourceId = state.inspectorView?.sourceId || (manifestEntries(resourceMode)[0]?.id || sources().find((source) => source.kind === resourceMode)?.id || "");
   const collapsedOutlineNodes = new Set();
   const collapsedOutlinePhases = new Set();
   const collapsedResourceGroups = new Set();
@@ -42,7 +48,8 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   };
   const syncBootstrap = () => { bootstrapNode.textContent = safeJson(state); };
   const snapshot = () => ({ loa: state.loa, catalog: state.catalog,
-    ...(state.resourceSources === undefined ? {} : { resourceSources: state.resourceSources }) });
+    ...(state.resourceSources === undefined ? {} : { resourceSources: state.resourceSources }),
+    ...(state.resourceManifest === undefined ? {} : { resourceManifest: state.resourceManifest }) });
   const bump = () => { syncBootstrap(); window.__hrReviewHost?.changed(snapshot()); };
   const actionIndex = (id) => state.loa.actions.findIndex((action) => action.id === id);
   const componentMap = () => {
@@ -59,6 +66,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
         if (!map.has(skill.ref)) map.set(skill.ref, { ...skill, kind: "skill" });
       }
     }
+    for (const entry of manifest()?.capabilities || []) map.set(entry.ref, { ...entry });
     return map;
   };
   const focusAction = (id) => {
@@ -110,18 +118,19 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   const renderRail = (restoreSelection = false) => {
     const rail = document.getElementById("hr-loa-rail");
     if (!rail) return;
-    if (resourceMode !== "none" && !supports(resourceMode)) resourceMode = supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-set") ? "skill-set" : "none";
+    if (resourceMode !== "none" && !supports(resourceMode)) resourceMode = supports("sources") ? "sources" : supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-set") ? "skill-set" : supports("workflows") ? "workflows" : "none";
     const choices = [
-      ["plugins", "Plugins"], ["skills", "Skills"], ["skill-set", "Skill sets"], ["none", "None"],
+      ["sources", "Sources"], ["plugins", "Plugins"], ["skills", "Skills"], ["skill-set", "Skill collections"], ["workflows", "Workflows"], ["none", "None"],
     ];
     const selector = "<label class=\"hr-loa-resource-label\" for=\"hr-loa-resource-mode\">Resource type</label>" +
       "<select id=\"hr-loa-resource-mode\" class=\"hr-loa-search\">" +
       choices.filter(([kind]) => kind === "none" || supports(kind))
         .map(([kind, label]) => "<option value=\"" + kind + "\"" + (resourceMode === kind ? " selected" : "") + ">" + label + "</option>").join("") + "</select>";
-    const available = sources().filter((source) => source.kind === resourceMode);
+    const legacy = sources().filter((source) => source.kind === resourceMode);
+    const available = resourceMode === "sources" || resourceMode === "workflows" ? manifestEntries(resourceMode) : legacy;
     if (resourceMode !== "plugins" && resourceMode !== "none" && !available.some((source) => source.id === sourceId)) sourceId = available[0]?.id || "";
     const sourceSelector = available.length ? "<label class=\"hr-loa-resource-label\" for=\"hr-loa-source-select\">" +
-      (resourceMode === "skill-set" ? "Skill set" : "Skill source") + "</label>" +
+      (resourceMode === "skill-set" ? "Skill collection" : resourceMode === "workflows" ? "Workflow" : "Source") + "</label>" +
       "<select id=\"hr-loa-source-select\" class=\"hr-loa-search\">" +
       available.map((source) => "<option value=\"" + esc(source.id) + "\"" + (source.id === sourceId ? " selected" : "") + ">" + esc(source.displayName) + "</option>").join("") + "</select>" : "";
     let body = "";
@@ -142,7 +151,22 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
         return plugins ? "<section class=\"hr-loa-category\"><h3 class=\"hr-loa-category-name\">" + esc(category.category) + "</h3>" + plugins + "</section>" : "";
       }).join("");
     } else if (resourceMode === "none") {
-      body = "<p class=\"hr-loa-empty\">No resource inspector selected. Actions and existing attachments remain available.</p>";
+      body = "<p class=\"hr-loa-empty\">No resources selected.</p>";
+    } else if (resourceMode === "sources" || resourceMode === "workflows") {
+      const selected = available.find((item) => item.id === sourceId);
+      const capabilities = manifestCapabilities();
+      const refs = resourceMode === "sources" ? (selected?.refs || []) : (selected?.steps || []).map((step) => step.ref);
+      const stepMap = new Map((selected?.steps || []).map((step) => [step.ref, step]));
+      const items = [...new Set(refs)].map((ref) => capabilities.get(ref)).filter(Boolean);
+      const filtered = items.filter((item) => !query || [item.displayName, item.ref, item.kind].join(" ").toLowerCase().includes(query));
+      body = "<div class=\"hr-loa-resource-list\">" + filtered.map((item) => {
+        const after = (stepMap.get(item.ref)?.after || []).map((ref) => capabilities.get(ref)?.displayName || ref);
+        const relations = (manifest()?.relationships || []).filter((relation) => relation.from === item.ref)
+          .map((relation) => relation.type + " " + (capabilities.get(relation.to)?.displayName || relation.to));
+        const meta = [item.kind.toUpperCase(), item.invocation ? item.invocation + "-invoked" : "", item.availability || "", after.length ? "after " + after.join(", ") : "", ...relations].filter(Boolean).join(" · ");
+        return "<div class=\"hr-loa-resource-row\"><label class=\"hr-loa-resource-pick\"><input type=\"checkbox\" data-resource-select=\"" + esc(item.ref) + "\"" + (selectedResourceRefs.has(item.ref) ? " checked" : "") + " aria-label=\"Select " + esc(item.displayName) + "\"></label><div class=\"hr-loa-resource-detail\"><span>" + esc(item.displayName) + "</span><small>" + esc(meta) + "</small></div><button type=\"button\" data-add-ref=\"" + esc(item.ref) + "\" aria-label=\"Attach " + esc(item.displayName) + "\">+</button></div>";
+      }).join("") + "</div>" +
+        (items.length ? "<div class=\"hr-loa-resource-bulk\"><button type=\"button\" id=\"hr-loa-attach-selected\"" + (selectedResourceRefs.size ? "" : " disabled") + ">Attach selected</button><button type=\"button\" id=\"hr-loa-attach-all\">Attach all</button></div>" : "");
     } else {
       const source = available.find((item) => item.id === sourceId);
       const groups = source?.kind === "skill-set" ? source.groups : source ? [{ id: source.id, displayName: source.displayName, skills: source.skills }] : [];
@@ -157,7 +181,9 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
           matched.map((skill) => componentButton(skill)).join("") + "</ul></section>";
       }).join("");
     }
-    const count = resourceMode === "plugins" ? state.catalog.reduce((sum, category) => sum + (category.plugins || []).reduce((n, plugin) => n + (plugin.skills || []).length, 0), 0)
+    const count = resourceMode === "sources" ? available.find((source) => source.id === sourceId)?.refs?.length || 0
+      : resourceMode === "workflows" ? available.find((source) => source.id === sourceId)?.steps?.length || 0
+      : resourceMode === "plugins" ? state.catalog.reduce((sum, category) => sum + (category.plugins || []).reduce((n, plugin) => n + (plugin.skills || []).length, 0), 0)
       : resourceMode === "none" ? 0 : (available.find((source) => source.id === sourceId)?.kind === "skills"
         ? available.find((source) => source.id === sourceId)?.skills?.length || 0
         : available.find((source) => source.id === sourceId)?.groups?.reduce((n, group) => n + group.skills.length, 0) || 0);
@@ -239,7 +265,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
         const ref = refOf(snapIn);
         const item = components.get(ref);
         const label = snapIn?.displayName || item?.displayName || ref;
-        const unavailable = !item;
+        const unavailable = !item || item.availability === "unavailable";
         return "<li class=\"hr-loa-snap-in" + (unavailable ? " is-unavailable" : "") + "\" data-ref=\"" + esc(ref) + "\"><span>" + esc(label) + (unavailable ? " · unavailable" : "") + "</span><button data-snap-in-remove=\"" + esc(ref) + "\" aria-label=\"Remove " + esc(label) + "\">×</button></li>";
       }).join("");
       return "<article class=\"hr-loa-action\" role=\"option\" tabindex=\"0\" draggable=\"" + (!editing) + "\" aria-selected=\"" + selected + "\" data-expanded=\"" + expanded + "\" data-action-id=\"" + esc(action.id) + "\"><div class=\"hr-loa-action-head\"><span class=\"hr-loa-action-index\">" + (index + 1) + "</span><code>" + esc(action.id) + "</code><div class=\"hr-loa-action-controls\"><button data-action-move-up aria-label=\"Move action up\" " + (index === 0 ? "disabled" : "") + ">↑</button><button data-action-move-down aria-label=\"Move action down\" " + (index === state.loa.actions.length - 1 ? "disabled" : "") + ">↓</button><button data-action-edit>Edit</button>" + (window.__hrReviewHost?.connected ? "<button data-action-comment>Comment</button>" : "") + "<button data-action-remove>Remove</button></div></div>" + content + "<ul class=\"hr-loa-snap-ins\">" + snaps + "</ul></article>";
@@ -276,7 +302,24 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   root.addEventListener("click", (event) => {
     const target = event.target.closest("button");
     const card = event.target.closest("[data-action-id]");
-    if (target?.dataset.outlinePhase !== undefined) {
+    if (target?.id === "hr-loa-attach-selected" || target?.id === "hr-loa-attach-all") {
+      const current = manifestEntries(resourceMode).find((item) => item.id === sourceId);
+      const refs = resourceMode === "sources" ? current?.refs || [] : (current?.steps || []).map((step) => step.ref);
+      const attachments = refs.filter((ref) => target.id === "hr-loa-attach-all" || selectedResourceRefs.has(ref))
+        .map((ref) => componentMap().get(ref)).filter(Boolean);
+      const currentAction = state.loa.actions.find((action) => action.id === selectedActionId);
+      if (currentAction) {
+        const existing = new Set(currentAction.snapIns.map(refOf));
+        const additions = attachments.filter((entry) => !existing.has(entry.ref));
+        if (additions.length) {
+          setActions(state.loa.actions.map((action) => action.id === currentAction.id
+            ? { ...action, snapIns: [...action.snapIns, ...additions] } : action), currentAction.id);
+        }
+      }
+      selectedResourceRefs.clear();
+      renderRail();
+      announce("Selected resources attached.");
+    } else if (target?.dataset.outlinePhase !== undefined) {
       const phase = target.dataset.outlinePhase;
       if (collapsedOutlinePhases.has(phase)) collapsedOutlinePhases.delete(phase);
       else collapsedOutlinePhases.add(phase);
@@ -380,17 +423,24 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   root.addEventListener("change", (event) => {
     if (event.target.id === "hr-loa-resource-mode") {
       resourceMode = event.target.value;
-      sourceId = sources().find((source) => source.kind === resourceMode)?.id || "";
+      sourceId = manifestEntries(resourceMode)[0]?.id || sources().find((source) => source.kind === resourceMode)?.id || "";
+      selectedResourceRefs.clear();
       railQuery = "";
       state.inspectorView = { mode: resourceMode, sourceId };
       renderRail();
       syncBootstrap();
     } else if (event.target.id === "hr-loa-source-select") {
       sourceId = event.target.value;
+      selectedResourceRefs.clear();
       railQuery = "";
       state.inspectorView = { mode: resourceMode, sourceId };
       renderRail();
       syncBootstrap();
+    } else if (event.target.dataset.resourceSelect !== undefined) {
+      if (event.target.checked) selectedResourceRefs.add(event.target.dataset.resourceSelect);
+      else selectedResourceRefs.delete(event.target.dataset.resourceSelect);
+      const attach = document.getElementById("hr-loa-attach-selected");
+      if (attach) attach.disabled = !selectedResourceRefs.size;
     }
   });
   root.addEventListener("input", (event) => {
@@ -520,9 +570,11 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
     mode: "loa",
     restore(document) {
       state = { ...state, loa: clone(document.loa), catalog: clone(document.catalog),
-        ...(document.resourceSources === undefined ? {} : { resourceSources: clone(document.resourceSources) }) };
+        resourceSources: document.resourceSources === undefined ? undefined : clone(document.resourceSources),
+        resourceManifest: document.resourceManifest === undefined ? undefined : clone(document.resourceManifest) };
       selectedActionId = state.loa.actions[0]?.id || null;
       editingActionId = null;
+      selectedResourceRefs.clear();
       syncBootstrap();
       renderRail(); renderActions();
     },

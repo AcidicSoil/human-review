@@ -15,10 +15,17 @@ test("LOA changes persist and reach the original agent poll as structured feedba
   const resourceSources = [{ id: "example", kind: "skills", displayName: "Example skills", skills: [
     { ref: "example://skill/check", displayName: "Check" },
   ] }];
+  const resourceManifest = {
+    format: "human-review.resources/v1",
+    sources: [{ id: "mixed", kind: "plugin", displayName: "Mixed plugin", refs: ["example://mcp"] }],
+    capabilities: [{ ref: "example://mcp", kind: "mcp", displayName: "MCP integration" }],
+    relationships: [], workflows: [],
+  };
   fs.writeFileSync(file, createLoaReviewHtml({
     loa: { actions: [{ id: "a1", content: "Original action", snapIns: [], phase: "Review" }] },
     catalog: [],
     resourceSources,
+    resourceManifest,
   }));
   const app = createServer();
   app.server.listen(0, "127.0.0.1");
@@ -41,7 +48,9 @@ test("LOA changes persist and reach the original agent poll as structured feedba
     const draft = {
       format: "human-review.snapshot/v1",
       mode: "loa",
-      document: { loa: { actions: [{ id: "a1", content: "Reviewed action", snapIns: [], phase: "Review" }] }, catalog: [], resourceSources },
+      document: { loa: { actions: [{ id: "a1", content: "Reviewed action", snapIns: [
+        { kind: "mcp", ref: "example://mcp", displayName: "MCP integration" },
+      ], phase: "Review" }] }, catalog: [], resourceSources, resourceManifest },
       baseHash: before.data.sourceHash,
       expectedRevision: 0,
     };
@@ -58,6 +67,8 @@ test("LOA changes persist and reach the original agent poll as structured feedba
     assert.equal(poll.data.pages[0].structured_review.mode, "loa");
     assert.equal(poll.data.pages[0].structured_review.document.loa.actions[0].content, "Reviewed action");
     assert.deepEqual(poll.data.pages[0].structured_review.document.resourceSources, resourceSources);
+    assert.deepEqual(poll.data.pages[0].structured_review.document.resourceManifest, resourceManifest);
+    assert.equal(poll.data.pages[0].structured_review.document.loa.actions[0].snapIns[0].kind, "mcp");
     assert.equal(poll.data.pages[0].structured_review.document.loa.actions[0].phase, "Review");
     assert.equal(poll.data.overall_note, "Review the action");
     assert.equal((await api(`/api/page/${key}`)).data.unsent.structured, 0);

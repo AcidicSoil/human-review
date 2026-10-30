@@ -1,3 +1,5 @@
+import { SNAP_IN_KINDS } from "./resource-manifest.js";
+
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
 function assertState(state) {
@@ -27,7 +29,7 @@ function actionIndex(state, actionId) {
   return state.loa.actions.findIndex((action) => action.id === actionId);
 }
 
-function catalogRefs(catalog, resourceSources = []) {
+function catalogRefs(catalog, resourceSources = [], manifest) {
   const refs = new Set();
   for (const category of Array.isArray(catalog) ? catalog : []) {
     for (const plugin of Array.isArray(category?.plugins) ? category.plugins : []) {
@@ -41,12 +43,13 @@ function catalogRefs(catalog, resourceSources = []) {
     const skills = source.kind === "skills" ? source.skills : (source.groups || []).flatMap((group) => group.skills || []);
     for (const skill of skills || []) if (typeof skill.ref === "string") refs.add(skill.ref);
   }
+  for (const entry of manifest?.capabilities || []) refs.add(entry.ref);
   return refs;
 }
 
 function normalizeSnapIn(snapIn) {
   if (!isRecord(snapIn)) throw new TypeError("snap-in must be an object.");
-  if (snapIn.kind !== "plugin" && snapIn.kind !== "skill") throw new TypeError("snap-in kind must be plugin or skill.");
+  if (!SNAP_IN_KINDS.includes(snapIn.kind)) throw new TypeError("snap-in kind is unsupported.");
   if (typeof snapIn.ref !== "string" || !snapIn.ref.trim()) throw new TypeError("snap-in must have a non-empty ref.");
   return { ...snapIn };
 }
@@ -139,12 +142,14 @@ export function removeSnapIn(state, actionId, ref) {
 
 export function markUnavailableSnapIns(state) {
   assertState(state);
-  const refs = catalogRefs(state.catalog, state.resourceSources);
+  const refs = catalogRefs(state.catalog, state.resourceSources, state.resourceManifest);
+  const blocked = new Set((state.resourceManifest?.capabilities || [])
+    .filter((entry) => entry.availability === "unavailable").map((entry) => entry.ref));
   return withActions(state, state.loa.actions.map((action) => ({
     ...action,
     snapIns: action.snapIns.map((snapIn) => {
       const ref = snapInRef(snapIn);
-      if (refs.has(ref)) {
+      if (refs.has(ref) && !blocked.has(ref)) {
         if (!isRecord(snapIn) || snapIn.unavailable === undefined) return copySnapIn(snapIn);
         const { unavailable: _unavailable, ...available } = snapIn;
         return available;

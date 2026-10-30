@@ -82,10 +82,12 @@ export function installLoaRuntime(skillDir) {
   const generator = fs.readFileSync(path.join(loaHere, "generator.js"), "utf8")
     .replaceAll("from \"./runtime.js\"", "from \"./loa-client.js\"")
     .replaceAll("from \"./catalog.js\"", "from \"./codex-catalog.mjs\"")
+    .replaceAll("from \"./resource-manifest.js\"", "from \"./resource-manifest.mjs\"")
     .replaceAll('from "../review-host.js"', 'from "./review-host.mjs"');
   fs.writeFileSync(path.join(skillDir, "loa-generator.mjs"), generator);
   fs.copyFileSync(path.join(loaHere, "runtime.js"), path.join(skillDir, "loa-client.js"));
   fs.copyFileSync(path.join(loaHere, "catalog.js"), path.join(skillDir, "codex-catalog.mjs"));
+  fs.copyFileSync(path.join(loaHere, "resource-manifest.js"), path.join(skillDir, "resource-manifest.mjs"));
   const runner = `#!/usr/bin/env node\nimport { runCli } from "./loa-generator.mjs";\nrunCli().then((code) => { process.exitCode = code; }).catch((error) => { console.error(error.message || error); process.exitCode = 1; });\n`;
   const runnerFile = path.join(skillDir, "human-review-loa.mjs");
   fs.writeFileSync(runnerFile, runner);
