@@ -1,9 +1,9 @@
 # Unified Human Review: shared review core
 
-Status: Shared core integrated on main; LOA action-first visual redesign implemented on branch loa-action-workbench, awaiting integration
+Status: Shared core and approved action-first LOA workbench integrated on main
 Date: 2026-10-29
 Repository: `/home/user/tools/human-review`
-Related designs: `design-ref/human-review-ui-concepts.figcraft` (original concepts), `design-ref/human-review-loa-workbench.png` (rendered action-first implementation)
+Related designs: `design-ref/human-review-ui-concepts.figcraft` (historical concepts plus six latest inspector states), `design-ref/human-review-loa-inspector-modes.png` (six-state overview), `design-ref/human-review-loa-workbench.png` (action-first implementation reference)
 
 ## Decision and outcome
 

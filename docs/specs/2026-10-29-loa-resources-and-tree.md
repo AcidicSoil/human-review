@@ -111,3 +111,15 @@ coexists with the legacy `catalog` and `resourceSources` formats.
 
 Verified seams: manifest validator, self-contained artifact browser, bundled
 generator, LOA state availability, and original structured Send/Poll protocol.
+
+
+## FigCraft design reference
+
+`design-ref/human-review-ui-concepts.figcraft` is the editable design source.
+Frames 05–10 reflect the implemented resource-source model, explicit workflows,
+the optional empty inspector, legacy plugin browsing, standalone skills, and
+legacy skill collections. The original four prototype frames are preserved.
+All sample resources are illustrative, not claims about installed capabilities.
+Inspect the six-state overview at
+`design-ref/human-review-loa-inspector-modes.png`. The FigCraft frames are
+static design states; the standalone review HTML is the behavioral implementation.

@@ -138,6 +138,13 @@ independently on desktop and stack on narrow screens.
 
 ![Optional resource inspector and nested action tree demo](design-ref/human-review-resource-tree-workbench.png)
 
+The [editable FigCraft prototype](design-ref/human-review-ui-concepts.figcraft)
+includes current LOA inspector states for **Sources**, **Workflows**, **None**,
+**Plugins**, **Skills**, and legacy **Skill collections**, alongside preserved
+historical LOA, DOM and Planning concepts.
+[View all six latest screens](design-ref/human-review-loa-inspector-modes.png).
+
+
 ## LOA component review
 
 A third review mode handles a machine-readable List of Actions (LOA), with
