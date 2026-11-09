@@ -23,6 +23,10 @@ const HELP = `human-review ${pkg.version}
   human-review notes done <id>        Mark a processed note complete
   human-review notes reopen <id>      Return a completed note to pending
   human-review notes delete <id>      Permanently delete a note
+  human-review notes inbox            Read handoffs explicitly sent by the user
+  human-review notes poll             Wait for a sent handoff (opt-in)
+      --timeout <secs>              Limit handoff polling duration
+  human-review notes ack <id>         Acknowledge receipt, without executing notes
       --scope <workspace>          Override the current-directory notebook
   human-review setup                  Teach Claude Code / Codex how to use human-review
   human-review setup --global         ...for every project, not just this one
@@ -304,47 +308,92 @@ function parseNotesArgs(args) {
   const action = args[0] || "open";
   const values = [];
   let scope = path.resolve(process.cwd());
+  let timeoutSecs = null;
   for (let index = 1; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--scope") {
       const value = args[++index];
       if (!value || value.startsWith("--")) throw new Error("--scope requires a value.");
       scope = value;
+    } else if (arg === "--timeout") {
+      timeoutSecs = Number(args[++index]);
     } else if (arg.startsWith("--")) {
-      throw new Error(`Unknown notes option: ${arg}`);
+      throw new Error("Unknown notes option: " + arg);
     } else {
       values.push(arg);
     }
   }
-  if (!["open", "add", "list", "done", "reopen", "delete"].includes(action)) {
-    throw new Error(`Unknown notes command: ${action}`);
+  if (!["open", "add", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
+    throw new Error("Unknown notes command: " + action);
   }
   if (action === "add" && values.length !== 1) throw new Error("Usage: human-review notes add <text> [--scope <workspace>]");
-  if (["done", "reopen", "delete"].includes(action) && values.length !== 1) {
-    throw new Error(`Usage: human-review notes ${action} <id> [--scope <workspace>]`);
+  if (["done", "reopen", "delete", "ack"].includes(action) && values.length !== 1) {
+    throw new Error("Usage: human-review notes " + action + " <id> [--scope <workspace>]");
   }
-  if (["open", "list"].includes(action) && values.length) throw new Error(`Unexpected notes argument: ${values[0]}`);
-  return { action, scope, value: values[0] };
+  if (["open", "list", "inbox", "poll"].includes(action) && values.length) {
+    throw new Error("Unexpected notes argument: " + values[0]);
+  }
+  if (timeoutSecs !== null && (action !== "poll" || !Number.isFinite(timeoutSecs) || timeoutSecs <= 0)) {
+    throw new Error("--timeout requires a positive number and is only available with notes poll.");
+  }
+  return { action, scope, value: values[0], timeoutSecs };
+}
+
+/** The agent opts into listening. No incoming handoff automatically starts a task. */
+async function pollNotes(scope, timeoutSecs) {
+  const started = Date.now();
+  const deadline = started + (timeoutSecs === null ? MAX_OPEN_WAIT_MS : timeoutSecs * 1000);
+  let server = await ensureServer();
+  while (Date.now() < deadline) {
+    const wait = Math.max(1, Math.min(25000, Math.round(deadline - Date.now())));
+    const route = "/api/notepad/poll?scope=" + encodeURIComponent(scope) + "&timeout=" + wait;
+    try {
+      const response = await request(server, { method: "GET", path: route, timeout: wait + 3000 });
+      if (response.status !== 200) throw new Error("Notepad poll failed (" + response.status + ").");
+      const data = JSON.parse(response.raw);
+      if (data.handoff) {
+        await writeStdout(JSON.stringify(data, null, 2) + "\n");
+        return;
+      }
+      if (data.status === "timeout") continue;
+      if (data.status === "superseded") {
+        await writeStdout(JSON.stringify(data, null, 2) + "\n");
+        return;
+      }
+      throw new Error("Unexpected notepad polling response.");
+    } catch (error) {
+      process.stderr.write("Notepad connection lost (" + error.message + "); reconnecting.\n");
+      await sleep(350);
+      server = await ensureServer();
+    }
+  }
+  await writeStdout(JSON.stringify({ status: "timeout", waited_seconds: (Date.now() - started) / 1000 }, null, 2) + "\n");
 }
 
 async function notesCommand(args) {
-  const { action, scope, value } = parseNotesArgs(args);
+  const { action, scope, value, timeoutSecs } = parseNotesArgs(args);
+  if (action === "poll") return pollNotes(scope, timeoutSecs);
   const server = await ensureServer();
-  const base = `/api/notepad?scope=${encodeURIComponent(scope)}`;
+  const query = "?scope=" + encodeURIComponent(scope);
   let method = "GET";
-  let route = base;
+  let route = "/api/notepad" + query;
   let body;
-  if (action === "open") route = `/api/notepad/open?scope=${encodeURIComponent(scope)}`;
+  if (action === "open") route = "/api/notepad/open" + query;
+  else if (action === "inbox") route = "/api/notepad/inbox" + query;
   else if (action === "add") {
     method = "POST";
     body = { text: value, author: "agent" };
   } else if (action === "done" || action === "reopen") {
     method = "PATCH";
-    route = `/api/notepad/${encodeURIComponent(value)}?scope=${encodeURIComponent(scope)}`;
+    route = "/api/notepad/" + encodeURIComponent(value) + query;
     body = { status: action === "done" ? "done" : "pending" };
   } else if (action === "delete") {
     method = "DELETE";
-    route = `/api/notepad/${encodeURIComponent(value)}?scope=${encodeURIComponent(scope)}`;
+    route = "/api/notepad/" + encodeURIComponent(value) + query;
+  } else if (action === "ack") {
+    method = "POST";
+    route = "/api/notepad/ack" + query;
+    body = { handoffId: value };
   }
   const result = await request(server, {
     method, path: route,
@@ -352,14 +401,21 @@ async function notesCommand(args) {
   }, body);
   let payload;
   try { payload = JSON.parse(result.raw); }
-  catch { throw new Error(`Notepad server returned HTTP ${result.status}.`); }
-  if (result.status < 200 || result.status >= 300) throw new Error(payload.error || `Notepad request failed (${result.status}).`);
+  catch { throw new Error("Notepad server returned HTTP " + result.status + "."); }
+  if (result.status < 200 || result.status >= 300) {
+    throw new Error(payload.error || "Notepad request failed (" + result.status + ").");
+  }
   if (action === "open") {
-    const url = `http://127.0.0.1:${server.port}${payload.path}`;
+    const url = "http://127.0.0.1:" + server.port + payload.path;
     openBrowser(url);
-    process.stdout.write(`Notepad: ${url}\n`);
+    process.stdout.write("Notepad: " + url + "\n");
   } else {
-    process.stdout.write(JSON.stringify(action === "list" ? payload.notes : action === "delete" ? payload : payload.note, null, 2) + "\n");
+    const output = action === "list" ? payload.notes
+      : action === "inbox" ? payload.handoffs
+      : action === "delete" ? payload
+      : action === "ack" ? payload.handoff
+      : payload.note;
+    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
   }
 }
 

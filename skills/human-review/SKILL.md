@@ -171,13 +171,20 @@ human-review notes open                                # user-facing HUD
 human-review notes list                                # only on request
 human-review notes done <id>                           # after processing
 human-review notes delete <id>                         # only when user requests deletion
+human-review notes inbox                               # read user-sent handoffs
+human-review notes poll --timeout 30                    # optional listener; separate process
+human-review notes ack <handoff-id>                     # acknowledge receipt, not completion
 ```
 
 The default notebook is scoped to the command's working directory; pass
 `--scope <workspace>` on every command if the user chooses a named scope.
-The HUD persists notes and refreshes while visible. It does not send review
-feedback, interrupt an agent poll, or request execution. **Do not poll notes or
-act on them automatically.** Only process selected notes when the user
+The HUD persists notes and refreshes while visible. Selecting notes and
+pressing **Send to agent** creates a durable notification on the separate note
+channel. `notes inbox` retrieves these handoffs without blocking; `notes poll`
+can wait for them when the user requests a listener, without affecting the
+Human Review agent poll. `notes ack <handoff-id>` confirms receipt only.
+**Never treat a sent note as permission to execute it.** Do not automatically
+monitor notes or act upon them without the user's configured instructions. Only process selected notes when the user
 explicitly asks, and mark them done after verifying the requested work.
 Deleting a note is permanent; never delete it merely because it was marked
 done or acted upon. Use `notes delete <id>` only when explicitly requested.

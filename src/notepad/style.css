@@ -46,3 +46,11 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
 
 .popout { flex: none; width: 32px; height: 32px; border: 1px solid #355779; background: #223b56; color: #bbdafc; border-radius: 9px; font-size: 18px; }
 .popout:hover { background: #345577; }
+
+
+.send-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.selection-count { color: #9baabe; font-size: 12px; }
+.send-button { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+.note.is-selected { border-color: #7398d0; background: #1c2d43; }
+.note-choice { width: 16px; height: 16px; margin: 2px 2px 0 0; flex: none; accent-color: #7ba5ff; cursor: pointer; }
+.delivery-status { color: #bcd6f9 !important; font-weight: 650; }

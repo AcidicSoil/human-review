@@ -15,7 +15,7 @@ states, and one Notepad HUD state matching the shipped non-blocking notebook:
 | 08 — LOA / Plugins | Plugin and nested skill browsing |
 | 09 — LOA / Skills | Explicit standalone skills from one source |
 | 10 — LOA / Skill libraries | Named skill libraries, with explicit group membership |
-| 11 — Notepad / Pending | Compact user/agent capture, pending list, Done and Delete controls, local save status |
+| 11 — Notepad / Pending | Select notes, Send to agent, receipt status, Done/Delete, and local save status |
 
 The four original library-first, action-first, Planning and DOM frames remain
 unchanged. The new frames use native editable FigCraft shapes and text. They are

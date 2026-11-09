@@ -223,6 +223,9 @@ test("CLI help documents the manual notepad lifecycle", async () => {
   assert.match(output.stdout, /notes list/);
   assert.match(output.stdout, /notes done <id>/);
   assert.match(output.stdout, /notes delete <id>/);
+  assert.match(output.stdout, /notes inbox/);
+  assert.match(output.stdout, /notes poll/);
+  assert.match(output.stdout, /notes ack <id>/);
 });
 
 test("an unreadable notebook never prevents the ordinary review server from starting", async t => {

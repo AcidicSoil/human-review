@@ -76,9 +76,11 @@ The existing `human-review` skill remains as a backwards-compatible umbrella and
 ## Notepad HUD — capture now, revisit later
 
 The Notepad HUD is a compact, workspace-scoped notebook for the user and agent.
-It uses Human Review's authenticated local server, but **does not** enter the
-blocking review Send/Poll workflow. Capturing a note saves it immediately;
-nothing is executed, scheduled, or sent to the agent automatically.
+It uses Human Review's authenticated local server and a **separate,
+durable note handoff channel**. Capturing a note saves it immediately; only
+pressing **Send to agent** on selected notes creates a notification. Nothing
+is executed or scheduled automatically, and ordinary review Send/Poll remains
+independent.
 
 ```sh
 human-review notes open
@@ -87,6 +89,9 @@ human-review notes list
 human-review notes done <note-id>
 human-review notes reopen <note-id>
 human-review notes delete <note-id>
+human-review notes inbox
+human-review notes poll --timeout 30
+human-review notes ack <handoff-id>
 ```
 
 Run these from the same workspace to share one notebook. Use
@@ -95,8 +100,22 @@ The HUD can pop out into a compact browser window; leave it alongside your
 conversation. User changes appear in the HUD immediately, and agent additions
 appear on its next refresh.
 
+**Send to agent:** Check the notes you want the agent to see, then select
+**Send to agent**. That creates one durable handoff containing only those notes.
+An agent can retrieve pending handoffs with `human-review notes inbox`, or
+wait for the next handoff with `human-review notes poll --timeout 30`.
+After reading, `human-review notes ack <handoff-id>` confirms receipt; the HUD
+shows **Agent received**. Receipt does **not** mark notes Done, delete them,
+or authorize implementation.
+
+The poll command is opt-in and blocks only its own CLI process. It can run as
+a separate listener while other work continues. A browser Send **cannot by
+itself wake an idle agent conversation** unless its agent host is already
+listening or checks the inbox; this is not a background worker.
+
 **To process notes:** tell the agent which pending notes to handle. The agent
-runs `human-review notes list`, performs only the work you requested, and
+runs `human-review notes list` (or reads a selected handoff), performs only the
+work you requested, and
 marks completed entries with `human-review notes done <note-id>`.
 To remove a note permanently, use **Delete** in the HUD (then **Delete now**
 to confirm), or explicitly request the agent to run

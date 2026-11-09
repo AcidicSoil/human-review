@@ -7,6 +7,8 @@ const input = document.getElementById("note-text");
 const form = document.getElementById("capture");
 const message = document.getElementById("message");
 const addButton = document.getElementById("add");
+const sendButton = document.getElementById("send-to-agent");
+const selectedCount = document.getElementById("selected-count");
 const filters = [...document.querySelectorAll("[data-filter]")];
 
 const segments = scope.replace(/[\\/]+$/, "").split(/[\\/]/);
@@ -16,6 +18,16 @@ let notes = [];
 let filter = "pending";
 let updating = false;
 let confirmingDeleteId = null;
+let handoffs = [];
+let selectedIds = new Set();
+let sending = false;
+
+function updateSelection() {
+  const count = selectedIds.size;
+  sendButton.disabled = !count || sending;
+  sendButton.textContent = count ? "Send to agent (" + count + ")" : "Send to agent";
+  selectedCount.textContent = count ? count + " selected" : "Select notes to share";
+}
 
 async function request(method, path, body) {
   const response = await fetch(path, {
@@ -41,12 +53,27 @@ function render() {
     item.setAttribute("aria-pressed", String(active));
   }
 
+  const knownIds = new Set(notes.map(note => note.id));
+  selectedIds = new Set([...selectedIds].filter(id => knownIds.has(id)));
+  updateSelection();
   const visible = notes.filter(note => filter === "all" || note.status === filter);
   list.replaceChildren();
   document.getElementById("empty").hidden = visible.length !== 0;
   for (const note of [...visible].reverse()) {
     const row = document.createElement("li");
     row.className = "note";
+    const choice = document.createElement("input");
+    choice.type = "checkbox";
+    choice.className = "note-choice";
+    choice.checked = selectedIds.has(note.id);
+    choice.setAttribute("aria-label", "Select note: " + note.text.slice(0, 70));
+    row.classList.toggle("is-selected", choice.checked);
+    choice.addEventListener("change", () => {
+      if (choice.checked) selectedIds.add(note.id);
+      else selectedIds.delete(note.id);
+      row.classList.toggle("is-selected", choice.checked);
+      updateSelection();
+    });
     const body = document.createElement("div");
     body.className = "note-main";
     const text = document.createElement("p");
@@ -55,6 +82,13 @@ function render() {
     const byline = document.createElement("small");
     byline.textContent = `${note.author === "agent" ? "Agent" : "You"} · ${new Date(note.createdAt).toLocaleString()}`;
     body.append(text, byline);
+    const latest = [...handoffs].reverse().find(handoff => handoff.notes.some(item => item.id === note.id));
+    if (latest) {
+      const delivery = document.createElement("small");
+      delivery.className = "delivery-status";
+      delivery.textContent = latest.status === "acknowledged" ? "Agent received" : "Awaiting agent";
+      body.append(delivery);
+    }
     const actions = document.createElement("div");
     actions.className = "note-actions";
     const notePath = `/api/notepad/${encodeURIComponent(note.id)}?scope=${encodeURIComponent(scope)}`;
@@ -119,7 +153,7 @@ function render() {
       });
       actions.append(button, remove);
     }
-    row.append(body, actions);
+    row.append(choice, body, actions);
     list.append(row);
   }
 }
@@ -130,6 +164,7 @@ async function refresh() {
   try {
     const result = await request("GET", endpoint);
     notes = result.notes;
+    handoffs = result.handoffs || [];
     render();
     message.textContent = "Saved locally";
   } catch (error) {
@@ -138,6 +173,26 @@ async function refresh() {
     updating = false;
   }
 }
+
+sendButton.addEventListener("click", async () => {
+  if (!selectedIds.size || sending) return;
+  sending = true;
+  updateSelection();
+  try {
+    const result = await request("POST", "/api/notepad/send?scope=" + encodeURIComponent(scope), {
+      noteIds: [...selectedIds],
+    });
+    handoffs.push(result.handoff);
+    selectedIds.clear();
+    render();
+    message.textContent = "Sent to agent — awaiting receipt";
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    sending = false;
+    updateSelection();
+  }
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -27,9 +27,11 @@ export class NotepadStore {
         throw new Error("Unsupported notepad file format.");
       }
       this.scopes = Object.assign(Object.create(null), stored.scopes);
+      this.handoffs = Object.assign(Object.create(null), stored.handoffs || {});
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       this.scopes = Object.create(null);
+      this.handoffs = Object.create(null);
     }
   }
 
@@ -80,8 +82,57 @@ export class NotepadStore {
     return removed;
   }
 
+  /** Only explicitly selected note IDs enter a handoff. Handoffs never execute notes. */
+  send(scope, noteIds) {
+    validScope(scope);
+    if (!Array.isArray(noteIds) || noteIds.length === 0 || noteIds.length > 100) {
+      throw new TypeError("Select between 1 and 100 notes to send.");
+    }
+    if (noteIds.some(id => typeof id !== "string" || !id.trim())) {
+      throw new TypeError("Each selected note ID must be a string.");
+    }
+    if (new Set(noteIds).size !== noteIds.length) {
+      throw new TypeError("Duplicate note IDs are not allowed.");
+    }
+    const available = new Map(this.list(scope).map(note => [note.id, note]));
+    if (noteIds.some(id => !available.has(id))) throw new TypeError("Unknown selected note ID.");
+    const now = new Date().toISOString();
+    const handoff = {
+      id: crypto.randomUUID(),
+      status: "pending",
+      createdAt: now,
+      acknowledgedAt: null,
+      notes: noteIds.map(id => {
+        const note = available.get(id);
+        return { id: note.id, text: note.text, author: note.author, createdAt: note.createdAt };
+      }),
+    };
+    this.handoffs[scope] = [...this.outbox(scope), handoff];
+    this.save();
+    return handoff;
+  }
+
+  outbox(scope) {
+    return [...(this.handoffs[validScope(scope)] || [])];
+  }
+
+  inbox(scope) {
+    return this.outbox(scope).filter(handoff => handoff.status === "pending");
+  }
+
+  ack(scope, handoffId) {
+    const items = this.outbox(scope);
+    const matching = items.find(item => item.id === handoffId);
+    if (!matching) return null;
+    if (matching.status === "acknowledged") return matching;
+    const updated = { ...matching, status: "acknowledged", acknowledgedAt: new Date().toISOString() };
+    this.handoffs[scope] = items.map(item => item.id === handoffId ? updated : item);
+    this.save();
+    return updated;
+  }
+
   save() {
     ensureStateDir();
-    atomicWrite(FILE(), JSON.stringify({ version: 1, scopes: this.scopes }, null, 2) + "\n");
+    atomicWrite(FILE(), JSON.stringify({ version: 1, scopes: this.scopes, handoffs: this.handoffs }, null, 2) + "\n");
   }
 }

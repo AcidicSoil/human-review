@@ -36,6 +36,7 @@ test("global setup installs the skill and local planning runtime for every agent
       assert.match(installedSkill, /human-review poll/);
       assert.match(installedSkill, /human-review notes add/);
       assert.match(installedSkill, /human-review notes delete/);
+      assert.match(installedSkill, /human-review notes inbox/);
       assert.match(installedSkill, /human-review-plan\.mjs/);
       assert.match(installedSkill, /human-review-loa\.mjs/);
       assert.match(installedSkill, /third review mode|LOA review/i);
