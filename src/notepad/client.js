@@ -15,6 +15,7 @@ document.getElementById("workspace").textContent = segments.at(-1) || scope;
 let notes = [];
 let filter = "pending";
 let updating = false;
+let confirmingDeleteId = null;
 
 async function request(method, path, body) {
   const response = await fetch(path, {
@@ -54,27 +55,71 @@ function render() {
     const byline = document.createElement("small");
     byline.textContent = `${note.author === "agent" ? "Agent" : "You"} · ${new Date(note.createdAt).toLocaleString()}`;
     body.append(text, byline);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "status";
-    const isDone = note.status === "done";
-    button.textContent = isDone ? "Reopen" : "Done";
-    button.setAttribute("aria-label", `${isDone ? "Reopen" : "Mark done"}: ${note.text.slice(0, 70)}`);
-    button.addEventListener("click", async () => {
-      button.disabled = true;
-      try {
-        const result = await request("PATCH", `/api/notepad/${encodeURIComponent(note.id)}?scope=${encodeURIComponent(scope)}`, {
-          status: isDone ? "pending" : "done",
-        });
-        notes = notes.map(item => item.id === note.id ? result.note : item);
+    const actions = document.createElement("div");
+    actions.className = "note-actions";
+    const notePath = `/api/notepad/${encodeURIComponent(note.id)}?scope=${encodeURIComponent(scope)}`;
+
+    if (confirmingDeleteId === note.id) {
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "status";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => {
+        confirmingDeleteId = null;
         render();
-        message.textContent = "Saved";
-      } catch (error) {
-        button.disabled = false;
-        message.textContent = error.message;
-      }
-    });
-    row.append(body, button);
+      });
+      const confirm = document.createElement("button");
+      confirm.type = "button";
+      confirm.className = "status delete confirm";
+      confirm.textContent = "Delete now";
+      confirm.setAttribute("aria-label", `Confirm delete: ${note.text.slice(0, 70)}`);
+      confirm.addEventListener("click", async () => {
+        confirm.disabled = true;
+        try {
+          const result = await request("DELETE", notePath);
+          notes = notes.filter(item => item.id !== result.deletedId);
+          confirmingDeleteId = null;
+          render();
+          message.textContent = "Note deleted";
+        } catch (error) {
+          confirm.disabled = false;
+          message.textContent = error.message;
+        }
+      });
+      actions.append(cancel, confirm);
+    } else {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "status";
+      const isDone = note.status === "done";
+      button.textContent = isDone ? "Reopen" : "Done";
+      button.setAttribute("aria-label", `${isDone ? "Reopen" : "Mark done"}: ${note.text.slice(0, 70)}`);
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          const result = await request("PATCH", notePath, {
+            status: isDone ? "pending" : "done",
+          });
+          notes = notes.map(item => item.id === note.id ? result.note : item);
+          render();
+          message.textContent = "Saved";
+        } catch (error) {
+          button.disabled = false;
+          message.textContent = error.message;
+        }
+      });
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "status delete";
+      remove.textContent = "Delete";
+      remove.setAttribute("aria-label", `Delete: ${note.text.slice(0, 70)}`);
+      remove.addEventListener("click", () => {
+        confirmingDeleteId = note.id;
+        render();
+      });
+      actions.append(button, remove);
+    }
+    row.append(body, actions);
     list.append(row);
   }
 }

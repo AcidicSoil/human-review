@@ -31,6 +31,13 @@ textarea::placeholder { color: #8b9bb4; }
 .note small { display: block; margin-top: 7px; color: #96a9c6; font-size: 11px; }
 .status { flex: none; border: 1px solid #405a79; background: #263b54; border-radius: 8px; color: #c3dcfb; font-weight: 600; padding: 5px 9px; font-size: 12px; }
 .status:hover { background: #334e70; }
+.note-actions { display: flex; flex: none; flex-direction: column; align-items: stretch; gap: 5px; }
+.note-actions button { min-width: 63px; }
+.status.delete { background: transparent; border-color: #405066; color: #b8c5d6; }
+.status.delete:hover { background: #3d2c39; border-color: #925e72; color: #ffbdc9; }
+.status.delete.confirm { color: #ffd2dc; background: #71384d; border-color: #a45c72; }
+.status.delete.confirm:hover { background: #864057; }
+
 .empty { text-align: center; color: #93a8c4; margin: 28px 0; }
 footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: #99aac1; }
 .connection { min-width: 0; overflow-wrap: anywhere; }

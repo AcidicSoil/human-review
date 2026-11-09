@@ -70,6 +70,16 @@ export class NotepadStore {
     return note;
   }
 
+  remove(scope, id) {
+    validScope(scope);
+    const notes = this.scopes[scope] || [];
+    const removed = notes.find((note) => note.id === id);
+    if (!removed) return null;
+    this.scopes[scope] = notes.filter((note) => note.id !== id);
+    this.save();
+    return removed;
+  }
+
   save() {
     ensureStateDir();
     atomicWrite(FILE(), JSON.stringify({ version: 1, scopes: this.scopes }, null, 2) + "\n");

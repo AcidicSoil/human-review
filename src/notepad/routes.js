@@ -68,6 +68,16 @@ export function createNotepadRoute({ token, viewToken }) {
       return true;
     }
 
+    if (noteRoute && req.method === "DELETE") {
+      try {
+        const note = notepad().remove(scope, noteRoute[1]);
+        json(res, note ? 200 : 404, note ? { deletedId: note.id } : { error: "Unknown note." });
+      } catch (error) {
+        badInput(error, res, json);
+      }
+      return true;
+    }
+
     return false;
   };
 }

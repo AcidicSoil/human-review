@@ -170,6 +170,7 @@ human-review notes add "Remember to verify the parser"  # agent capture
 human-review notes open                                # user-facing HUD
 human-review notes list                                # only on request
 human-review notes done <id>                           # after processing
+human-review notes delete <id>                         # only when user requests deletion
 ```
 
 The default notebook is scoped to the command's working directory; pass
@@ -178,6 +179,10 @@ The HUD persists notes and refreshes while visible. It does not send review
 feedback, interrupt an agent poll, or request execution. **Do not poll notes or
 act on them automatically.** Only process selected notes when the user
 explicitly asks, and mark them done after verifying the requested work.
+Deleting a note is permanent; never delete it merely because it was marked
+done or acted upon. Use `notes delete <id>` only when explicitly requested.
+The HUD requires a second confirmation click before removal.
+
 The local CLI must be installed; skill-only plugin installation does not
 implicitly provide its executable.
 

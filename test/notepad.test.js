@@ -49,6 +49,38 @@ test("notes persist independently per workspace and can be completed manually", 
   assert.equal(store.setStatus("/workspace/two", first.id, "done"), null);
 });
 
+test("deleting a note removes only its own scope and persists across reload", () => {
+  const store = new NotepadStore();
+  const first = store.add("delete-one", "Delete this", "user");
+  const second = store.add("delete-one", "Keep this", "agent");
+  const other = store.add("delete-two", "Different scope", "user");
+  assert.equal(store.remove("delete-two", first.id), null, "wrong scope must not delete");
+  assert.equal(store.remove("delete-one", "not-found"), null);
+  assert.equal(store.remove("delete-one", first.id)?.id, first.id);
+  assert.equal(store.remove("delete-one", first.id), null, "repeat deletes must be harmless");
+  assert.deepEqual(new NotepadStore().list("delete-one").map(note => note.id), [second.id]);
+  assert.deepEqual(new NotepadStore().list("delete-two").map(note => note.id), [other.id]);
+  store.setStatus("delete-one", second.id, "done");
+  assert.equal(store.remove("delete-one", second.id)?.status, "done");
+  assert.deepEqual(new NotepadStore().list("delete-one"), [], "completed notes are deletable too");
+});
+
+test("DELETE requires authentication and preserves feedback state", async t => {
+  const server = await start(0);
+  t.after(() => server.dispose());
+  const route = "/api/notepad?scope=delete-api";
+  const made = await call(server.port, server.token, "POST", route, { text: "Temporary note" });
+  assert.equal(made.status, 201);
+  const id = made.body.note.id;
+  const path = "/api/notepad/" + id;
+  assert.equal((await call(server.port, null, "DELETE", path + "?scope=delete-api")).status, 401);
+  assert.equal((await call(server.port, server.token, "DELETE", path + "?scope=wrong")).status, 404);
+  assert.equal((await call(server.port, server.token, "DELETE", path + "?scope=delete-api")).status, 200);
+  assert.deepEqual((await call(server.port, server.token, "GET", route)).body.notes, []);
+  assert.equal((await call(server.port, server.token, "DELETE", path + "?scope=delete-api")).status, 404);
+  assert.equal((await call(server.port, server.token, "GET", "/api/status?target=delete-api")).body.feedback_waiting, false);
+});
+
 test("note boundaries reject empty, large, invalid or unauthorized changes", () => {
   const store = new NotepadStore();
   assert.throws(() => store.add("scope", "   ", "user"), /empty|text/i);
@@ -151,6 +183,11 @@ test("CLI adds, lists, completes and reopens notes through the authenticated ser
   const reopened = await run("reopen", note.id, "--scope", scope);
   assert.equal(reopened.code, 0, reopened.stderr);
   assert.equal(JSON.parse(reopened.stdout).status, "pending");
+  const removed = await run("delete", note.id, "--scope", scope);
+  assert.equal(removed.code, 0, removed.stderr);
+  assert.equal(JSON.parse(removed.stdout).deletedId, note.id);
+  assert.deepEqual(JSON.parse((await run("list", "--scope", scope)).stdout), []);
+  assert.notEqual((await run("delete", note.id, "--scope", scope)).code, 0);
   const invalid = await run("add", " ", "--scope", scope);
   assert.notEqual(invalid.code, 0);
   assert.match(invalid.stderr, /empty/i);
@@ -185,6 +222,7 @@ test("CLI help documents the manual notepad lifecycle", async () => {
   assert.match(output.stdout, /notes add <text>/);
   assert.match(output.stdout, /notes list/);
   assert.match(output.stdout, /notes done <id>/);
+  assert.match(output.stdout, /notes delete <id>/);
 });
 
 test("an unreadable notebook never prevents the ordinary review server from starting", async t => {

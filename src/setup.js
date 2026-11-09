@@ -131,8 +131,9 @@ For non-blocking capture during a task, use
 working directory unless \`--scope <workspace>\` is supplied. Never process
 notes automatically: only run \`npx -y human-review notes list\` when the
 user explicitly requests action, then complete the selected notes after the
-work is verified with \`notes done <id>\`. The notepad does not affect review
-Send/Poll or the current task.
+work is verified with \`notes done <id>\`. Only when the user explicitly requests
+permanent deletion may the agent run \`notes delete <id>\`. The notepad does
+not affect review Send/Poll or the current task.
 
 For large plans, specs, or PRDs, generate an offline editable artifact with
 \`__PLAN__ <source> <output.review.html>\`. For structured Lists of Actions and

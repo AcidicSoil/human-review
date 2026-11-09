@@ -22,6 +22,7 @@ const HELP = `human-review ${pkg.version}
   human-review notes list             Read saved notes (JSON)
   human-review notes done <id>        Mark a processed note complete
   human-review notes reopen <id>      Return a completed note to pending
+  human-review notes delete <id>      Permanently delete a note
       --scope <workspace>          Override the current-directory notebook
   human-review setup                  Teach Claude Code / Codex how to use human-review
   human-review setup --global         ...for every project, not just this one
@@ -315,11 +316,11 @@ function parseNotesArgs(args) {
       values.push(arg);
     }
   }
-  if (!["open", "add", "list", "done", "reopen"].includes(action)) {
+  if (!["open", "add", "list", "done", "reopen", "delete"].includes(action)) {
     throw new Error(`Unknown notes command: ${action}`);
   }
   if (action === "add" && values.length !== 1) throw new Error("Usage: human-review notes add <text> [--scope <workspace>]");
-  if (["done", "reopen"].includes(action) && values.length !== 1) {
+  if (["done", "reopen", "delete"].includes(action) && values.length !== 1) {
     throw new Error(`Usage: human-review notes ${action} <id> [--scope <workspace>]`);
   }
   if (["open", "list"].includes(action) && values.length) throw new Error(`Unexpected notes argument: ${values[0]}`);
@@ -341,6 +342,9 @@ async function notesCommand(args) {
     method = "PATCH";
     route = `/api/notepad/${encodeURIComponent(value)}?scope=${encodeURIComponent(scope)}`;
     body = { status: action === "done" ? "done" : "pending" };
+  } else if (action === "delete") {
+    method = "DELETE";
+    route = `/api/notepad/${encodeURIComponent(value)}?scope=${encodeURIComponent(scope)}`;
   }
   const result = await request(server, {
     method, path: route,
@@ -355,7 +359,7 @@ async function notesCommand(args) {
     openBrowser(url);
     process.stdout.write(`Notepad: ${url}\n`);
   } else {
-    process.stdout.write(JSON.stringify(action === "list" ? payload.notes : payload.note, null, 2) + "\n");
+    process.stdout.write(JSON.stringify(action === "list" ? payload.notes : action === "delete" ? payload : payload.note, null, 2) + "\n");
   }
 }
 

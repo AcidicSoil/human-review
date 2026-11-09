@@ -86,6 +86,7 @@ human-review notes add "Investigate the cache policy later"
 human-review notes list
 human-review notes done <note-id>
 human-review notes reopen <note-id>
+human-review notes delete <note-id>
 ```
 
 Run these from the same workspace to share one notebook. Use
@@ -97,6 +98,10 @@ appear on its next refresh.
 **To process notes:** tell the agent which pending notes to handle. The agent
 runs `human-review notes list`, performs only the work you requested, and
 marks completed entries with `human-review notes done <note-id>`.
+To remove a note permanently, use **Delete** in the HUD (then **Delete now**
+to confirm), or explicitly request the agent to run
+`human-review notes delete <note-id>`. Deletion is scoped to the current
+workspace and removes either pending or completed notes.
 Notes are **not** executable instructions by themselves. The local notebook
 is stored separately at `~/.human-review/notepad.json` (or inside
 `HUMAN_REVIEW_STATE_DIR` when configured). Notes do not expire with review
