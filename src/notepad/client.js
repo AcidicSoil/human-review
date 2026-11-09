@@ -226,10 +226,51 @@ for (const item of filters) item.addEventListener("click", () => {
 });
 
 document.getElementById("popout").addEventListener("click", () => {
-  const windowName = "human-review-notepad";
+  const windowName = "human-review-notepad:" + encodeURIComponent(scope);
   const popup = window.open(location.href, windowName, "popup,width=440,height=740,resizable=yes");
   if (!popup) message.textContent = "Allow popups to open the compact window.";
 });
+
+/**
+ * Register this live browser window with the shared server. An agent's next
+ * "notes open" requests focus through this connection instead of opening a
+ * duplicate. The connection closes when the window closes.
+ */
+async function observeWindow(signal) {
+  while (!signal.aborted) {
+    try {
+      const response = await fetch("/api/notepad/window/connect?scope=" + encodeURIComponent(scope), {
+        headers: { "x-human-review-token": token },
+        cache: "no-store",
+        signal,
+      });
+      if (!response.ok || !response.body) return;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, { stream: true });
+        let index;
+        while ((index = pending.indexOf("\n")) !== -1) {
+          const line = pending.slice(0, index).trim();
+          pending = pending.slice(index + 1);
+          if (line && JSON.parse(line).event === "focus") window.focus();
+        }
+      }
+    } catch (error) {
+      if (signal.aborted) return;
+    }
+    if (!signal.aborted) await new Promise(resolve => setTimeout(resolve, 600));
+  }
+}
+
+if (typeof ReadableStream !== "undefined" && typeof TextDecoder !== "undefined") {
+  const connection = new AbortController();
+  window.addEventListener("pagehide", () => connection.abort(), { once: true });
+  void observeWindow(connection.signal);
+}
 
 refresh();
 setInterval(() => {

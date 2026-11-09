@@ -35,6 +35,7 @@ test("global setup installs the skill and local planning runtime for every agent
       const installedSkill = fs.readFileSync(skill, "utf8");
       assert.match(installedSkill, /human-review poll/);
       assert.match(installedSkill, /human-review notes add/);
+      assert.match(installedSkill, /reuses|duplicate windows/i);
       assert.match(installedSkill, /human-review notes delete/);
       assert.match(installedSkill, /human-review notes inbox/);
       assert.match(installedSkill, /human-review-plan\.mjs/);

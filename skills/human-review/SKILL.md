@@ -178,6 +178,10 @@ human-review notes ack <handoff-id>                     # acknowledge receipt, n
 
 The default notebook is scoped to the command's working directory; pass
 `--scope <workspace>` on every command if the user chooses a named scope.
+Run `notes open` at session start without creating duplicate windows: when a
+window is registered for that workspace, the CLI requests focus rather than
+launching another. A different workspace opens separately. Browser/OS focus
+restrictions may require the user to foreground the existing window manually.
 The HUD persists notes and refreshes while visible. Selecting notes and
 pressing **Send to agent** creates a durable notification on the separate note
 channel. `notes inbox` retrieves these handoffs without blocking; `notes poll`

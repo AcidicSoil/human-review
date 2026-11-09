@@ -128,8 +128,10 @@ instantly whether feedback is already waiting, without blocking.
 For non-blocking capture during a task, use
 \`npx -y human-review notes add "note text"\` or open the local HUD with
 \`npx -y human-review notes open\`. The notes are scoped to the current
-working directory unless \`--scope <workspace>\` is supplied. Never process
-notes automatically: only run \`npx -y human-review notes list\` when the
+working directory unless \`--scope <workspace>\` is supplied.
+At session start, \`notes open\` reuses an already-open workspace window and
+requests focus instead of spawning duplicates. Never process notes
+automatically: only run \`npx -y human-review notes list\` when the
 user explicitly requests action, then complete the selected notes after the
 work is verified with \`notes done <id>\`. Only when the user explicitly requests
 permanent deletion may the agent run \`notes delete <id>\`.

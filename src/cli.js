@@ -407,8 +407,16 @@ async function notesCommand(args) {
   }
   if (action === "open") {
     const url = "http://127.0.0.1:" + server.port + payload.path;
-    openBrowser(url);
-    process.stdout.write("Notepad: " + url + "\n");
+    const activation = await request(server, {
+      method: "POST", path: "/api/notepad/window/activate" + query,
+    });
+    if (activation.status !== 200) throw new Error("Could not activate the Notepad window.");
+    const { action } = JSON.parse(activation.raw);
+    if (action === "launch") openBrowser(url);
+    else if (!["reused", "opening"].includes(action)) throw new Error("Unexpected Notepad window state.");
+    const label = action === "reused" ? "Reusing Notepad: "
+      : action === "opening" ? "Notepad opening: " : "Notepad: ";
+    process.stdout.write(label + url + "\n");
   } else {
     const output = action === "list" ? payload.notes
       : action === "inbox" ? payload.handoffs

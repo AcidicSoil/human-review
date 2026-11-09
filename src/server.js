@@ -818,7 +818,7 @@ export function createServer() {
       if (STATIC[route]) return serveFile(res, path.join(here, STATIC[route][0]), STATIC[route][1] || undefined);
 
       // Notepad runs independently of review feedback and long-poll state.
-      if (await notepadRoute({ req, res, url, json, readBody })) return;
+      if (await notepadRoute.handle({ req, res, url, json, readBody })) return;
 
       // --- open a browser session for a file or localhost URL
       if (route === "/api/session" && req.method === "POST") {
@@ -1391,12 +1391,15 @@ export function createServer() {
 
     // Busy means a connected browser or a listening agent — a session record
     // alone must not keep the process alive forever.
-    const busy = [...sessions.values()].some((s) => s.clients.size > 0) || [...pollers.values()].some((s) => s.size > 0);
+    const busy = [...sessions.values()].some((s) => s.clients.size > 0)
+      || [...pollers.values()].some((s) => s.size > 0)
+      || notepadRoute.hasOpenWindows();
     if (!busy && now - lastActivity > IDLE_SHUTDOWN_MS) process.exit(0);
   }, 60000);
   sweep.unref();
 
   const dispose = () => {
+    notepadRoute.close();
     clearInterval(sweep);
     for (const entry of watched.values()) fs.unwatchFile(entry.file);
     watched.clear();

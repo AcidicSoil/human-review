@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { NotepadStore } from "./store.js";
+import { createNotepadWindowRegistry } from "./windows.js";
 
 const template = new URL("./index.html", import.meta.url);
 const MAX_WAIT_MS = 25000;
@@ -9,6 +10,7 @@ export function createNotepadRoute({ token, viewToken }) {
   let store;
   const notepad = () => (store ||= new NotepadStore());
   const waiting = new Map();
+  const windows = createNotepadWindowRegistry();
 
   const badInput = (error, res, json) => {
     if (!(error instanceof TypeError || error instanceof RangeError)) throw error;
@@ -23,7 +25,7 @@ export function createNotepadRoute({ token, viewToken }) {
     json(listener.res, 200, payload);
   };
 
-  return async ({ req, res, url, json, readBody }) => {
+  const handle = async ({ req, res, url, json, readBody }) => {
     const route = url.pathname;
     const scope = url.searchParams.get("scope");
 
@@ -36,6 +38,26 @@ export function createNotepadRoute({ token, viewToken }) {
         "x-frame-options": "DENY",
       });
       res.end(html.replace("__TOKEN__", token));
+      return true;
+    }
+
+    if (route === "/api/notepad/window/connect" && req.method === "GET") {
+      try {
+        notepad().list(scope);
+        windows.connect(scope, res);
+      } catch (error) {
+        badInput(error, res, json);
+      }
+      return true;
+    }
+
+    if (route === "/api/notepad/window/activate" && req.method === "POST") {
+      try {
+        notepad().list(scope);
+        json(res, 200, windows.activate(scope));
+      } catch (error) {
+        badInput(error, res, json);
+      }
       return true;
     }
 
@@ -152,4 +174,6 @@ export function createNotepadRoute({ token, viewToken }) {
 
     return false;
   };
+
+  return { handle, hasOpenWindows: windows.hasOpenWindows, close: windows.close };
 }

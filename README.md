@@ -97,8 +97,12 @@ human-review notes ack <handoff-id>
 Run these from the same workspace to share one notebook. Use
 `--scope <workspace>` consistently to choose a different notebook.
 The HUD can pop out into a compact browser window; leave it alongside your
-conversation. User changes appear in the HUD immediately, and agent additions
-appear on its next refresh.
+conversation. Repeating `notes open` **reuses the live window for that
+workspace** instead of opening duplicates. It requests focus on that window
+(browser/OS restrictions can prevent bringing it to the foreground).
+A different workspace gets its own window. Closing a window releases its
+registration; simultaneous agent launches reserve one opening for 20 seconds.
+User changes appear immediately; agent additions appear on the next refresh.
 
 **Send to agent:** Check the notes you want the agent to see, then select
 **Send to agent**. That creates one durable handoff containing only those notes.
