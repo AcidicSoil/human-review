@@ -6,11 +6,11 @@ Scope: LOA artifacts only. Ordinary DOM and Planning review editors stay unchang
 
 ## Intent
 
-Plugins are an optional resource type rather than the fixed identity of the inspector. A reviewer can choose plugin skills, explicitly declared standalone skills, one explicit skill collection, a package source, an explicit workflow, or no inspector. LOA actions may be organized in a real tree using declared phase and parent references. No resource roots are discovered implicitly for new resource types.
+Plugins are an optional resource type rather than the fixed identity of the inspector. A reviewer can choose plugin skills, explicitly declared standalone skills, one explicit skill library, a package source, an explicit workflow, or no inspector. LOA actions may be organized in a real tree using declared phase and parent references. No resource roots are discovered implicitly for new resource types.
 
 ## Input contract
 
-Legacy `{ "loa": { "actions": [...] }, "catalog": [...] }` remains valid. The optional `resourceSources` array adds non-plugin skills without modifying canonical plugin refs or the `snapIns` shape.
+Existing `{ "loa": { "actions": [...] }, "catalog": [...] }` remains valid. The optional `resourceSources` array adds non-plugin skills without modifying canonical plugin refs or the `snapIns` shape.
 
 ```json
 {
@@ -30,13 +30,13 @@ Legacy `{ "loa": { "actions": [...] }, "catalog": [...] }` remains valid. The op
     },
     {
       "id": "delivery",
-      "kind": "skill-set",
+      "kind": "skill-library",
       "displayName": "Delivery lifecycle",
       "groups": [
         {
           "id": "planning",
           "displayName": "Planning",
-          "skills": [{ "ref": "example://set/plan", "displayName": "Plan" }]
+          "skills": [{ "ref": "example://library/plan", "displayName": "Plan" }]
         }
       ]
     }
@@ -46,11 +46,11 @@ Legacy `{ "loa": { "actions": [...] }, "catalog": [...] }` remains valid. The op
 
 The `example://` references above are placeholders for explicitly supplied references, not discovered resources or installed capabilities.
 
-- `catalog` is the legacy plugin catalog. If both `catalog` and `resourceSources` are omitted, the existing plugin-discovery behavior remains available, unless `resourceManifest` is provided. If `resourceSources` or `resourceManifest` is supplied and `catalog` omitted, `catalog` defaults to an empty array; no plugin discovery occurs.
-- `resourceSources[].kind` is `skills` (direct `skills[]`) or `skill-set` (named `groups[]`, each containing `skills[]`). Every source and group has a unique nonempty ID within its scope. Skills have nonempty refs and display names and are treated as `kind: "skill"` attachments.
-- Resource sources are explicit embedded data. The LOA browser runtime never reads arbitrary directories or invokes a skill or plugin. Legacy collection groups are provided by the input; the UI never invents lifecycle stages.
-- A source selector switches among available `Sources`, `Plugins`, `Skills`, `Skill collections`, `Workflows`, and `None` options. A second selector chooses **one** named source or workflow. Its selection is saved to reviewed HTML as UI state but does not alter canonical action attachments.
-- The clean JSON export includes `resourceSources` when present; legacy JSON remains `{ loa, catalog }`. Live agent feedback includes the same canonical fields. Catalog entries remain embedded when other sources are selected; availability is determined across all embedded sources, not just the active view.
+- `catalog` is the plugin catalog. If both `catalog` and `resourceSources` are omitted, the existing plugin-discovery behavior remains available, unless `resourceManifest` is provided. If `resourceSources` or `resourceManifest` is supplied and `catalog` omitted, `catalog` defaults to an empty array; no plugin discovery occurs.
+- `resourceSources[].kind` is `skills` (direct `skills[]`) or `skill-library` (named `groups[]`, each containing `skills[]`). Every source and group has a unique nonempty ID within its scope. Skills have nonempty refs and display names and are treated as `kind: "skill"` attachments.
+- Resource sources are explicit embedded data. The LOA browser runtime never reads arbitrary directories or invokes a skill or plugin. Skill-library groups are provided by the input; the UI never invents lifecycle stages.
+- A source selector switches among available `Sources`, `Plugins`, `Skills`, `Skill libraries`, `Workflows`, and `None` options. A second selector chooses **one** named source or workflow. Its selection is saved to reviewed HTML as UI state but does not alter canonical action attachments.
+- The clean JSON export includes `resourceSources` when present; JSON without additional resources remains `{ loa, catalog }`. Live agent feedback includes the same canonical fields. Catalog entries remain embedded when other sources are selected; availability is determined across all embedded sources, not just the active view.
 
 ## Tree contract
 
@@ -62,22 +62,22 @@ The `example://` references above are placeholders for explicitly supplied refer
 - Phase headers and parent nodes are collapsible. Search reveals matching nodes and their ancestors without mutating canonical data. Tree navigation supports arrow keys, Home/End and selection.
 - Deleting a parent promotes its children to the removed node's parent, or to the removed root's phase. Existing IDs, snap-ins and comments are not rewritten.
 - Existing action move/drag controls continue to change the canonical array order, not the declared parent references. Tree rendering uses parent references rather than guessing hierarchy from text.
-- Flat legacy actions appear beneath an **Actions** group, preserving order.
+- Flat actions appear beneath an **Actions** group, preserving order.
 
 ## Acceptance and verification
 
-Focused tests cover legacy plugin behavior, explicit resource-only generation, source selection, a single named skill collection, inspector disabling without data loss, renamed/unknown refs, persisted inspector state, nested phase tree search, keyboard navigation, cycle detection, parent deletion, 145-action large catalog compatibility, packaging and live agent feedback. Chrome verifies the self-contained artifact at desktop and mobile widths.
+Focused tests cover plugin behavior, explicit resource-only generation, source selection, a single named skill library, inspector disabling without data loss, renamed/unknown refs, persisted inspector state, nested phase tree search, keyboard navigation, cycle detection, parent deletion, 145-action large catalog compatibility, packaging and live agent feedback. Chrome verifies the self-contained artifact at desktop and mobile widths.
 
 The code, generated HTML, and documentation must not rely on any external application, directory discovery, runtime network access, or implicit source inference.
 
 ## Scope limits
 
-No cross-mode editor changes. No skill execution or installation. No automatic source discovery beyond the original legacy plugin-discovery fallback. No automatic reparenting on action reorder. No full-suite requirement for this scoped implementation.
+No cross-mode editor changes. No skill execution or installation. No automatic source discovery beyond the original plugin-discovery fallback. No automatic reparenting on action reorder. No full-suite requirement for this scoped implementation.
 
 ## Versioned resource manifest
 
 `resourceManifest.format` is `human-review.resources/v1`. It is optional and
-coexists with the legacy `catalog` and `resourceSources` formats.
+coexists with the plugin `catalog` and `resourceSources` formats.
 
 - **Sources** describe distribution or membership: `{id,kind,displayName,refs}`.
   Supported kinds are `library`, `repository`, `plugin`, and `package`.
@@ -117,8 +117,8 @@ generator, LOA state availability, and original structured Send/Poll protocol.
 
 `design-ref/human-review-ui-concepts.figcraft` is the editable design source.
 Frames 05–10 reflect the implemented resource-source model, explicit workflows,
-the optional empty inspector, legacy plugin browsing, standalone skills, and
-legacy skill collections. The original four prototype frames are preserved.
+the optional empty inspector, plugin browsing, standalone skills, and
+skill libraries. The original four prototype frames are preserved.
 All sample resources are illustrative, not claims about installed capabilities.
 Inspect the six-state overview at
 `design-ref/human-review-loa-inspector-modes.png`. The FigCraft frames are

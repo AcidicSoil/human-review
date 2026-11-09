@@ -45,11 +45,11 @@ For a structured List of Actions and component catalog, create the artifact in t
 human-review-loa path/to/loa.json path/to/loa.loa.review.html
 ```
 
-The LOA inspector is optional and source-selectable: **Plugins**, standalone **Skills**, legacy **Skill collections**, and **None**. For plugin-only legacy input, a missing `catalog` triggers the existing Codex plugin discovery. To disable that, explicitly supply `"catalog": []`, `resourceSources`, or `resourceManifest`, which defaults the absent plugin catalog to empty.
+The LOA inspector is optional and source-selectable: **Plugins**, standalone **Skills**, **Skill libraries**, and **None**. For plugin-only input, a missing `catalog` triggers the existing Codex plugin discovery. To disable that, explicitly supply `"catalog": []`, `resourceSources`, or `resourceManifest`, which defaults the absent plugin catalog to empty.
 
-Non-plugin sources must be explicitly supplied in `resourceSources`: `{id,kind:"skills",displayName,skills:[{ref,displayName}]}` for individual skills, or `{id,kind:"skill-set",displayName,groups:[{id,displayName,skills:[{ref,displayName}]}]}` for named collections. Never invent installed sources or scan unspecified directories. When a user requests one collection, only that named collection is selected in the inspector. Hidden resources do not invalidate attached references.
+Non-plugin sources must be explicitly supplied in `resourceSources`: `{id,kind:"skills",displayName,skills:[{ref,displayName}]}` for individual skills, or `{id,kind:"skill-library",displayName,groups:[{id,displayName,skills:[{ref,displayName}]}]}` for named skill libraries. Never invent installed sources or scan unspecified directories. When a user requests one skill library, only that named library is selected in the inspector. Hidden resources do not invalidate attached references.
 
-Each action has a stable `id`, string `content`, and `snapIns[]`. Optional `phase` and `parentId` provide a real, collapsible action tree. Keep parent IDs valid and acyclic; do not infer hierarchy from prose. Legacy flat actions remain valid. Plugin cards are grouping headers; nested plugin skills are valid attach targets. Existing plugin refs remain loadable, but do not create new plugin-level attachments from the inspector.
+Each action has a stable `id`, string `content`, and `snapIns[]`. Optional `phase` and `parentId` provide a real, collapsible action tree. Keep parent IDs valid and acyclic; do not infer hierarchy from prose. Flat actions remain valid. Plugin cards are grouping headers; nested plugin skills are valid attach targets. Existing plugin refs remain loadable, but do not create new plugin-level attachments from the inspector.
 
 For mixed packages and explicit workflows, prefer the versioned
 `resourceManifest: { format:"human-review.resources/v1", sources, capabilities,

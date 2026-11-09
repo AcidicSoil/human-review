@@ -124,17 +124,17 @@ test("manifest rejects unknown refs, duplicate resources, broken relations, and 
   ] }] }), /cycle/i);
 });
 
-test("legacy skill grouping remains usable and is identified as a collection", () => {
+test("declared skill library is available as a separate resource type", () => {
   const dom = new JSDOM(createLoaReviewHtml({
     loa: { actions: [{ id: "a", content: "Review", snapIns: [] }] }, catalog: [],
-    resourceSources: [{ id: "legacy", kind: "skill-set", displayName: "Old collection", groups: [
-      { id: "phase", displayName: "Phase", skills: [{ ref: "old.skill", displayName: "Old skill" }] },
+    resourceSources: [{ id: "engineering", kind: "skill-library", displayName: "Engineering library", groups: [
+      { id: "phase", displayName: "Phase", skills: [{ ref: "library.review", displayName: "Review skill" }] },
     ] }],
-  }), { runScripts: "dangerously", url: "file:///tmp/legacy-resource.html" });
+  }), { runScripts: "dangerously", url: "file:///tmp/library-resource.html" });
   try {
     const doc = dom.window.document;
-    assert.equal(doc.querySelector("#hr-loa-resource-mode option[value=skill-set]").textContent, "Skill collections");
-    assert.equal(doc.querySelector("#hr-loa-source-select").value, "legacy");
+    assert.equal(doc.querySelector("#hr-loa-resource-mode option[value=skill-library]").textContent, "Skill libraries");
+    assert.equal(doc.querySelector("#hr-loa-source-select").value, "engineering");
   } finally { dom.window.close(); }
 });
 
@@ -183,10 +183,10 @@ test("manifest-only generation avoids plugin discovery and survives serialized H
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("restoring a legacy agent snapshot clears stale manifest data", () => {
+test("restoring an agent snapshot without manifest clears stale manifest data", () => {
   const parent = { postMessage() {} };
   const dom = new JSDOM(createLoaReviewHtml(make()), {
-    runScripts: "dangerously", url: "file:///tmp/restore-legacy.html",
+    runScripts: "dangerously", url: "file:///tmp/restore-without-manifest.html",
     beforeParse(window) { Object.defineProperty(window, "parent", { value: parent }); },
   });
   try {

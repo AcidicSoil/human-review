@@ -12,9 +12,9 @@ LOA inspector states, matching the implemented action-first workbench:
 | 05 — LOA / Sources | Library, repository or plugin memberships; mixed capabilities and subset/bulk attachment |
 | 06 — LOA / Workflows | Explicit, dependency-ordered workflow steps; live session comment control |
 | 07 — LOA / None | Optional inspector with existing action attachments intact |
-| 08 — LOA / Plugins | Legacy plugin and nested skill browsing |
+| 08 — LOA / Plugins | Plugin and nested skill browsing |
 | 09 — LOA / Skills | Explicit standalone skills from one source |
-| 10 — LOA / Skill collections | Legacy named collections, with explicit group membership |
+| 10 — LOA / Skill libraries | Named skill libraries, with explicit group membership |
 
 The four original library-first, action-first, Planning and DOM frames remain
 unchanged. The new frames use native editable FigCraft shapes and text. They are

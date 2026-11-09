@@ -127,7 +127,7 @@ retain their existing purposes.
 The LOA editor uses an action-first workbench: a collapsible **action tree**
 on the left, the ordered editor in the center, and a configurable **resource
 inspector** on the right. The inspector supports **Plugins**, **Skills**,
-**Skill collections** (legacy), **Sources**, **Workflows**, and **None**. Select exactly
+**Skill libraries**, **Sources**, **Workflows**, and **None**. Select exactly
 one to browse at a time. Hidden resources do not detach skills or mark them
 unavailable. Plugin groups start collapsed for large catalogs. Action editing,
 drag and keyboard reordering, skill attachment, live comments, offline exports,
@@ -140,7 +140,7 @@ independently on desktop and stack on narrow screens.
 
 The [editable FigCraft prototype](design-ref/human-review-ui-concepts.figcraft)
 includes current LOA inspector states for **Sources**, **Workflows**, **None**,
-**Plugins**, **Skills**, and legacy **Skill collections**, alongside preserved
+**Plugins**, **Skills**, and **Skill libraries**, alongside preserved
 historical LOA, DOM and Planning concepts.
 [View all six latest screens](design-ref/human-review-loa-inspector-modes.png).
 
@@ -155,7 +155,7 @@ self-contained artifact with an action tree, editor, and resource inspector:
 human-review-loa loa.json loa.loa.review.html
 ```
 
-For backward compatibility, input containing only `{ "loa": { "actions": [] } }`
+Input containing only `{ "loa": { "actions": [] } }`
 still uses the existing installed-plugin discovery when `catalog` is omitted.
 To opt out, explicitly provide `"catalog": []`, or provide
 `"resourceSources"` (which defaults the missing catalog to empty).
@@ -200,9 +200,8 @@ The example refs are illustrative, not installed capabilities. `Sources`
 lists only a selected package's declared members; `Workflows` lists only
 declared steps. Attach all, select a subset, or attach individually. Shared
 references are deduplicated per action. Source selection never removes existing
-attachments. `resourceSources` and `kind: "skill-set"` remain readable for
-legacy artifacts; the UI labels these **Skill collections**. No filesystem
-scanning occurs for either new format.
+attachments. `resourceSources` uses `kind: "skill-library"` for named skill
+libraries. No alternate type name is accepted. No filesystem scanning occurs.
 
 An explicitly supplied `catalog` is still supported and is preserved as the manual override. Actions have stable IDs, editable content, and an unbounded `snapIns[]` array. Plugin cards are organizational groups rather than selectable components. Expand or collapse each plugin as needed, then click or drag an individual nested skill onto an action; duplicate refs on one action are ignored. Existing plugin-level refs in loaded LOAs remain visible for compatibility, but the rail creates new attachments at skill level only. Actions can be edited, removed, and reordered with the card drag surface, keyboard-accessible move controls, or the keyboard shortcuts. References missing from every configured source, or explicitly marked unavailable, remain visible.
 

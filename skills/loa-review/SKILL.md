@@ -13,11 +13,11 @@ If the user supplied only a natural-language task, derive a concise ordered `loa
 
 ## Optional resource sources and action tree
 
-Use the action-first LOA workbench: the left tree navigates phases and parent-child actions, the central panel edits and reorders actions, and the right inspector shows a user-selected resource type. Resources are **optional**. Supported types: Plugins (legacy `catalog`), standalone Skills, legacy Skill collections, Sources, Workflows, or None. Explicit `resourceSources` contains `{id,kind:"skills",displayName,skills:[{ref,displayName}]}` or `{id,kind:"skill-set",displayName,groups:[{id,displayName,skills:[{ref,displayName}]}]}`. These entries are supplied as data, never discovered from unspecified filesystem roots. The selected collection is one named source, not an implicit workflow. No implicit grouping is invented.
+Use the action-first LOA workbench: the left tree navigates phases and parent-child actions, the central panel edits and reorders actions, and the right inspector shows a user-selected resource type. Resources are **optional**. Supported types: Plugins (plugin `catalog`), standalone Skills, Skill libraries, Sources, Workflows, or None. Explicit `resourceSources` contains `{id,kind:"skills",displayName,skills:[{ref,displayName}]}` or `{id,kind:"skill-library",displayName,groups:[{id,displayName,skills:[{ref,displayName}]}]}`. These entries are supplied as data, never discovered from unspecified filesystem roots. The selected skill library is one named source, not an implicit workflow. No implicit grouping is invented.
 
-A root action may declare `phase`; a child may declare `parentId` referencing an existing action ID. Maintain those references when editing and reordering, reject cycles and missing parents, and preserve legacy flat actions. Never infer action hierarchy from prose.
+A root action may declare `phase`; a child may declare `parentId` referencing an existing action ID. Maintain those references when editing and reordering, reject cycles and missing parents, and preserve flat actions. Never infer action hierarchy from prose.
 
-For legacy plugin-only input, **omit `catalog` and `resourceSources`** to retain installed/enabled plugin discovery. If `resourceSources` or `resourceManifest` is supplied without `catalog`, use an empty plugin catalog. If the task requests no resources, explicitly supply empty `catalog: []` and `resourceSources: []` arrays.
+For plugin-only input, **omit `catalog` and `resourceSources`** to retain installed/enabled plugin discovery. If `resourceSources` or `resourceManifest` is supplied without `catalog`, use an empty plugin catalog. If the task requests no resources, explicitly supply empty `catalog: []` and `resourceSources: []` arrays.
 
 For mixed packages use `resourceManifest` with format
 `human-review.resources/v1`: `sources:[{id,kind,displayName,refs}]`,

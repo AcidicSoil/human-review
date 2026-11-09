@@ -217,8 +217,8 @@ function validateResourceSources(sources) {
     const id = requireString(source.id, `${where}.id`);
     if (ids.has(id)) throw new TypeError(`Duplicate resource source ID: ${id}`);
     ids.add(id);
-    if (source.kind !== "skills" && source.kind !== "skill-set") {
-      throw new TypeError(`${where}.kind must be skills or skill-set.`);
+    if (source.kind !== "skills" && source.kind !== "skill-library") {
+      throw new TypeError(`${where}.kind must be skills or skill-library.`);
     }
     requireString(source.displayName, `${where}.displayName`);
     const validateSkills = (items, location) => {

@@ -31,7 +31,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
     : kind === "sources" || kind === "workflows"
       ? manifestEntries(kind).length > 0
       : sources().some((source) => source.kind === kind);
-  const defaultMode = supports("sources") ? "sources" : supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-set") ? "skill-set" : supports("workflows") ? "workflows" : "none";
+  const defaultMode = supports("sources") ? "sources" : supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-library") ? "skill-library" : supports("workflows") ? "workflows" : "none";
   let resourceMode = (state.inspectorView?.mode === "none" || supports(state.inspectorView?.mode)) ? state.inspectorView.mode : defaultMode;
   let sourceId = state.inspectorView?.sourceId || (manifestEntries(resourceMode)[0]?.id || sources().find((source) => source.kind === resourceMode)?.id || "");
   const collapsedOutlineNodes = new Set();
@@ -118,19 +118,19 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
   const renderRail = (restoreSelection = false) => {
     const rail = document.getElementById("hr-loa-rail");
     if (!rail) return;
-    if (resourceMode !== "none" && !supports(resourceMode)) resourceMode = supports("sources") ? "sources" : supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-set") ? "skill-set" : supports("workflows") ? "workflows" : "none";
+    if (resourceMode !== "none" && !supports(resourceMode)) resourceMode = supports("sources") ? "sources" : supports("plugins") ? "plugins" : supports("skills") ? "skills" : supports("skill-library") ? "skill-library" : supports("workflows") ? "workflows" : "none";
     const choices = [
-      ["sources", "Sources"], ["plugins", "Plugins"], ["skills", "Skills"], ["skill-set", "Skill collections"], ["workflows", "Workflows"], ["none", "None"],
+      ["sources", "Sources"], ["plugins", "Plugins"], ["skills", "Skills"], ["skill-library", "Skill libraries"], ["workflows", "Workflows"], ["none", "None"],
     ];
     const selector = "<label class=\"hr-loa-resource-label\" for=\"hr-loa-resource-mode\">Resource type</label>" +
       "<select id=\"hr-loa-resource-mode\" class=\"hr-loa-search\">" +
       choices.filter(([kind]) => kind === "none" || supports(kind))
         .map(([kind, label]) => "<option value=\"" + kind + "\"" + (resourceMode === kind ? " selected" : "") + ">" + label + "</option>").join("") + "</select>";
-    const legacy = sources().filter((source) => source.kind === resourceMode);
-    const available = resourceMode === "sources" || resourceMode === "workflows" ? manifestEntries(resourceMode) : legacy;
+    const matchingSources = sources().filter((source) => source.kind === resourceMode);
+    const available = resourceMode === "sources" || resourceMode === "workflows" ? manifestEntries(resourceMode) : matchingSources;
     if (resourceMode !== "plugins" && resourceMode !== "none" && !available.some((source) => source.id === sourceId)) sourceId = available[0]?.id || "";
     const sourceSelector = available.length ? "<label class=\"hr-loa-resource-label\" for=\"hr-loa-source-select\">" +
-      (resourceMode === "skill-set" ? "Skill collection" : resourceMode === "workflows" ? "Workflow" : "Source") + "</label>" +
+      (resourceMode === "skill-library" ? "Skill library" : resourceMode === "workflows" ? "Workflow" : "Source") + "</label>" +
       "<select id=\"hr-loa-source-select\" class=\"hr-loa-search\">" +
       available.map((source) => "<option value=\"" + esc(source.id) + "\"" + (source.id === sourceId ? " selected" : "") + ">" + esc(source.displayName) + "</option>").join("") + "</select>" : "";
     let body = "";
@@ -169,7 +169,7 @@ export const LOA_CLIENT_SOURCE = String.raw`(() => {
         (items.length ? "<div class=\"hr-loa-resource-bulk\"><button type=\"button\" id=\"hr-loa-attach-selected\"" + (selectedResourceRefs.size ? "" : " disabled") + ">Attach selected</button><button type=\"button\" id=\"hr-loa-attach-all\">Attach all</button></div>" : "");
     } else {
       const source = available.find((item) => item.id === sourceId);
-      const groups = source?.kind === "skill-set" ? source.groups : source ? [{ id: source.id, displayName: source.displayName, skills: source.skills }] : [];
+      const groups = source?.kind === "skill-library" ? source.groups : source ? [{ id: source.id, displayName: source.displayName, skills: source.skills }] : [];
       body = groups.map((group, index) => {
         const matched = (group.skills || []).filter((skill) => !query || [skill.ref, skill.displayName, group.displayName].join(" ").toLowerCase().includes(query));
         if (query && !matched.length) return "";

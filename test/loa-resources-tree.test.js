@@ -13,12 +13,12 @@ const sources = [
     { ref: "skills://workspace/test", displayName: "Test" },
     { ref: "skills://workspace/build", displayName: "Build" },
   ] },
-  { id: "delivery", kind: "skill-set", displayName: "Delivery", groups: [
-    { id: "plan", displayName: "Plan", skills: [{ ref: "skills://sets/plan", displayName: "Plan" }] },
-    { id: "ship", displayName: "Deploy", skills: [{ ref: "skills://sets/deploy", displayName: "Deploy" }] },
+  { id: "delivery", kind: "skill-library", displayName: "Delivery", groups: [
+    { id: "plan", displayName: "Plan", skills: [{ ref: "skills://libraries/plan", displayName: "Plan" }] },
+    { id: "ship", displayName: "Deploy", skills: [{ ref: "skills://libraries/deploy", displayName: "Deploy" }] },
   ] },
-  { id: "review", kind: "skill-set", displayName: "Review", groups: [
-    { id: "quality", displayName: "Quality", skills: [{ ref: "skills://sets/review", displayName: "Review" }] },
+  { id: "review", kind: "skill-library", displayName: "Review", groups: [
+    { id: "quality", displayName: "Quality", skills: [{ ref: "skills://libraries/review", displayName: "Review" }] },
   ] },
 ];
 const catalog = [{ category: "Integrations", plugins: [{ ref: "plugin", displayName: "Plugin", skills: [
@@ -54,7 +54,7 @@ test("catalog sources are explicit, validated, and do not trigger automatic plug
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("resource inspector switches between plugins, standalone skills, one named set and none without changing attachments", () => {
+test("resource inspector switches between plugins, standalone skills, one named skill library and none without changing attachments", () => {
   const dom = new JSDOM(createLoaReviewHtml({
     loa: { actions: [action("a", "Review")] }, catalog, resourceSources: sources,
   }), { runScripts: "dangerously", url: "file:///tmp/source-review.html" });
@@ -70,15 +70,15 @@ test("resource inspector switches between plugins, standalone skills, one named 
     assert.equal(doc.querySelector('[data-add-ref="skills://workspace/test"]') !== null, true);
     doc.querySelector('[data-add-ref="skills://workspace/test"]').click();
     assert.equal(bootstrap().loa.actions[0].snapIns[0].ref, "skills://workspace/test");
-    const setMode = doc.querySelector("#hr-loa-resource-mode");
-    setMode.value = "skill-set";
-    setMode.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
-    const sets = doc.querySelector("#hr-loa-source-select");
-    assert.ok(sets);
-    sets.value = "review";
-    sets.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
-    assert.ok(doc.querySelector('[data-add-ref="skills://sets/review"]'));
-    assert.equal(doc.querySelector('[data-add-ref="skills://sets/plan"]'), null);
+    const libraryMode = doc.querySelector("#hr-loa-resource-mode");
+    libraryMode.value = "skill-library";
+    libraryMode.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    const libraries = doc.querySelector("#hr-loa-source-select");
+    assert.ok(libraries);
+    libraries.value = "review";
+    libraries.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+    assert.ok(doc.querySelector('[data-add-ref="skills://libraries/review"]'));
+    assert.equal(doc.querySelector('[data-add-ref="skills://libraries/plan"]'), null);
     const noneMode = doc.querySelector("#hr-loa-resource-mode");
     noneMode.value = "none";
     noneMode.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
@@ -137,7 +137,7 @@ test('selected inspector view survives reopening a reviewed HTML artifact', () =
   }), { runScripts: 'dangerously', url: 'file:///tmp/review-view.html' });
   try {
     const select = dom.window.document.querySelector('#hr-loa-resource-mode');
-    select.value = 'skill-set';
+    select.value = 'skill-library';
     select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
     const named = dom.window.document.querySelector('#hr-loa-source-select');
     named.value = 'review';
@@ -146,9 +146,9 @@ test('selected inspector view survives reopening a reviewed HTML artifact', () =
     const reopened = new JSDOM(html, { runScripts: 'dangerously', url: 'file:///tmp/review-view.html' });
     try {
       const doc = reopened.window.document;
-      assert.equal(doc.querySelector('#hr-loa-resource-mode').value, 'skill-set');
+      assert.equal(doc.querySelector('#hr-loa-resource-mode').value, 'skill-library');
       assert.equal(doc.querySelector('#hr-loa-source-select').value, 'review');
-      assert.ok(doc.querySelector('[data-add-ref="skills://sets/review"]'));
+      assert.ok(doc.querySelector('[data-add-ref="skills://libraries/review"]'));
     } finally { reopened.window.close(); }
   } finally { dom.window.close(); }
 });
@@ -177,7 +177,7 @@ test('tree items support keyboard navigation and collapse or expand their childr
 test("availability uses all configured sources, not just plugin catalog or active inspector", () => {
   const input = { loa: { actions: [action("a", "Review", { snapIns: [
     { kind: "skill", ref: "skills://workspace/test", displayName: "Test" },
-    { kind: "skill", ref: "skills://sets/plan", displayName: "Plan" },
+    { kind: "skill", ref: "skills://libraries/plan", displayName: "Plan" },
     { kind: "skill", ref: "missing.ref", displayName: "Missing" },
   ] })] }, catalog: [], resourceSources: sources };
   const output = markUnavailableSnapIns(input).loa.actions[0].snapIns;
@@ -201,16 +201,16 @@ test('searching a phase name shows its member actions and descendants', () => {
   } finally { dom.window.close(); }
 });
 
-test('single declared skill set is the default and an empty configuration has no inspector resources', () => {
+test('single declared skill library is the default and an empty configuration has no inspector resources', () => {
   const doc = (resourceSources) => {
     const dom = new JSDOM(createLoaReviewHtml({ loa: { actions: [action('a', 'Review')] }, catalog: [], resourceSources }), {
-      runScripts: 'dangerously', url: 'file:///tmp/one-set.html',
+      runScripts: 'dangerously', url: 'file:///tmp/one-library.html',
     });
     return dom;
   };
   const only = doc([sources[1]]);
   try {
-    assert.equal(only.window.document.querySelector('#hr-loa-resource-mode').value, 'skill-set');
+    assert.equal(only.window.document.querySelector('#hr-loa-resource-mode').value, 'skill-library');
     assert.equal(only.window.document.querySelector('#hr-loa-source-select').value, 'delivery');
     assert.equal(only.window.document.querySelectorAll('[data-add-ref]').length, 2);
   } finally { only.window.close(); }
