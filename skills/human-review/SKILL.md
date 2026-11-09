@@ -160,6 +160,27 @@ In both modes, direct user edits come first and must not be silently reverted by
 
 Do not ask the user to restate edits, comments, or section actions in chat. The reviewed artifact is the instruction set.
 
+## Notepad HUD (non-blocking)
+
+If the user or agent wants to capture something for later without stopping the
+current task, use the installed Human Review CLI:
+
+```sh
+human-review notes add "Remember to verify the parser"  # agent capture
+human-review notes open                                # user-facing HUD
+human-review notes list                                # only on request
+human-review notes done <id>                           # after processing
+```
+
+The default notebook is scoped to the command's working directory; pass
+`--scope <workspace>` on every command if the user chooses a named scope.
+The HUD persists notes and refreshes while visible. It does not send review
+feedback, interrupt an agent poll, or request execution. **Do not poll notes or
+act on them automatically.** Only process selected notes when the user
+explicitly asks, and mark them done after verifying the requested work.
+The local CLI must be installed; skill-only plugin installation does not
+implicitly provide its executable.
+
 ## Ordinary review loop
 
 Open the review page for an HTML/Markdown file or local route:

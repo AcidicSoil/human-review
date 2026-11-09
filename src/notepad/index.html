@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notepad · Human Review</title>
+  <link rel="stylesheet" href="/notepad.css">
+</head>
+<body data-token="__TOKEN__">
+  <main class="hud">
+    <header class="heading">
+      <span class="symbol" aria-hidden="true">✎</span>
+      <div class="identity">
+        <h1>Notepad</h1>
+        <p id="workspace" class="workspace"></p>
+      </div>
+      <span id="count" class="count" aria-label="Pending notes">0</span>
+      <button id="popout" class="popout" type="button" title="Open compact window" aria-label="Open compact notepad window">↗</button>
+    </header>
+
+    <form id="capture" class="capture">
+      <label class="sr-only" for="note-text">New note</label>
+      <textarea id="note-text" maxlength="4000" rows="3" placeholder="Capture a thought or task…" required></textarea>
+      <div class="capture-bar">
+        <span class="hint">Ctrl / ⌘ + Enter</span>
+        <button id="add" type="submit" class="primary">Save note <span aria-hidden="true">↗</span></button>
+      </div>
+    </form>
+
+    <section class="entries" aria-label="Saved notes">
+      <div class="filters" role="group" aria-label="Filter notes">
+        <button class="filter active" data-filter="pending" aria-pressed="true" type="button">Pending</button>
+        <button class="filter" data-filter="done" aria-pressed="false" type="button">Done</button>
+        <button class="filter" data-filter="all" aria-pressed="false" type="button">All</button>
+      </div>
+      <ul id="notes" class="notes"></ul>
+      <p id="empty" class="empty" hidden>No notes yet.</p>
+    </section>
+
+    <footer>
+      <span class="connection" id="message" role="status" aria-live="polite">Ready</span>
+    </footer>
+  </main>
+  <script type="module" src="/notepad.js"></script>
+</body>
+</html>

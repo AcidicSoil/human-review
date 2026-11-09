@@ -17,6 +17,12 @@ const HELP = `human-review ${pkg.version}
       --ack                        Acknowledge the last batch, then wait for the next
       --timeout <secs>             Give up with {"status":"timeout"} after this long (default: wait for Send)
   human-review status <target>        Report whether feedback is waiting, without blocking
+  human-review notes open             Open the workspace notepad HUD
+  human-review notes add <text>       Capture a note without interrupting review
+  human-review notes list             Read saved notes (JSON)
+  human-review notes done <id>        Mark a processed note complete
+  human-review notes reopen <id>      Return a completed note to pending
+      --scope <workspace>          Override the current-directory notebook
   human-review setup                  Teach Claude Code / Codex how to use human-review
   human-review setup --global         ...for every project, not just this one
 
@@ -291,6 +297,68 @@ async function statusCommand(input) {
   process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
+// --------------------------------------------------------------- notepad CLI
+
+function parseNotesArgs(args) {
+  const action = args[0] || "open";
+  const values = [];
+  let scope = path.resolve(process.cwd());
+  for (let index = 1; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--scope") {
+      const value = args[++index];
+      if (!value || value.startsWith("--")) throw new Error("--scope requires a value.");
+      scope = value;
+    } else if (arg.startsWith("--")) {
+      throw new Error(`Unknown notes option: ${arg}`);
+    } else {
+      values.push(arg);
+    }
+  }
+  if (!["open", "add", "list", "done", "reopen"].includes(action)) {
+    throw new Error(`Unknown notes command: ${action}`);
+  }
+  if (action === "add" && values.length !== 1) throw new Error("Usage: human-review notes add <text> [--scope <workspace>]");
+  if (["done", "reopen"].includes(action) && values.length !== 1) {
+    throw new Error(`Usage: human-review notes ${action} <id> [--scope <workspace>]`);
+  }
+  if (["open", "list"].includes(action) && values.length) throw new Error(`Unexpected notes argument: ${values[0]}`);
+  return { action, scope, value: values[0] };
+}
+
+async function notesCommand(args) {
+  const { action, scope, value } = parseNotesArgs(args);
+  const server = await ensureServer();
+  const base = `/api/notepad?scope=${encodeURIComponent(scope)}`;
+  let method = "GET";
+  let route = base;
+  let body;
+  if (action === "open") route = `/api/notepad/open?scope=${encodeURIComponent(scope)}`;
+  else if (action === "add") {
+    method = "POST";
+    body = { text: value, author: "agent" };
+  } else if (action === "done" || action === "reopen") {
+    method = "PATCH";
+    route = `/api/notepad/${encodeURIComponent(value)}?scope=${encodeURIComponent(scope)}`;
+    body = { status: action === "done" ? "done" : "pending" };
+  }
+  const result = await request(server, {
+    method, path: route,
+    ...(body ? { headers: { "content-type": "application/json" } } : {}),
+  }, body);
+  let payload;
+  try { payload = JSON.parse(result.raw); }
+  catch { throw new Error(`Notepad server returned HTTP ${result.status}.`); }
+  if (result.status < 200 || result.status >= 300) throw new Error(payload.error || `Notepad request failed (${result.status}).`);
+  if (action === "open") {
+    const url = `http://127.0.0.1:${server.port}${payload.path}`;
+    openBrowser(url);
+    process.stdout.write(`Notepad: ${url}\n`);
+  } else {
+    process.stdout.write(JSON.stringify(action === "list" ? payload.notes : payload.note, null, 2) + "\n");
+  }
+}
+
 // ---------------------------------------------------------------------- main
 
 const argv = process.argv.slice(2);
@@ -333,7 +401,9 @@ function parsePollArgs(rest) {
 }
 
 try {
-  if (argv[0] === "poll") {
+  if (argv[0] === "notes") {
+    await notesCommand(argv.slice(1));
+  } else if (argv[0] === "poll") {
     const { file, ack, timeoutSecs } = parsePollArgs(argv.slice(1));
     if (!file) throw new Error("Usage: human-review poll <file-or-localhost-url> [--ack] [--timeout <secs>]");
     await pollCommand(file, { ack, timeoutSecs });

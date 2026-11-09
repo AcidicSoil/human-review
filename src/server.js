@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { atomicWrite, Store, resolveAsset } from "./state.js";
+import { createNotepadRoute } from "./notepad/routes.js";
 import { injectSdk, stripSdk } from "./html-transform.js";
 import { isMarkdown, renderMarkdownPage } from "./markdown.js";
 import { canonicalTarget, ensureStateDir, localUrl, SERVER_PROTOCOL, serverPath, stateDir, targetKey } from "./paths.js";
@@ -181,6 +182,7 @@ export function createServer() {
   );
   /** Unguessable path segment for the artifact route, which the iframe cannot send a header to. */
   const viewToken = crypto.randomBytes(8).toString("hex");
+  const notepadRoute = createNotepadRoute({ token, viewToken });
   /** The localhost page most recently served, for proxying its app's own requests. */
   let lastUrlPageKey = null;
   const watched = new Map(); // key -> { file }
@@ -735,6 +737,8 @@ export function createServer() {
     "/frame-policy.js": ["frame-policy.js", CORS],
     "/click-target.js": ["click-target.js", CORS],
     "/serialize.js": ["serialize.js", CORS],
+    "/notepad.js": ["notepad/client.js", null],
+    "/notepad.css": ["notepad/style.css", null],
   };
 
   /**
@@ -812,6 +816,9 @@ export function createServer() {
 
       // --- static chrome assets
       if (STATIC[route]) return serveFile(res, path.join(here, STATIC[route][0]), STATIC[route][1] || undefined);
+
+      // Notepad runs independently of review feedback and long-poll state.
+      if (await notepadRoute({ req, res, url, json, readBody })) return;
 
       // --- open a browser session for a file or localhost URL
       if (route === "/api/session" && req.method === "POST") {
@@ -1396,7 +1403,7 @@ export function createServer() {
     server.close();
   };
 
-  return { server, store, token, dispose };
+  return { server, store, token, viewToken, dispose };
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1513,7 +1520,7 @@ export async function start(port = 0) {
     err.code = "EALREADY";
     throw err;
   }
-  const { server, store, token, dispose } = createServer();
+  const { server, store, token, viewToken, dispose } = createServer();
   return new Promise((resolve, reject) => {
     // Without this, a busy HUMAN_REVIEW_PORT dies as an uncaught exception.
     server.once("error", (err) => {
@@ -1529,7 +1536,7 @@ export async function start(port = 0) {
       } catch {
         // Windows has no meaningful chmod; the state dir mode covers it.
       }
-      resolve({ server, store, port: actual, token, dispose });
+      resolve({ server, store, port: actual, token, viewToken, dispose });
     });
   });
 }

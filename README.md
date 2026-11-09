@@ -73,6 +73,38 @@ The plugin exposes three focused entry skills:
 
 The existing `human-review` skill remains as a backwards-compatible umbrella and shared runtime support.
 
+## Notepad HUD — capture now, revisit later
+
+The Notepad HUD is a compact, workspace-scoped notebook for the user and agent.
+It uses Human Review's authenticated local server, but **does not** enter the
+blocking review Send/Poll workflow. Capturing a note saves it immediately;
+nothing is executed, scheduled, or sent to the agent automatically.
+
+```sh
+human-review notes open
+human-review notes add "Investigate the cache policy later"
+human-review notes list
+human-review notes done <note-id>
+human-review notes reopen <note-id>
+```
+
+Run these from the same workspace to share one notebook. Use
+`--scope <workspace>` consistently to choose a different notebook.
+The HUD can pop out into a compact browser window; leave it alongside your
+conversation. User changes appear in the HUD immediately, and agent additions
+appear on its next refresh.
+
+**To process notes:** tell the agent which pending notes to handle. The agent
+runs `human-review notes list`, performs only the work you requested, and
+marks completed entries with `human-review notes done <note-id>`.
+Notes are **not** executable instructions by themselves. The local notebook
+is stored separately at `~/.human-review/notepad.json` (or inside
+`HUMAN_REVIEW_STATE_DIR` when configured). Notes do not expire with review
+sessions. This MVP is a local browser window, not an overlay injected directly
+into a chat product.
+
+![Compact Notepad HUD](design-ref/notepad-hud.png)
+
 ## Ordinary HTML, Markdown, and localhost review
 
 Open an HTML or Markdown file:

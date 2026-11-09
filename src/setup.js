@@ -125,6 +125,15 @@ in one line. \`{"status":"superseded"}\` means a newer poll of yours owns the
 wait; stop this one silently. \`npx -y human-review status <target>\` reports
 instantly whether feedback is already waiting, without blocking.
 
+For non-blocking capture during a task, use
+\`npx -y human-review notes add "note text"\` or open the local HUD with
+\`npx -y human-review notes open\`. The notes are scoped to the current
+working directory unless \`--scope <workspace>\` is supplied. Never process
+notes automatically: only run \`npx -y human-review notes list\` when the
+user explicitly requests action, then complete the selected notes after the
+work is verified with \`notes done <id>\`. The notepad does not affect review
+Send/Poll or the current task.
+
 For large plans, specs, or PRDs, generate an offline editable artifact with
 \`__PLAN__ <source> <output.review.html>\`. For structured Lists of Actions and
 plugin/skill catalogs, use \`__LOA__ <input.json> <output.loa.review.html>\`.
