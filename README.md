@@ -105,6 +105,8 @@ into a chat product.
 
 ![Compact Notepad HUD](design-ref/notepad-hud.png)
 
+[Editable Notepad HUD frame in FigCraft](design-ref/human-review-ui-concepts.figcraft) · [FigCraft rendering](design-ref/notepad-hud.figcraft.png)
+
 ## Ordinary HTML, Markdown, and localhost review
 
 Open an HTML or Markdown file:
