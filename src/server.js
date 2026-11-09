@@ -1452,6 +1452,20 @@ let holdsLock = false;
  */
 async function claimServerSlot() {
   ensureStateDir();
+  // A live older server still owns the lock. Verify its PID and protocol
+  // before asking it to exit, then acquire the released lock normally.
+  // Attempting replacement only after acquiring the lock is unreachable.
+  const existing = readServerRecord();
+  if (existing?.pid && existing.protocol < SERVER_PROTOCOL) {
+    const health = await probeHealth(existing.port);
+    if (health?.pid === existing.pid && health.protocol === existing.protocol) {
+      try {
+        process.kill(existing.pid, "SIGTERM");
+      } catch {}
+      for (let i = 0; i < 30 && pidAlive(existing.pid); i += 1) await sleep(100);
+    }
+  }
+
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       fs.writeFileSync(lockPath(), String(process.pid), { flag: "wx" });
