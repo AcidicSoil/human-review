@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { openBrowser } from "../browser-open.js";
 import { fileURLToPath } from "node:url";
 import { REVIEW_HOST_SOURCE } from "../review-host.js";
 
@@ -140,13 +140,6 @@ export async function generateReviewArtifact(inputFile, outputFile) {
   return { output, editor };
 }
 
-function openArtifact(file) {
-  const detached = { detached: true, stdio: "ignore" };
-  if (process.platform === "darwin") return spawn("open", [file], detached).unref();
-  if (process.platform === "win32") return spawn("cmd", ["/c", "start", "", file], { ...detached, windowsHide: true }).unref();
-  return spawn("xdg-open", [file], detached).unref();
-}
-
 export async function runCli(argv = process.argv.slice(2)) {
   const noOpen = argv.includes("--no-open");
   const clean = argv.filter((arg) => arg !== "--no-open");
@@ -156,6 +149,6 @@ export async function runCli(argv = process.argv.slice(2)) {
   }
   const result = await generateReviewArtifact(clean[0], clean[1]);
   console.log(result.output);
-  if (!noOpen) { try { openArtifact(result.output); } catch {} }
+  if (!noOpen) openBrowser(result.output);
   return 0;
 }

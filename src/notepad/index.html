@@ -12,11 +12,20 @@
       <span class="symbol" aria-hidden="true">✎</span>
       <div class="identity">
         <h1>Notepad</h1>
-        <p id="workspace" class="workspace"></p>
+        <label class="sr-only" for="project-notebooks">Project notebook</label>
+        <select id="project-notebooks" class="project-picker" title="Switch project notebook"></select>
       </div>
       <span id="count" class="count" aria-label="Pending notes">0</span>
+      <button id="delete-notebook" class="project-delete" type="button" title="Delete project notebook" aria-label="Delete selected project notebook">Delete</button>
       <button id="popout" class="popout" type="button" title="Open compact window" aria-label="Open compact notepad window">↗</button>
     </header>
+    <div id="notebook-delete-confirm" class="project-confirm" hidden>
+      <p>Delete all notes and handoffs for <strong id="notebook-delete-name"></strong>? This cannot be undone.</p>
+      <div class="project-confirm-actions">
+        <button id="cancel-delete-notebook" class="status" type="button">Cancel</button>
+        <button id="confirm-delete-notebook" class="status delete confirm" type="button">Delete notebook</button>
+      </div>
+    </div>
 
     <form id="capture" class="capture">
       <label class="sr-only" for="note-text">New note</label>

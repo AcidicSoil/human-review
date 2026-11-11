@@ -176,13 +176,20 @@ human-review notes poll --timeout 30                    # optional listener; sep
 human-review notes ack <handoff-id>                     # acknowledge receipt, not completion
 ```
 
-The default notebook is scoped to the command's working directory; pass
-`--scope <workspace>` on every command if the user chooses a named scope.
+The default notebook is scoped to the Git repository root, including when
+invoked from a subdirectory. Outside Git, the current directory is the scope.
+`HUMAN_REVIEW_DEFAULT_SCOPE` selects a fixed default; explicit
+`--scope <workspace>` takes precedence on individual commands.
 Run `notes open` at session start without creating duplicate windows: when a
 window is registered for that workspace, the CLI requests focus rather than
 launching another. A different workspace opens separately. Browser/OS focus
 restrictions may require the user to foreground the existing window manually.
-The HUD persists notes and refreshes while visible. Selecting notes and
+The HUD persists notes and refreshes while visible. Its project selector
+switches between saved notebook scopes in the same window, retaining drafts.
+Only on explicit user request, the adjacent Delete button can remove one
+project's entire notebook, including notes and handoffs, after confirmation;
+it never deletes project files. An agent waiting on that notebook receives
+`{"status":"deleted"}` and stops waiting. Selecting notes and
 pressing **Send to agent** creates a durable notification on the separate note
 channel. `notes inbox` retrieves these handoffs without blocking; `notes poll`
 can wait for them when the user requests a listener, without affecting the

@@ -1,7 +1,11 @@
-const scope = new URL(location.href).searchParams.get("scope") || "";
+let scope = new URL(location.href).searchParams.get("scope") || "";
 const token = document.body.dataset.token;
-const endpoint = `/api/notepad?scope=${encodeURIComponent(scope)}`;
+const endpoint = () => `/api/notepad?scope=${encodeURIComponent(scope)}`;
 
+const projectPicker = document.getElementById("project-notebooks");
+const deleteNotebook = document.getElementById("delete-notebook");
+const notebookConfirm = document.getElementById("notebook-delete-confirm");
+const confirmNotebookDeletion = document.getElementById("confirm-delete-notebook");
 const list = document.getElementById("notes");
 const input = document.getElementById("note-text");
 const form = document.getElementById("capture");
@@ -11,9 +15,6 @@ const sendButton = document.getElementById("send-to-agent");
 const selectedCount = document.getElementById("selected-count");
 const filters = [...document.querySelectorAll("[data-filter]")];
 
-const segments = scope.replace(/[\\/]+$/, "").split(/[\\/]/);
-document.getElementById("workspace").textContent = segments.at(-1) || scope;
-
 let notes = [];
 let filter = "pending";
 let updating = false;
@@ -21,6 +22,58 @@ let confirmingDeleteId = null;
 let handoffs = [];
 let selectedIds = new Set();
 let sending = false;
+let projects = [];
+let confirmingNotebookDelete = false;
+let deletingNotebook = false;
+let windowConnection;
+const drafts = new Map();
+
+function notebookName(value) {
+  return value.replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) || value;
+}
+
+function renderProjects() {
+  const options = [...new Set([scope, ...projects])].sort((a, b) => a.localeCompare(b));
+  const installed = [...projectPicker.options].map(option => option.value);
+  if (installed.length !== options.length || installed.some((value, index) => value !== options[index])) {
+    const names = options.map(notebookName);
+    projectPicker.replaceChildren();
+    for (const [index, value] of options.entries()) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = names.indexOf(names[index]) !== names.lastIndexOf(names[index])
+        ? names[index] + " — " + value : names[index];
+      option.title = value;
+      projectPicker.append(option);
+    }
+  }
+  projectPicker.value = scope;
+  projectPicker.title = scope;
+  projectPicker.disabled = deletingNotebook;
+  deleteNotebook.disabled = deletingNotebook || !projects.includes(scope);
+  notebookConfirm.hidden = !confirmingNotebookDelete;
+  document.getElementById("notebook-delete-name").textContent = scope;
+}
+
+function switchScope(next) {
+  if (!next || next === scope) return;
+  drafts.set(scope, input.value);
+  scope = next;
+  input.value = drafts.get(next) || "";
+  notes = [];
+  handoffs = [];
+  selectedIds.clear();
+  confirmingDeleteId = null;
+  confirmingNotebookDelete = false;
+  filter = "pending";
+  const url = new URL(location.href);
+  url.searchParams.set("scope", scope);
+  history.replaceState(null, "", url);
+  render();
+  renderProjects();
+  startObserving();
+  void refresh();
+}
 
 function updateSelection() {
   const count = selectedIds.size;
@@ -45,6 +98,7 @@ async function request(method, path, body) {
 }
 
 function render() {
+  const viewedScope = scope;
   const pending = notes.filter(note => note.status === "pending");
   document.getElementById("count").textContent = String(pending.length);
   for (const item of filters) {
@@ -111,6 +165,7 @@ function render() {
         confirm.disabled = true;
         try {
           const result = await request("DELETE", notePath);
+          if (scope !== viewedScope) return;
           notes = notes.filter(item => item.id !== result.deletedId);
           confirmingDeleteId = null;
           render();
@@ -134,6 +189,7 @@ function render() {
           const result = await request("PATCH", notePath, {
             status: isDone ? "pending" : "done",
           });
+          if (scope !== viewedScope) return;
           notes = notes.map(item => item.id === note.id ? result.note : item);
           render();
           message.textContent = "Saved";
@@ -161,27 +217,37 @@ function render() {
 async function refresh() {
   if (updating) return;
   updating = true;
+  const viewedScope = scope;
   try {
-    const result = await request("GET", endpoint);
+    const [result, available] = await Promise.all([
+      request("GET", endpoint()),
+      request("GET", "/api/notepad/scopes"),
+    ]);
+    if (scope !== viewedScope) return;
     notes = result.notes;
     handoffs = result.handoffs || [];
+    projects = available.scopes || [];
     render();
+    renderProjects();
     message.textContent = "Saved locally";
   } catch (error) {
-    message.textContent = error.message;
+    if (scope === viewedScope) message.textContent = error.message;
   } finally {
     updating = false;
+    if (scope !== viewedScope) void refresh();
   }
 }
 
 sendButton.addEventListener("click", async () => {
   if (!selectedIds.size || sending) return;
+  const viewedScope = scope;
   sending = true;
   updateSelection();
   try {
-    const result = await request("POST", "/api/notepad/send?scope=" + encodeURIComponent(scope), {
+    const result = await request("POST", "/api/notepad/send?scope=" + encodeURIComponent(viewedScope), {
       noteIds: [...selectedIds],
     });
+    if (scope !== viewedScope) return;
     handoffs.push(result.handoff);
     selectedIds.clear();
     render();
@@ -196,11 +262,13 @@ sendButton.addEventListener("click", async () => {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const viewedScope = scope;
   const text = input.value.trim();
   if (!text) return;
   addButton.disabled = true;
   try {
-    const result = await request("POST", endpoint, { text, author: "user" });
+    const result = await request("POST", endpoint(), { text, author: "user" });
+    if (scope !== viewedScope) return;
     notes.push(result.note);
     input.value = "";
     filter = "pending";
@@ -225,6 +293,52 @@ for (const item of filters) item.addEventListener("click", () => {
   render();
 });
 
+projectPicker.addEventListener("change", () => switchScope(projectPicker.value));
+
+deleteNotebook.addEventListener("click", () => {
+  confirmingNotebookDelete = true;
+  renderProjects();
+  confirmNotebookDeletion.focus();
+});
+
+document.getElementById("cancel-delete-notebook").addEventListener("click", () => {
+  confirmingNotebookDelete = false;
+  renderProjects();
+  deleteNotebook.focus();
+});
+
+confirmNotebookDeletion.addEventListener("click", async () => {
+  if (!confirmingNotebookDelete || deletingNotebook) return;
+  const removedScope = scope;
+  deletingNotebook = true;
+  renderProjects();
+  try {
+    await request("DELETE", "/api/notepad/scope?scope=" + encodeURIComponent(removedScope));
+    drafts.delete(removedScope);
+    input.value = "";
+    projects = projects.filter(item => item !== removedScope);
+    confirmingNotebookDelete = false;
+    notes = [];
+    handoffs = [];
+    selectedIds.clear();
+    confirmingDeleteId = null;
+    const next = projects[0];
+    if (next) switchScope(next);
+    else {
+      input.value = "";
+      render();
+      renderProjects();
+      void refresh();
+    }
+    message.textContent = "Project notebook deleted";
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    deletingNotebook = false;
+    renderProjects();
+  }
+});
+
 document.getElementById("popout").addEventListener("click", () => {
   const windowName = "human-review-notepad:" + encodeURIComponent(scope);
   const popup = window.open(location.href, windowName, "popup,width=440,height=740,resizable=yes");
@@ -236,10 +350,10 @@ document.getElementById("popout").addEventListener("click", () => {
  * "notes open" requests focus through this connection instead of opening a
  * duplicate. The connection closes when the window closes.
  */
-async function observeWindow(signal) {
+async function observeWindow(viewedScope, signal) {
   while (!signal.aborted) {
     try {
-      const response = await fetch("/api/notepad/window/connect?scope=" + encodeURIComponent(scope), {
+      const response = await fetch("/api/notepad/window/connect?scope=" + encodeURIComponent(viewedScope), {
         headers: { "x-human-review-token": token },
         cache: "no-store",
         signal,
@@ -256,7 +370,7 @@ async function observeWindow(signal) {
         while ((index = pending.indexOf("\n")) !== -1) {
           const line = pending.slice(0, index).trim();
           pending = pending.slice(index + 1);
-          if (line && JSON.parse(line).event === "focus") window.focus();
+          if (!signal.aborted && line && JSON.parse(line).event === "focus") window.focus();
         }
       }
     } catch (error) {
@@ -266,12 +380,15 @@ async function observeWindow(signal) {
   }
 }
 
-if (typeof ReadableStream !== "undefined" && typeof TextDecoder !== "undefined") {
-  const connection = new AbortController();
-  window.addEventListener("pagehide", () => connection.abort(), { once: true });
-  void observeWindow(connection.signal);
+function startObserving() {
+  if (typeof ReadableStream === "undefined" || typeof TextDecoder === "undefined") return;
+  windowConnection?.abort();
+  windowConnection = new AbortController();
+  void observeWindow(scope, windowConnection.signal);
 }
 
+window.addEventListener("pagehide", () => windowConnection?.abort(), { once: true });
+startObserving();
 refresh();
 setInterval(() => {
   if (!document.hidden) refresh();

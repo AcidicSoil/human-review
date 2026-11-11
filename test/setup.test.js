@@ -31,6 +31,13 @@ test("global setup installs the skill and local planning runtime for every agent
       assert.equal(fs.existsSync(loaGenerator), true);
       assert.equal(fs.existsSync(loaClient), true);
       assert.equal(fs.existsSync(loaRunner), true);
+      for (const name of ["human-review", "ordinary-review", "planning-review", "loa-review", "host-workspace-operator"]) {
+        for (const relative of ["agents/openai.yaml", ...(name === "human-review" ? [] : ["SKILL.md"])]) {
+          const expected = fs.readFileSync(path.join(import.meta.dirname, "..", "skills", name, relative), "utf8");
+          const actual = fs.readFileSync(path.join(home, root, "skills", name, relative), "utf8");
+          assert.equal(actual, expected, `${root}/${name}/${relative} must be synchronized`);
+        }
+      }
 
       const installedSkill = fs.readFileSync(skill, "utf8");
       assert.match(installedSkill, /human-review poll/);
@@ -46,6 +53,32 @@ test("global setup installs the skill and local planning runtime for every agent
     assert.match(result.join("\n"), /Claude Code plan runtime/);
     assert.match(result.join("\n"), /Codex plan runtime/);
     assert.match(result.join("\n"), /Shared agents plan runtime/);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("setup refreshes linked Claude skills without replacing links", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-linked-"));
+  const names = ["human-review", "ordinary-review", "planning-review", "loa-review", "host-workspace-operator"];
+  try {
+    for (const name of names) {
+      const shared = path.join(home, ".agents", "skills", name);
+      const linked = path.join(home, ".claude", "skills", name);
+      fs.mkdirSync(shared, { recursive: true });
+      fs.mkdirSync(path.dirname(linked), { recursive: true });
+      fs.symlinkSync(path.relative(path.dirname(linked), shared), linked, "dir");
+    }
+    installSkills(home, { global: true, home });
+    for (const name of names) {
+      const linked = path.join(home, ".claude", "skills", name);
+      assert.equal(fs.lstatSync(linked).isSymbolicLink(), true, `${name} link must remain intact`);
+      assert.equal(fs.existsSync(path.join(linked, "SKILL.md")), true);
+    }
+    assert.equal(
+      fs.readFileSync(path.join(home, ".codex", "skills", "loa-review", "SKILL.md"), "utf8"),
+      fs.readFileSync(path.join(import.meta.dirname, "..", "skills", "loa-review", "SKILL.md"), "utf8"),
+    );
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
   }

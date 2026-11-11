@@ -71,6 +71,22 @@ export function createNotepadRoute({ token, viewToken }) {
       return true;
     }
 
+    if (route === "/api/notepad/scopes" && req.method === "GET") {
+      json(res, 200, { scopes: notepad().listScopes() });
+      return true;
+    }
+
+    if (route === "/api/notepad/scope" && req.method === "DELETE") {
+      try {
+        const removed = notepad().deleteScope(scope);
+        json(res, removed ? 200 : 404, removed || { error: "Unknown notebook." });
+        if (removed) finish(scope, { status: "deleted" }, json);
+      } catch (error) {
+        badInput(error, res, json);
+      }
+      return true;
+    }
+
     if (route === "/api/notepad" && req.method === "GET") {
       try {
         json(res, 200, { notes: notepad().list(scope), handoffs: notepad().outbox(scope) });

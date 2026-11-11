@@ -52,16 +52,48 @@ export function shellQuote(arg) {
 
 export const readSkill = () => fs.readFileSync(path.join(here, "SKILL.md"), "utf8");
 
+const skillsRoot = path.join(here, "..", "skills");
+
+function copySkillFiles(source, destination) {
+  fs.mkdirSync(destination, { recursive: true });
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      copySkillFiles(path.join(source, entry.name), path.join(destination, entry.name));
+    } else if (entry.isFile()) {
+      fs.copyFileSync(path.join(source, entry.name), path.join(destination, entry.name));
+    }
+  }
+}
+
+function installFocusedSkills(base) {
+  const installed = [];
+  for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name === "human-review") continue;
+    const source = path.join(skillsRoot, entry.name);
+    if (!fs.existsSync(path.join(source, "SKILL.md"))) continue;
+    copySkillFiles(source, path.join(base, "skills", entry.name));
+    installed.push(entry.name);
+  }
+  return installed;
+}
+
 function installReviewHostRuntime(skillDir) {
   fs.copyFileSync(path.join(here, "review-host.js"), path.join(skillDir, "review-host.mjs"));
+  fs.copyFileSync(path.join(here, "browser-open.js"), path.join(skillDir, "browser-open.mjs"));
+}
+
+function bundleSharedImports(source) {
+  return source
+    .replaceAll('from "../review-host.js"', 'from "./review-host.mjs"')
+    .replaceAll('from "../browser-open.js"', 'from "./browser-open.mjs"');
 }
 
 export function installPlanRuntime(skillDir) {
   fs.mkdirSync(skillDir, { recursive: true });
 
   installReviewHostRuntime(skillDir);
-  fs.writeFileSync(path.join(skillDir, "generator.mjs"), fs.readFileSync(path.join(plateHere, "generator.js"), "utf8")
-    .replaceAll('from "../review-host.js"', 'from "./review-host.mjs"'));
+  fs.writeFileSync(path.join(skillDir, "generator.mjs"),
+    bundleSharedImports(fs.readFileSync(path.join(plateHere, "generator.js"), "utf8")));
   fs.copyFileSync(path.join(plateHere, "fallback-client.js"), path.join(skillDir, "fallback-client.js"));
   fs.copyFileSync(path.join(plateHere, "artifact-tools.js"), path.join(skillDir, "artifact-tools.js"));
 
@@ -79,11 +111,10 @@ export function installPlanRuntime(skillDir) {
 export function installLoaRuntime(skillDir) {
   fs.mkdirSync(skillDir, { recursive: true });
   installReviewHostRuntime(skillDir);
-  const generator = fs.readFileSync(path.join(loaHere, "generator.js"), "utf8")
+  const generator = bundleSharedImports(fs.readFileSync(path.join(loaHere, "generator.js"), "utf8")
     .replaceAll("from \"./runtime.js\"", "from \"./loa-client.js\"")
     .replaceAll("from \"./catalog.js\"", "from \"./codex-catalog.mjs\"")
-    .replaceAll("from \"./resource-manifest.js\"", "from \"./resource-manifest.mjs\"")
-    .replaceAll('from "../review-host.js"', 'from "./review-host.mjs"');
+    .replaceAll("from \"./resource-manifest.js\"", "from \"./resource-manifest.mjs\""));
   fs.writeFileSync(path.join(skillDir, "loa-generator.mjs"), generator);
   fs.copyFileSync(path.join(loaHere, "runtime.js"), path.join(skillDir, "loa-client.js"));
   fs.copyFileSync(path.join(loaHere, "catalog.js"), path.join(skillDir, "codex-catalog.mjs"));
@@ -127,10 +158,13 @@ instantly whether feedback is already waiting, without blocking.
 
 For non-blocking capture during a task, use
 \`npx -y human-review notes add "note text"\` or open the local HUD with
-\`npx -y human-review notes open\`. The notes are scoped to the current
-working directory unless \`--scope <workspace>\` is supplied.
+\`npx -y human-review notes open\`. Notes default to the Git repository root,
+or the current directory outside Git. \`HUMAN_REVIEW_DEFAULT_SCOPE\` selects a
+fixed default, and \`--scope <workspace>\` overrides it for one command.
 At session start, \`notes open\` reuses an already-open workspace window and
-requests focus instead of spawning duplicates. Never process notes
+requests focus instead of spawning duplicates. The HUD project dropdown
+switches saved notebooks in one window. Deleting a complete notebook requires
+explicit user confirmation and never touches project files. Never process notes
 automatically: only run \`npx -y human-review notes list\` when the
 user explicitly requests action, then complete the selected notes after the
 work is verified with \`notes done <id>\`. Only when the user explicitly requests
@@ -217,7 +251,10 @@ export function installSkills(cwd, { global: isGlobal = false, home = os.homedir
     if (!projectPlanCmd) projectPlanCmd = planCmd;
     if (!projectLoaCmd) projectLoaCmd = loaCmd;
     fs.writeFileSync(skillFile, skillFor(cmd, planCmd, loaCmd));
+    copySkillFiles(path.join(skillsRoot, "human-review", "agents"), path.join(skillDir, "agents"));
+    const focused = installFocusedSkills(base);
     done.push(`${agent} skill  ${skillFile}${isGlobal ? "   (all projects)" : ""}`);
+    done.push(`${agent} focused skills  ${focused.join(", ")}`);
     done.push(`${agent} plan runtime  ${runnerFile}`);
     done.push(`${agent} LOA runtime  ${loaRunnerFile}`);
   }

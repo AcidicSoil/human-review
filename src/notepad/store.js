@@ -39,6 +39,23 @@ export class NotepadStore {
     return [...(this.scopes[validScope(scope)] || [])];
   }
 
+  listScopes() {
+    return [...new Set([...Object.keys(this.scopes), ...Object.keys(this.handoffs)])]
+      .filter(scope => this.scopes[scope]?.length || this.handoffs[scope]?.length)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
+  deleteScope(scope) {
+    validScope(scope);
+    const notesDeleted = this.scopes[scope]?.length || 0;
+    const handoffsDeleted = this.handoffs[scope]?.length || 0;
+    if (!notesDeleted && !handoffsDeleted) return null;
+    delete this.scopes[scope];
+    delete this.handoffs[scope];
+    this.save();
+    return { scope, notesDeleted, handoffsDeleted };
+  }
+
   add(scope, text, author = "user") {
     validScope(scope);
     if (typeof text !== "string" || !text.trim()) throw new TypeError("Note text cannot be empty.");

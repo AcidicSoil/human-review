@@ -68,7 +68,7 @@ function cli(...args) {
     const child=spawn(process.execPath,["src/cli.js","notes",...args],{
       cwd:root,
       env:{...process.env,PATH:directory+"/bin:"+process.env.PATH,
-        OPEN_LOG:directory+"/open.log"},
+        BROWSER:directory+"/bin/browser-stub", OPEN_LOG:directory+"/open.log"},
     });
     let output="", errors="";
     child.stdout.on("data",chunk=>output+=chunk);
@@ -103,7 +103,7 @@ test("notes open launches only once per scope and reuses an active window", asyn
   t.after(()=>server.dispose());
   const bin=path.join(directory,"bin");
   fs.mkdirSync(bin,{recursive:true});
-  const opener=path.join(bin,"xdg-open");
+  const opener=path.join(bin,"browser-stub");
   fs.writeFileSync(opener,'#!/bin/sh\nprintf "open\\n" >> "$OPEN_LOG"\n');
   fs.chmodSync(opener,0o755);
   const scope=path.join(directory,"workspace-one");

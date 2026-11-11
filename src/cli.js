@@ -6,6 +6,8 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { canonicalTarget, ensureStateDir, SERVER_PROTOCOL, serverPath, statePath, targetKey } from "./paths.js";
 import { installSkills, shellQuote } from "./setup.js";
+import { resolveNotesScope } from "./notepad/scope.js";
+import { openBrowser } from "./browser-open.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(fs.readFileSync(path.join(here, "..", "package.json"), "utf8"));
@@ -27,7 +29,8 @@ const HELP = `human-review ${pkg.version}
   human-review notes poll             Wait for a sent handoff (opt-in)
       --timeout <secs>              Limit handoff polling duration
   human-review notes ack <id>         Acknowledge receipt, without executing notes
-      --scope <workspace>          Override the current-directory notebook
+      --scope <workspace>          Override the default notebook
+                                  Default: HUMAN_REVIEW_DEFAULT_SCOPE, Git root, then current directory
   human-review setup                  Teach Claude Code / Codex how to use human-review
   human-review setup --global         ...for every project, not just this one
 
@@ -99,16 +102,6 @@ async function ensureServer() {
     if (record?.protocol === SERVER_PROTOCOL && record.port && (await alive(record.port))) return record;
   }
   throw new Error("Could not start the local human-review server.");
-}
-
-function openBrowser(url) {
-  const command =
-    process.platform === "darwin" ? ["open", [url]] : process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : ["xdg-open", [url]];
-  const child = spawn(command[0], command[1], { detached: true, stdio: "ignore" });
-  // A missing opener (headless Linux without xdg-open) surfaces as an async
-  // 'error' event, not a throw. Printing the URL below is the fallback.
-  child.on("error", () => {});
-  child.unref();
 }
 
 // ------------------------------------------------------------------ commands
@@ -307,14 +300,14 @@ async function statusCommand(input) {
 function parseNotesArgs(args) {
   const action = args[0] || "open";
   const values = [];
-  let scope = path.resolve(process.cwd());
+  let explicitScope;
   let timeoutSecs = null;
   for (let index = 1; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--scope") {
       const value = args[++index];
       if (!value || value.startsWith("--")) throw new Error("--scope requires a value.");
-      scope = value;
+      explicitScope = value;
     } else if (arg === "--timeout") {
       timeoutSecs = Number(args[++index]);
     } else if (arg.startsWith("--")) {
@@ -336,7 +329,7 @@ function parseNotesArgs(args) {
   if (timeoutSecs !== null && (action !== "poll" || !Number.isFinite(timeoutSecs) || timeoutSecs <= 0)) {
     throw new Error("--timeout requires a positive number and is only available with notes poll.");
   }
-  return { action, scope, value: values[0], timeoutSecs };
+  return { action, scope: resolveNotesScope({ explicitScope }), value: values[0], timeoutSecs };
 }
 
 /** The agent opts into listening. No incoming handoff automatically starts a task. */
@@ -356,7 +349,7 @@ async function pollNotes(scope, timeoutSecs) {
         return;
       }
       if (data.status === "timeout") continue;
-      if (data.status === "superseded") {
+      if (data.status === "superseded" || data.status === "deleted") {
         await writeStdout(JSON.stringify(data, null, 2) + "\n");
         return;
       }

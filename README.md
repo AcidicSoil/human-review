@@ -32,7 +32,15 @@ You can also install it with `npx`:
 npx -y human-review setup --global
 ```
 
-Setup installs the planning-artifact runtime **inside each Human Review skill directory**, not just `SKILL.md`. That local runtime includes the generator, artifact navigation/export tools, a built-in editor fallback, and the prebuilt Plate browser bundle when the package was built normally. Agents therefore do not need to download Plate/React/esbuild later just to create a planning artifact.
+Setup synchronizes **all five Human Review skills** (Human Review, Ordinary Review,
+Planning Review, LOA Review, and Host Workspace Operator) into Claude Code, Codex,
+and shared agents when run with `--global`. It preserves existing skill-directory
+symlinks and unrelated files, and refreshes each skill's agent metadata. The
+umbrella Human Review skill also installs the planning/LOA runtimes **inside its
+skill directory**, not just `SKILL.md`. That local runtime includes the generator,
+artifact navigation/export tools, a built-in editor fallback, and the prebuilt
+Plate browser bundle when the package was built normally. Agents therefore do not
+need to download Plate/React/esbuild later to create a planning artifact.
 
 ### ChatGPT/Codex plugin
 
@@ -94,8 +102,12 @@ human-review notes poll --timeout 30
 human-review notes ack <handoff-id>
 ```
 
-Run these from the same workspace to share one notebook. Use
-`--scope <workspace>` consistently to choose a different notebook.
+By default, commands run within a Git checkout share one notebook keyed by the
+repository root, even when invoked from subdirectories. Outside a Git checkout,
+the current working directory is the scope. Set `HUMAN_REVIEW_DEFAULT_SCOPE` to
+use a fixed notebook, or pass `--scope <workspace>` to override it for one command.
+Precedence is explicit `--scope`, environment default, Git root, then current
+directory. Use the same scope for every command that should share a notebook.
 The HUD can pop out into a compact browser window; leave it alongside your
 conversation. Repeating `notes open` **reuses the live window for that
 workspace** instead of opening duplicates. It requests focus on that window
@@ -103,6 +115,21 @@ workspace** instead of opening duplicates. It requests focus on that window
 A different workspace gets its own window. Closing a window releases its
 registration; simultaneous agent launches reserve one opening for 20 seconds.
 User changes appear immediately; agent additions appear on the next refresh.
+The project selector lists notebooks with saved notes or handoffs, including
+projects with the same folder name (shown with their paths). Switching changes
+the notebook inside the same window, preserves unsaved drafts for each project,
+and reconnects agent focus tracking. **Delete** beside the selector removes the
+selected project's entire notebook—notes and sent handoffs—only after a second
+confirmation; it does not delete files in that project. An active handoff poll
+for a deleted notebook receives `{"status":"deleted"}`.
+
+Human Review opens the HUD, ordinary pages, and generated Planning/LOA artifacts
+with the executable configured in `BROWSER` (for example, `BROWSER=wslview` on
+WSL). Without it, the platform's default opener is used. This avoids launching
+Codex through an unrelated system URL association; explicitly select Codex as
+your browser only if that is what you intend. LOA plugin catalog discovery is
+separate and still uses the Codex CLI only when no catalog or resource source
+is supplied.
 
 **Send to agent:** Check the notes you want the agent to see, then select
 **Send to agent**. That creates one durable handoff containing only those notes.
