@@ -118,7 +118,11 @@ User changes appear immediately; agent additions appear on the next refresh.
 The project selector lists notebooks with saved notes or handoffs, including
 projects with the same folder name (shown with their paths). Switching changes
 the notebook inside the same window, preserves unsaved drafts for each project,
-and reconnects agent focus tracking. **Delete** beside the selector removes the
+and reconnects agent focus tracking. To move notes, select one or more using
+their checkboxes, choose **Move**, select an existing destination notebook, and
+confirm **Move here**. Notes retain identity, status, author, and timestamps.
+Previously sent handoffs remain with their original project; moving a note
+does not send another handoff or act on it. **Delete** beside the selector removes the
 selected project's entire notebook—notes and sent handoffs—only after a second
 confirmation; it does not delete files in that project. An active handoff poll
 for a deleted notebook receives `{"status":"deleted"}`.

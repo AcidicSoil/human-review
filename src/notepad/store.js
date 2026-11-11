@@ -7,6 +7,7 @@ import { ensureStateDir, stateDir } from "../paths.js";
 const FILE = () => path.join(stateDir(), "notepad.json");
 const MAX_NOTE_LENGTH = 4000;
 const MAX_NOTES_PER_SCOPE = 1000;
+const MAX_SELECTED_NOTES = 100;
 
 function validScope(scope) {
   if (typeof scope !== "string" || !scope.trim() || scope.length > 512) {
@@ -99,11 +100,9 @@ export class NotepadStore {
     return removed;
   }
 
-  /** Only explicitly selected note IDs enter a handoff. Handoffs never execute notes. */
-  send(scope, noteIds) {
-    validScope(scope);
-    if (!Array.isArray(noteIds) || noteIds.length === 0 || noteIds.length > 100) {
-      throw new TypeError("Select between 1 and 100 notes to send.");
+  selectedNotes(scope, noteIds) {
+    if (!Array.isArray(noteIds) || noteIds.length === 0 || noteIds.length > MAX_SELECTED_NOTES) {
+      throw new TypeError("Select between 1 and 100 notes.");
     }
     if (noteIds.some(id => typeof id !== "string" || !id.trim())) {
       throw new TypeError("Each selected note ID must be a string.");
@@ -113,16 +112,38 @@ export class NotepadStore {
     }
     const available = new Map(this.list(scope).map(note => [note.id, note]));
     if (noteIds.some(id => !available.has(id))) throw new TypeError("Unknown selected note ID.");
+    return noteIds.map(id => available.get(id));
+  }
+
+  move(scope, destination, noteIds) {
+    validScope(scope);
+    validScope(destination);
+    if (scope === destination) throw new TypeError("Choose another project notebook.");
+    if (!this.listScopes().includes(destination)) throw new TypeError("Unknown destination notebook.");
+    const moved = this.selectedNotes(scope, noteIds);
+    const targetNotes = this.list(destination);
+    if (targetNotes.length + moved.length > MAX_NOTES_PER_SCOPE) {
+      throw new RangeError("Destination notebook is full (1000 notes per scope).");
+    }
+    const movedIds = new Set(noteIds);
+    this.scopes[scope] = this.list(scope).filter(note => !movedIds.has(note.id));
+    this.scopes[destination] = [...targetNotes, ...moved];
+    this.save();
+    return moved;
+  }
+
+  /** Only explicitly selected note IDs enter a handoff. Handoffs never execute notes. */
+  send(scope, noteIds) {
+    const selected = this.selectedNotes(scope, noteIds);
     const now = new Date().toISOString();
     const handoff = {
       id: crypto.randomUUID(),
       status: "pending",
       createdAt: now,
       acknowledgedAt: null,
-      notes: noteIds.map(id => {
-        const note = available.get(id);
-        return { id: note.id, text: note.text, author: note.author, createdAt: note.createdAt };
-      }),
+      notes: selected.map(note => ({
+        id: note.id, text: note.text, author: note.author, createdAt: note.createdAt,
+      })),
     };
     this.handoffs[scope] = [...this.outbox(scope), handoff];
     this.save();

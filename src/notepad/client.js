@@ -12,6 +12,10 @@ const form = document.getElementById("capture");
 const message = document.getElementById("message");
 const addButton = document.getElementById("add");
 const sendButton = document.getElementById("send-to-agent");
+const moveButton = document.getElementById("move-notes");
+const movePanel = document.getElementById("move-panel");
+const moveDestination = document.getElementById("move-destination");
+const confirmMove = document.getElementById("confirm-move");
 const selectedCount = document.getElementById("selected-count");
 const filters = [...document.querySelectorAll("[data-filter]")];
 
@@ -22,6 +26,8 @@ let confirmingDeleteId = null;
 let handoffs = [];
 let selectedIds = new Set();
 let sending = false;
+let moving = false;
+let movePanelOpen = false;
 let projects = [];
 let confirmingNotebookDelete = false;
 let deletingNotebook = false;
@@ -32,27 +38,45 @@ function notebookName(value) {
   return value.replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) || value;
 }
 
+function renderScopeOptions(select, values, placeholder = false) {
+  const options = placeholder ? ["", ...values] : values;
+  const installed = [...select.options].map(option => option.value);
+  if (installed.length === options.length && installed.every((value, index) => value === options[index])) return;
+  const names = values.map(notebookName);
+  const previous = select.value;
+  select.replaceChildren();
+  for (const value of options) {
+    const option = document.createElement("option");
+    option.value = value;
+    const name = notebookName(value);
+    option.textContent = !value ? "Choose project" :
+      names.indexOf(name) !== names.lastIndexOf(name) ? name + " — " + value : name;
+    option.title = value;
+    select.append(option);
+  }
+  select.value = options.includes(previous) ? previous : options[0] || "";
+}
+
+function renderMovePanel() {
+  const destinations = projects.filter(project => project !== scope);
+  renderScopeOptions(moveDestination, destinations, true);
+  movePanel.hidden = !movePanelOpen;
+  moveButton.disabled = !selectedIds.size || !destinations.length || sending || moving;
+  moveDestination.disabled = moving;
+  document.getElementById("cancel-move").disabled = moving;
+  confirmMove.disabled = !selectedIds.size || moving || sending || !destinations.includes(moveDestination.value);
+}
+
 function renderProjects() {
   const options = [...new Set([scope, ...projects])].sort((a, b) => a.localeCompare(b));
-  const installed = [...projectPicker.options].map(option => option.value);
-  if (installed.length !== options.length || installed.some((value, index) => value !== options[index])) {
-    const names = options.map(notebookName);
-    projectPicker.replaceChildren();
-    for (const [index, value] of options.entries()) {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = names.indexOf(names[index]) !== names.lastIndexOf(names[index])
-        ? names[index] + " — " + value : names[index];
-      option.title = value;
-      projectPicker.append(option);
-    }
-  }
+  renderScopeOptions(projectPicker, options);
   projectPicker.value = scope;
   projectPicker.title = scope;
-  projectPicker.disabled = deletingNotebook;
-  deleteNotebook.disabled = deletingNotebook || !projects.includes(scope);
+  projectPicker.disabled = deletingNotebook || moving;
+  deleteNotebook.disabled = deletingNotebook || moving || !projects.includes(scope);
   notebookConfirm.hidden = !confirmingNotebookDelete;
   document.getElementById("notebook-delete-name").textContent = scope;
+  renderMovePanel();
 }
 
 function switchScope(next) {
@@ -65,6 +89,7 @@ function switchScope(next) {
   selectedIds.clear();
   confirmingDeleteId = null;
   confirmingNotebookDelete = false;
+  movePanelOpen = false;
   filter = "pending";
   const url = new URL(location.href);
   url.searchParams.set("scope", scope);
@@ -77,9 +102,11 @@ function switchScope(next) {
 
 function updateSelection() {
   const count = selectedIds.size;
-  sendButton.disabled = !count || sending;
+  sendButton.disabled = !count || sending || moving;
   sendButton.textContent = count ? "Send to agent (" + count + ")" : "Send to agent";
-  selectedCount.textContent = count ? count + " selected" : "Select notes to share";
+  selectedCount.textContent = count ? count + " selected" : "Select notes";
+  if (!count) movePanelOpen = false;
+  renderMovePanel();
 }
 
 async function request(method, path, body) {
@@ -239,7 +266,7 @@ async function refresh() {
 }
 
 sendButton.addEventListener("click", async () => {
-  if (!selectedIds.size || sending) return;
+  if (!selectedIds.size || sending || moving) return;
   const viewedScope = scope;
   sending = true;
   updateSelection();
@@ -257,6 +284,51 @@ sendButton.addEventListener("click", async () => {
   } finally {
     sending = false;
     updateSelection();
+  }
+});
+
+moveButton.addEventListener("click", () => {
+  if (moveButton.disabled) return;
+  movePanelOpen = true;
+  renderMovePanel();
+  moveDestination.focus();
+});
+
+moveDestination.addEventListener("change", renderMovePanel);
+
+document.getElementById("cancel-move").addEventListener("click", () => {
+  movePanelOpen = false;
+  renderMovePanel();
+  moveButton.focus();
+});
+
+confirmMove.addEventListener("click", async () => {
+  const destination = moveDestination.value;
+  if (moving || sending || confirmMove.disabled || destination === scope) return;
+  const origin = scope;
+  const noteIds = [...selectedIds];
+  moving = true;
+  updateSelection();
+  renderProjects();
+  try {
+    const result = await request("POST", "/api/notepad/move?scope=" + encodeURIComponent(origin), {
+      destination, noteIds,
+    });
+    if (scope !== origin) return;
+    const movedIds = new Set(result.moved.map(note => note.id));
+    notes = notes.filter(note => !movedIds.has(note.id));
+    selectedIds.clear();
+    movePanelOpen = false;
+    render();
+    await refresh();
+    message.textContent = result.moved.length + " note" + (result.moved.length === 1 ? "" : "s") +
+      " moved to " + notebookName(destination);
+  } catch (error) {
+    if (scope === origin) message.textContent = error.message;
+  } finally {
+    moving = false;
+    updateSelection();
+    renderProjects();
   }
 });
 

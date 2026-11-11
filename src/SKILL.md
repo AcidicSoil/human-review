@@ -186,6 +186,10 @@ launching another. A different workspace opens separately. Browser/OS focus
 restrictions may require the user to foreground the existing window manually.
 The HUD persists notes and refreshes while visible. Its project selector
 switches between saved notebook scopes in the same window, retaining drafts.
+To move selected notes, check their boxes, press **Move**, choose an existing
+destination notebook, and confirm **Move here**. The operation preserves each
+note's status, author, ID and timestamps. Existing sent handoffs stay in the
+original notebook; moving notes does not notify or authorize an agent.
 Only on explicit user request, the adjacent Delete button can remove one
 project's entire notebook, including notes and handoffs, after confirmation;
 it never deletes project files. An agent waiting on that notebook receives
