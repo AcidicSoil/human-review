@@ -13,6 +13,7 @@ const message = document.getElementById("message");
 const addButton = document.getElementById("add");
 const sendButton = document.getElementById("send-to-agent");
 const moveButton = document.getElementById("move-notes");
+const moveAllButton = document.getElementById("move-all-notes");
 const movePanel = document.getElementById("move-panel");
 const moveDestination = document.getElementById("move-destination");
 const confirmMove = document.getElementById("confirm-move");
@@ -27,7 +28,7 @@ let handoffs = [];
 let selectedIds = new Set();
 let sending = false;
 let moving = false;
-let movePanelOpen = false;
+let moveMode = null;
 let projects = [];
 let confirmingNotebookDelete = false;
 let deletingNotebook = false;
@@ -60,11 +61,13 @@ function renderScopeOptions(select, values, placeholder = false) {
 function renderMovePanel() {
   const destinations = projects.filter(project => project !== scope);
   renderScopeOptions(moveDestination, destinations, true);
-  movePanel.hidden = !movePanelOpen;
+  movePanel.hidden = !moveMode;
   moveButton.disabled = !selectedIds.size || !destinations.length || sending || moving;
+  moveAllButton.disabled = !notes.length || !destinations.length || sending || moving;
   moveDestination.disabled = moving;
   document.getElementById("cancel-move").disabled = moving;
-  confirmMove.disabled = !selectedIds.size || moving || sending || !destinations.includes(moveDestination.value);
+  const hasNotes = moveMode === "all" ? notes.length > 0 : selectedIds.size > 0;
+  confirmMove.disabled = !hasNotes || moving || sending || !destinations.includes(moveDestination.value);
 }
 
 function renderProjects() {
@@ -89,7 +92,7 @@ function switchScope(next) {
   selectedIds.clear();
   confirmingDeleteId = null;
   confirmingNotebookDelete = false;
-  movePanelOpen = false;
+  moveMode = null;
   filter = "pending";
   const url = new URL(location.href);
   url.searchParams.set("scope", scope);
@@ -105,7 +108,7 @@ function updateSelection() {
   sendButton.disabled = !count || sending || moving;
   sendButton.textContent = count ? "Send to agent (" + count + ")" : "Send to agent";
   selectedCount.textContent = count ? count + " selected" : "Select notes";
-  if (!count) movePanelOpen = false;
+  if (!count && moveMode === "selected") moveMode = null;
   renderMovePanel();
 }
 
@@ -287,17 +290,23 @@ sendButton.addEventListener("click", async () => {
   }
 });
 
-moveButton.addEventListener("click", () => {
-  if (moveButton.disabled) return;
-  movePanelOpen = true;
+function openMovePanel(mode) {
+  moveMode = mode;
   renderMovePanel();
   moveDestination.focus();
+}
+
+moveButton.addEventListener("click", () => {
+  if (!moveButton.disabled) openMovePanel("selected");
+});
+moveAllButton.addEventListener("click", () => {
+  if (!moveAllButton.disabled) openMovePanel("all");
 });
 
 moveDestination.addEventListener("change", renderMovePanel);
 
 document.getElementById("cancel-move").addEventListener("click", () => {
-  movePanelOpen = false;
+  moveMode = null;
   renderMovePanel();
   moveButton.focus();
 });
@@ -306,19 +315,19 @@ confirmMove.addEventListener("click", async () => {
   const destination = moveDestination.value;
   if (moving || sending || confirmMove.disabled || destination === scope) return;
   const origin = scope;
-  const noteIds = [...selectedIds];
+  const payload = moveMode === "all"
+    ? { destination, all: true }
+    : { destination, noteIds: [...selectedIds] };
   moving = true;
   updateSelection();
   renderProjects();
   try {
-    const result = await request("POST", "/api/notepad/move?scope=" + encodeURIComponent(origin), {
-      destination, noteIds,
-    });
+    const result = await request("POST", "/api/notepad/move?scope=" + encodeURIComponent(origin), payload);
     if (scope !== origin) return;
     const movedIds = new Set(result.moved.map(note => note.id));
     notes = notes.filter(note => !movedIds.has(note.id));
     selectedIds.clear();
-    movePanelOpen = false;
+    moveMode = null;
     render();
     await refresh();
     message.textContent = result.moved.length + " note" + (result.moved.length === 1 ? "" : "s") +

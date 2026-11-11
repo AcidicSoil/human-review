@@ -42,7 +42,10 @@ test("lists only persisted notebooks and deletes only the selected scope", () =>
   store.remove("/project/third", store.list("/project/third")[0].id);
   store.list("/project/not-created");
 
-  assert.deepEqual(store.listScopes(), ["/project/first", "/project/second"]);
+  assert.deepEqual(store.listScopes(), ["/project/first", "/project/second", "/project/third"]);
+  assert.deepEqual(store.deleteScope("/project/third"), {
+    scope: "/project/third", notesDeleted: 0, handoffsDeleted: 0,
+  });
   assert.deepEqual(store.deleteScope("/project/second"), {
     scope: "/project/second", notesDeleted: 1, handoffsDeleted: 1,
   });
@@ -51,6 +54,29 @@ test("lists only persisted notebooks and deletes only the selected scope", () =>
   assert.deepEqual(new NotepadStore().list("/project/first").map(note => note.id), [first.id]);
   assert.deepEqual(new NotepadStore().outbox("/project/second"), []);
   assert.equal(handoff.status, "pending");
+});
+
+test("legacy notebook files migrate without creating phantom notebooks", () => {
+  const previousDir = process.env.HUMAN_REVIEW_STATE_DIR;
+  const legacyDir = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-legacy-notes-"));
+  try {
+    process.env.HUMAN_REVIEW_STATE_DIR = legacyDir;
+    const note = {
+      id: "legacy-note", text: "Keep", author: "user", status: "pending",
+      createdAt: "2026-11-11T00:00:00Z", updatedAt: "2026-11-11T00:00:00Z",
+    };
+    fs.writeFileSync(path.join(legacyDir, "notepad.json"), JSON.stringify({
+      version: 1, scopes: { "/legacy/active": [note], "/legacy/empty": [] },
+      handoffs: { "/legacy/destination": [{ id: "archived", status: "acknowledged", notes: [] }] },
+    }));
+    const store = new NotepadStore();
+    assert.deepEqual(store.listScopes(), ["/legacy/active", "/legacy/destination", "/legacy/empty"]);
+    store.move("/legacy/active", "/legacy/destination", [note.id]);
+    assert.deepEqual(new NotepadStore().listScopes(), ["/legacy/active", "/legacy/destination", "/legacy/empty"]);
+  } finally {
+    process.env.HUMAN_REVIEW_STATE_DIR = previousDir;
+    fs.rmSync(legacyDir, { recursive: true, force: true });
+  }
 });
 
 test("project notebook API requires authentication and does not touch other notes", async t => {

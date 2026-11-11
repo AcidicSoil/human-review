@@ -109,7 +109,7 @@ export function createNotepadRoute({ token, viewToken }) {
     if (route === "/api/notepad/move" && req.method === "POST") {
       try {
         const body = await readBody(req);
-        const moved = notepad().move(scope, body.destination, body.noteIds);
+        const moved = notepad().move(scope, body.destination, body.noteIds, { all: body.all === true });
         json(res, 200, { destination: body.destination, moved });
       } catch (error) {
         badInput(error, res, json);

@@ -29,10 +29,15 @@ export class NotepadStore {
       }
       this.scopes = Object.assign(Object.create(null), stored.scopes);
       this.handoffs = Object.assign(Object.create(null), stored.handoffs || {});
+      // Legacy files already retained empty scopes after their final note moved.
+      this.notebooks = new Set(stored.notebooks || [
+        ...Object.keys(this.scopes), ...Object.keys(this.handoffs),
+      ]);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       this.scopes = Object.create(null);
       this.handoffs = Object.create(null);
+      this.notebooks = new Set();
     }
   }
 
@@ -41,16 +46,15 @@ export class NotepadStore {
   }
 
   listScopes() {
-    return [...new Set([...Object.keys(this.scopes), ...Object.keys(this.handoffs)])]
-      .filter(scope => this.scopes[scope]?.length || this.handoffs[scope]?.length)
-      .sort((a, b) => a.localeCompare(b));
+    return [...this.notebooks].sort((a, b) => a.localeCompare(b));
   }
 
   deleteScope(scope) {
     validScope(scope);
     const notesDeleted = this.scopes[scope]?.length || 0;
     const handoffsDeleted = this.handoffs[scope]?.length || 0;
-    if (!notesDeleted && !handoffsDeleted) return null;
+    if (!this.notebooks.has(scope)) return null;
+    this.notebooks.delete(scope);
     delete this.scopes[scope];
     delete this.handoffs[scope];
     this.save();
@@ -74,6 +78,7 @@ export class NotepadStore {
       updatedAt: now,
     };
     this.scopes[scope] = [...notes, note];
+    this.notebooks.add(scope);
     this.save();
     return note;
   }
@@ -115,17 +120,19 @@ export class NotepadStore {
     return noteIds.map(id => available.get(id));
   }
 
-  move(scope, destination, noteIds) {
+  move(scope, destination, noteIds, { all = false } = {}) {
     validScope(scope);
     validScope(destination);
     if (scope === destination) throw new TypeError("Choose another project notebook.");
-    if (!this.listScopes().includes(destination)) throw new TypeError("Unknown destination notebook.");
-    const moved = this.selectedNotes(scope, noteIds);
+    if (!this.notebooks.has(destination)) throw new TypeError("Unknown destination notebook.");
+    if (all && noteIds !== undefined) throw new TypeError("Move all does not accept selected note IDs.");
+    const moved = all ? this.list(scope) : this.selectedNotes(scope, noteIds);
+    if (!moved.length) throw new TypeError("No notes to move.");
     const targetNotes = this.list(destination);
     if (targetNotes.length + moved.length > MAX_NOTES_PER_SCOPE) {
       throw new RangeError("Destination notebook is full (1000 notes per scope).");
     }
-    const movedIds = new Set(noteIds);
+    const movedIds = new Set(moved.map(note => note.id));
     this.scopes[scope] = this.list(scope).filter(note => !movedIds.has(note.id));
     this.scopes[destination] = [...targetNotes, ...moved];
     this.save();
@@ -171,6 +178,8 @@ export class NotepadStore {
 
   save() {
     ensureStateDir();
-    atomicWrite(FILE(), JSON.stringify({ version: 1, scopes: this.scopes, handoffs: this.handoffs }, null, 2) + "\n");
+    atomicWrite(FILE(), JSON.stringify({
+      version: 1, notebooks: this.listScopes(), scopes: this.scopes, handoffs: this.handoffs,
+    }, null, 2) + "\n");
   }
 }

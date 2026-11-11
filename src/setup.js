@@ -163,9 +163,12 @@ or the current directory outside Git. \`HUMAN_REVIEW_DEFAULT_SCOPE\` selects a
 fixed default, and \`--scope <workspace>\` overrides it for one command.
 At session start, \`notes open\` reuses an already-open workspace window and
 requests focus instead of spawning duplicates. The HUD project dropdown
-switches saved notebooks in one window. To move notes across existing notebooks,
-the user selects notes, presses Move, picks a destination, and confirms Move here.
-Moves preserve notes and do not transfer prior handoffs or notify agents.
+switches existing notebooks in one window. To move notes, the user checks
+selected notes and presses Move, or presses Move all for the entire notebook
+including completed and filtered notes. Both require choosing an existing
+destination and confirming Move here. Empty notebooks remain available after
+moves; no new destination notebooks are created. Prior handoffs stay in their
+original notebook; moves do not notify agents.
 Deleting a complete notebook requires explicit user confirmation and never
 touches project files. Never process notes
 automatically: only run \`npx -y human-review notes list\` when the

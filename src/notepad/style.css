@@ -56,7 +56,7 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
 
 .send-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .selection-count { color: #9baabe; font-size: 12px; }
-.selection-actions { display: flex; align-items: center; gap: 7px; }
+.selection-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .send-button { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
 .move-panel { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px; background: #182638; border: 1px solid #355779; border-radius: 10px; }
 .move-panel[hidden] { display: none; }

@@ -51,6 +51,25 @@ test("moving selected notes preserves identity, status and source handoffs", () 
   assert.equal(store.listScopes().includes("/move/source"), true, "historical handoff preserves source notebook");
 });
 
+test("moving the last note retains an empty notebook across restarts", () => {
+  const store = new NotepadStore();
+  const source = "/move/empty-source";
+  const destination = "/move/empty-destination";
+  const note = store.add(source, "Last note", "user");
+  store.add(destination, "Existing", "user");
+  store.move(source, destination, [note.id]);
+  assert.deepEqual(store.list(source), []);
+  assert.ok(store.listScopes().includes(source), "empty source remains selectable");
+  const reloaded = new NotepadStore();
+  assert.ok(reloaded.listScopes().includes(source), "empty source survives restart");
+  assert.deepEqual(reloaded.move(destination, source, [note.id]).map(item => item.id), [note.id]);
+  assert.equal(reloaded.list(source)[0].id, note.id);
+  assert.deepEqual(reloaded.deleteScope(destination), {
+    scope: destination, notesDeleted: 1, handoffsDeleted: 0,
+  });
+  assert.ok(!new NotepadStore().listScopes().includes(destination));
+});
+
 test("invalid moves leave both notebooks unchanged", () => {
   const store = new NotepadStore();
   const first = store.add("/move/invalid-from", "Preserved", "user");
@@ -75,6 +94,7 @@ test("full destinations reject moves without partial writes", () => {
   const store = new NotepadStore();
   const note = store.add("/move/capacity-source", "Keep in source", "user");
   const target = "/move/capacity-target";
+  store.add(target, "Existing", "user");
   store.scopes[target] = Array.from({ length: 1000 }, (_, index) => ({
     id: "filler-" + index, text: "Existing note", author: "user", status: "pending",
     createdAt: "2026-11-11T00:00:00Z", updatedAt: "2026-11-11T00:00:00Z",
@@ -83,6 +103,38 @@ test("full destinations reject moves without partial writes", () => {
   assert.throws(() => store.move("/move/capacity-source", target, [note.id]), RangeError);
   assert.equal(new NotepadStore().list("/move/capacity-source")[0].id, note.id);
   assert.equal(new NotepadStore().list(target).length, 1000);
+});
+
+test("move all moves more than 100 notes atomically and keeps empty notebook", async t => {
+  const server = await start(0);
+  t.after(() => server.dispose());
+  const source = "/api/move-all-source";
+  const destination = "/api/move-all-destination";
+  const base = "/api/notepad";
+  const sourceUrl = base + "?scope=" + encodeURIComponent(source);
+  const toUrl = base + "?scope=" + encodeURIComponent(destination);
+  await request(server, "POST", toUrl, { text: "Existing" });
+  for (let i = 0; i < 105; i++) {
+    const created = await request(server, "POST", sourceUrl, { text: "Bulk " + i });
+    if (i === 1) {
+      await request(server, "PATCH", base + "/" + created.body.note.id + "?scope=" + encodeURIComponent(source), { status: "done" });
+    }
+  }
+  const moved = await request(server, "POST", base + "/move?scope=" + encodeURIComponent(source), {
+    destination, all: true,
+  });
+  assert.equal(moved.status, 200);
+  assert.equal(moved.body.moved.length, 105);
+  assert.equal(moved.body.moved[1].status, "done");
+  assert.equal((await request(server, "GET", sourceUrl)).body.notes.length, 0);
+  assert.equal((await request(server, "GET", toUrl)).body.notes.length, 106);
+  assert.ok((await request(server, "GET", base + "/scopes")).body.scopes.includes(source));
+  assert.equal((await request(server, "POST", base + "/move?scope=" + encodeURIComponent(source), {
+    destination, all: true,
+  })).status, 400);
+  assert.equal((await request(server, "POST", base + "/move?scope=" + encodeURIComponent(destination), {
+    destination: "/not-a-notebook", all: true,
+  })).status, 400);
 });
 
 test("authenticated move API rejects invalid scopes and preserves other projects", async t => {
@@ -105,12 +157,13 @@ test("authenticated move API rejects invalid scopes and preserves other projects
   assert.equal((await request(server, "POST", url, payload)).status, 400);
 });
 
-test("HUD moves checked notes through the project picker without sending a handoff", async () => {
+test("HUD moves selected and all notes, including hidden completed notes", async () => {
   const from = "/projects/a";
   const to = "/projects/b";
   const notebooks = new Map([
-    [from, ["First", "Second"].map((text, index) => ({
-      id: "note-" + index, text, author: "user", status: "pending", createdAt: "2026-11-11T00:00:00Z",
+    [from, ["First", "Second", "Third"].map((text, index) => ({
+      id: "note-" + index, text, author: "user", status: index === 1 ? "done" : "pending",
+      createdAt: "2026-11-11T00:00:00Z",
     }))],
     [to, [{ id: "note-target", text: "Already here", author: "user", status: "pending", createdAt: "2026-11-11T00:00:00Z" }]],
   ]);
@@ -130,17 +183,18 @@ test("HUD moves checked notes through the project picker without sending a hando
     window.fetch = async (url, init = {}) => {
       const parsed = new URL(url, window.location.href);
       const method = init.method || "GET";
-      seen.push({ path: parsed.pathname, method });
+      seen.push({ path: parsed.pathname, method, body: init.body ? JSON.parse(init.body) : null });
       const response = (data, status = 200) => ({ ok: status < 400, json: async () => data, status });
       if (parsed.pathname === "/api/notepad/scopes") return response({ scopes: [...notebooks.keys()] });
       if (parsed.pathname === "/api/notepad" && method === "GET") return response({
         notes: [...(notebooks.get(parsed.searchParams.get("scope")) || [])], handoffs: [],
       });
       if (parsed.pathname === "/api/notepad/move" && method === "POST") {
-        const { destination, noteIds } = JSON.parse(init.body);
+        const { destination, noteIds, all } = JSON.parse(init.body);
         const source = parsed.searchParams.get("scope");
-        const moved = notebooks.get(source).filter(note => noteIds.includes(note.id));
-        notebooks.set(source, notebooks.get(source).filter(note => !noteIds.includes(note.id)));
+        const ids = all ? notebooks.get(source).map(note => note.id) : noteIds;
+        const moved = notebooks.get(source).filter(note => ids.includes(note.id));
+        notebooks.set(source, notebooks.get(source).filter(note => !ids.includes(note.id)));
         notebooks.get(destination).push(...moved);
         return response({ moved, destination });
       }
@@ -153,7 +207,10 @@ test("HUD moves checked notes through the project picker without sending a hando
     const panel = doc.getElementById("move-panel");
     assert.ok(move, "Selection should offer a move action");
     assert.equal(move.disabled, true);
-    for (const checkbox of doc.querySelectorAll(".note input[type=checkbox]")) checkbox.click();
+    assert.equal(doc.querySelectorAll(".note").length, 2, "completed notes hidden by pending filter");
+    const moveAll = doc.getElementById("move-all-notes");
+    assert.equal(moveAll.disabled, false, "move all works without selections");
+    doc.querySelector(".note input[type=checkbox]").click();
     assert.equal(move.disabled, false);
     move.click();
     assert.equal(panel.hidden, false);
@@ -169,11 +226,28 @@ test("HUD moves checked notes through the project picker without sending a hando
     doc.getElementById("confirm-move").click();
     await flush();
     assert.equal(seen.filter(call => call.path === "/api/notepad/move" && call.method === "POST").length, 1);
-    assert.equal(notebooks.get(from).length, 0);
-    assert.equal(notebooks.get(to).length, 3);
-    assert.equal(doc.querySelectorAll(".note").length, 0);
+    assert.equal(notebooks.get(from).length, 2);
+    assert.equal(notebooks.get(to).length, 2);
+    assert.equal(doc.querySelectorAll(".note").length, 1);
     assert.equal(doc.getElementById("send-to-agent").disabled, true);
     assert.equal(panel.hidden, true);
+    assert.equal(moveAll.disabled, false);
+    moveAll.click();
+    assert.equal(panel.hidden, false);
+    destination.value = to;
+    destination.dispatchEvent(new window.Event("change", { bubbles: true }));
+    doc.getElementById("confirm-move").click();
+    await flush();
+    assert.deepEqual(seen.filter(call => call.path === "/api/notepad/move").map(call => call.body), [
+      { destination: to, noteIds: ["note-2"] },
+      { destination: to, all: true },
+    ]);
+    assert.equal(notebooks.get(from).length, 0);
+    assert.equal(notebooks.get(to).length, 4);
+    assert.equal(notebooks.get(to).some(note => note.status === "done"), true);
+    assert.equal(doc.querySelectorAll(".note").length, 0);
+    assert.equal(panel.hidden, true);
+    assert.ok([...doc.getElementById("project-notebooks").options].some(option => option.value === from));
     assert.equal(seen.some(call => call.path === "/api/notepad/send"), false);
   } finally {
     window.close();

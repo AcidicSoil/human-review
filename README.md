@@ -115,16 +115,19 @@ workspace** instead of opening duplicates. It requests focus on that window
 A different workspace gets its own window. Closing a window releases its
 registration; simultaneous agent launches reserve one opening for 20 seconds.
 User changes appear immediately; agent additions appear on the next refresh.
-The project selector lists notebooks with saved notes or handoffs, including
+The project selector lists existing notebooks, including empty notebooks and
 projects with the same folder name (shown with their paths). Switching changes
 the notebook inside the same window, preserves unsaved drafts for each project,
-and reconnects agent focus tracking. To move notes, select one or more using
-their checkboxes, choose **Move**, select an existing destination notebook, and
-confirm **Move here**. Notes retain identity, status, author, and timestamps.
-Previously sent handoffs remain with their original project; moving a note
-does not send another handoff or act on it. **Delete** beside the selector removes the
-selected project's entire notebook—notes and sent handoffs—only after a second
-confirmation; it does not delete files in that project. An active handoff poll
+and reconnects agent focus tracking. To move selected notes, check their boxes,
+press **Move**, select an existing destination notebook, and confirm **Move here**.
+Press **Move all** instead to transfer every note in the current notebook,
+including completed or filtered-out notes, without selecting them first.
+Notes retain identity, status, author, and timestamps. The original notebook
+remains available even when its last note moves; moving cannot create a new
+destination notebook. Previously sent handoffs stay with their original project;
+moving notes never sends another handoff. Only **Delete** beside the project
+selector removes a notebook, including its notes and sent handoffs, after a
+second confirmation; project files are untouched. An active handoff poll
 for a deleted notebook receives `{"status":"deleted"}`.
 
 Human Review opens the HUD, ordinary pages, and generated Planning/LOA artifacts
