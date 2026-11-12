@@ -131,3 +131,50 @@ test("inline editing saves or cancels without losing drafts during refresh", asy
     window.close();
   }
 });
+
+test("a long notebook scrolls within the HUD and stays at its position after refresh", async () => {
+  const css = fs.readFileSync(path.join(root, "../src/notepad/style.css"), "utf8");
+  const notes = Array.from({ length: 85 }, (_, i) => ({
+    id: "scroll-" + i, text: "Follow up on issue " + i,
+    author: "agent", status: "pending", createdAt: "2026-11-12T10:00:00Z",
+  }));
+  const dom = new JSDOM(page.replace("__TOKEN__", "test-token"), {
+    url: "http://localhost/notepad/preview?scope=scroll-demo",
+    runScripts: "outside-only",
+  });
+  const { window } = dom;
+  let refresh;
+  try {
+    const sheet = window.document.createElement("style");
+    sheet.textContent = css;
+    window.document.head.append(sheet);
+    window.setInterval = callback => { refresh = callback; return 1; };
+    window.fetch = async url => ({
+      ok: true, status: 200,
+      json: async () => url === "/api/notepad/scopes"
+        ? { scopes: ["scroll-demo"] } : { notes, handoffs: [] },
+    });
+    window.eval(script);
+    for (let i = 0; i < 6; i++) await new Promise(resolve => setImmediate(resolve));
+
+    const list = window.document.getElementById("notes");
+    assert.equal(list.children.length, 85, "every saved note stays available");
+    assert.equal(list.tabIndex, 0, "the scroll region is keyboard focusable");
+    assert.equal(window.getComputedStyle(list).flexGrow, "1");
+    assert.equal(window.getComputedStyle(list).overflowY, "auto");
+    assert.equal(window.getComputedStyle(window.document.querySelector(".hud")).height, "100dvh");
+
+    const replace = list.replaceChildren.bind(list);
+    list.replaceChildren = (...children) => {
+      list.scrollTop = 0; // Simulate browser clamping when the list briefly empties.
+      return replace(...children);
+    };
+    list.scrollTop = 240;
+    refresh();
+    for (let i = 0; i < 6; i++) await new Promise(resolve => setImmediate(resolve));
+    assert.equal(list.scrollTop, 240, "polling does not jump back to the first note");
+    assert.equal(list.children.length, 85);
+  } finally {
+    window.close();
+  }
+});

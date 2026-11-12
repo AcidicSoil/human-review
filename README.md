@@ -128,7 +128,10 @@ User changes appear immediately; agent additions appear on the next refresh.
 Select **Edit** on any note to revise its text inline, then **Save** or **Cancel**.
 Use Ctrl/⌘+Enter to save or Escape to cancel. Changes preserve the original
 note ID, author, status and creation time; previously sent handoffs keep their
-original snapshot and are not resent.
+original snapshot and are not resent. Saved notes scroll within a bounded,
+keyboard-focusable area instead of extending the page; use Tab and the keyboard
+or a mouse/touch scroll to browse older notes. Automatic refresh keeps your
+scroll position, including with large notebooks.
 The project selector lists existing notebooks, including empty notebooks and
 projects with the same folder name (shown with their paths). Switching changes
 the notebook inside the same window, preserves unsaved drafts for each project,

@@ -159,8 +159,10 @@ instantly whether feedback is already waiting, without blocking.
 For non-blocking capture during a task, use
 \`npx -y human-review notes add "note text"\`, or revise existing work with
 \`npx -y human-review notes edit <id> "revised text"\`. The HUD supports
-inline Edit, Save and Cancel. Edits preserve note identity/status and do not
-resend existing handoffs. Open the HUD with \`npx -y human-review notes open\`.
+inline Edit, Save and Cancel. Saved notes scroll inside a bounded,
+keyboard-focusable list without growing the page; refresh preserves position.
+Edits preserve note identity/status and do not resend existing handoffs.
+Open the HUD with \`npx -y human-review notes open\`.
 Notes default to the Git repository root,
 or the current directory outside Git. \`HUMAN_REVIEW_DEFAULT_SCOPE\` selects a
 fixed default, and \`--scope <workspace>\` overrides it for one command.

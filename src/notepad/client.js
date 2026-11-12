@@ -158,6 +158,7 @@ function switchScope(next, nextFilter = "pending") {
   closeReportChoices();
   reportForm.reset();
   filter = nextFilter;
+  list.scrollTop = 0;
   const url = new URL(location.href);
   url.searchParams.set("scope", scope);
   history.replaceState(null, "", url);
@@ -302,6 +303,7 @@ function render() {
   selectedIds = new Set([...selectedIds].filter(id => knownIds.has(id)));
   updateSelection();
   const visible = notes.filter(note => filter === "all" || note.status === filter);
+  const scrollPosition = list.scrollTop;
   list.replaceChildren();
   document.getElementById("empty").hidden = visible.length !== 0;
   for (const note of [...visible].reverse()) {
@@ -439,6 +441,7 @@ function render() {
     row.append(choice, body, actions);
     list.append(row);
   }
+  list.scrollTop = scrollPosition;
 }
 
 async function refresh() {
@@ -650,6 +653,7 @@ input.addEventListener("keydown", (event) => {
 });
 for (const item of filters) item.addEventListener("click", () => {
   filter = item.dataset.filter;
+  list.scrollTop = 0;
   render();
 });
 
