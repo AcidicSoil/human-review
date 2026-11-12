@@ -61,19 +61,26 @@ test("plugin starter prompts surface every focused review skill", () => {
   for (const entry of cases) assert.match(prompts, new RegExp(entry.name));
 });
 
-test("notepad skill describes automatic capture and permission-gated processing", () => {
+test("notepad instructions proactively check unfinished work without permission gates", () => {
+  for (const file of [
+    path.join(skillsRoot, "human-review-notepad", "SKILL.md"),
+    path.join(root, "src", "SKILL.md"),
+    path.join(root, "src", "setup.js"),
+  ]) {
+    const content = fs.readFileSync(file, "utf8");
+    assert.match(content, /notes list/);
+    assert.match(content, /session start|start of .*project session/i);
+    assert.match(content, /proactive|check.*(notes|unfinished)/i);
+    assert.doesNotMatch(content, /notes list[^\n]*only on request|only run[^\n]*notes list[^\n]*when/i);
+    assert.doesNotMatch(content, /do not automatically\s+monitor notes|never process notes\s+automatically/i);
+  }
   const skill = fs.readFileSync(path.join(skillsRoot, "human-review-notepad", "SKILL.md"), "utf8");
-  assert.match(skill, /session start|start of .*project session/i);
-  assert.match(skill, /notes add/);
-  assert.match(skill, /notes inbox/);
-  assert.match(skill, /notes ack/);
-  assert.match(skill, /notes poll.*--timeout/);
-  assert.match(skill, /notes done/);
-  assert.match(skill, /notes delete/);
-  assert.match(skill, /--scope/);
+  for (const command of ["notes add", "notes inbox", "notes ack", "notes poll --timeout", "notes done", "notes delete"]) {
+    assert.match(skill, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
   assert.match(skill, /Move all/);
-  assert.match(skill, /explicit.*request|explicit.*instruction/i);
-  assert.match(skill, /never .*automatical|do not automatically/i);
+  assert.match(skill, /--scope/);
+  assert.match(skill, /delete[^\n]*explicit/i);
 });
 
 test("loa-review defaults to the approved prototype catalog contract", () => {

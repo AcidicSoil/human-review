@@ -162,7 +162,9 @@ For non-blocking capture during a task, use
 or the current directory outside Git. \`HUMAN_REVIEW_DEFAULT_SCOPE\` selects a
 fixed default, and \`--scope <workspace>\` overrides it for one command.
 At session start, \`notes open\` reuses an already-open workspace window and
-requests focus instead of spawning duplicates. The HUD project dropdown
+requests focus instead of spawning duplicates. Proactively check unfinished
+work with \`notes list\` and \`notes inbox\` at session start and natural
+checkpoints; no user permission is needed to read notes. The HUD project dropdown
 switches existing notebooks in one window. To move notes, the user checks
 selected notes and presses Move, or presses Move all for the entire notebook
 including completed and filtered notes. Both require choosing an existing
@@ -170,15 +172,13 @@ destination and confirming Move here. Empty notebooks remain available after
 moves; no new destination notebooks are created. Prior handoffs stay in their
 original notebook; moves do not notify agents.
 Deleting a complete notebook requires explicit user confirmation and never
-touches project files. Never process notes
-automatically: only run \`npx -y human-review notes list\` when the
-user explicitly requests action, then complete the selected notes after the
-work is verified with \`notes done <id>\`. Only when the user explicitly requests
-permanent deletion may the agent run \`notes delete <id>\`.
-When the user selects notes and presses Send to agent, retrieve those explicit
-handoffs with \`notes inbox\` or an optional \`notes poll --timeout 30\` listener,
-then call \`notes ack <handoff-id>\` after reading. Acknowledgement never
-authorizes execution or completes notes; await explicit permission for work.
+touches project files. Check and maintain notes proactively, including
+unfinished work related to the current assignment. Mark verified work done with
+\`notes done <id>\`; permanently delete only on an explicit request.
+Read handoffs with \`notes inbox\`, and use bounded
+\`notes poll --timeout 30\` when waiting for handoffs is useful. Call
+\`notes ack <handoff-id>\` after reading; acknowledgement is not completion.
+Unrelated or destructive tasks still require user direction.
 Note polling is separate from ordinary Human Review polling.
 
 For large plans, specs, or PRDs, generate an offline editable artifact with

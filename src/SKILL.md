@@ -162,17 +162,19 @@ Do not ask the user to restate edits, comments, or section actions in chat. The 
 
 ## Notepad HUD (non-blocking)
 
-If the user or agent wants to capture something for later without stopping the
-current task, use the installed Human Review CLI:
+Use the installed Human Review CLI proactively for unfinished project work.
+At session start, open the HUD, check saved notes and inbox, then revisit notes
+at natural checkpoints or whenever they can inform the current task. No user
+request is required to read or check notes. Capture discoveries immediately:
 
 ```sh
 human-review notes add "Remember to verify the parser"  # agent capture
 human-review notes open                                # user-facing HUD
-human-review notes list                                # only on request
+human-review notes list                                # check proactively
 human-review notes done <id>                           # after processing
 human-review notes delete <id>                         # only when user requests deletion
 human-review notes inbox                               # read user-sent handoffs
-human-review notes poll --timeout 30                    # optional listener; separate process
+human-review notes poll --timeout 30                    # bounded listener when useful
 human-review notes ack <handoff-id>                     # acknowledge receipt, not completion
 ```
 
@@ -199,11 +201,11 @@ it never deletes project files. An agent waiting on that notebook receives
 `{"status":"deleted"}` and stops waiting. Selecting notes and
 pressing **Send to agent** creates a durable notification on the separate note
 channel. `notes inbox` retrieves these handoffs without blocking; `notes poll`
-can wait for them when the user requests a listener, without affecting the
-Human Review agent poll. `notes ack <handoff-id>` confirms receipt only.
-**Never treat a sent note as permission to execute it.** Do not automatically
-monitor notes or act upon them without the user's configured instructions. Only process selected notes when the user
-explicitly asks, and mark them done after verifying the requested work.
+can wait for handoffs when useful, without affecting the Human Review agent
+poll. `notes ack <handoff-id>` confirms receipt only. Proactively check notes
+and use relevant unfinished work to continue the current assignment. Reading
+notes requires no special authorization; unrelated or destructive tasks still
+require user direction. Mark notes done after verifying the requested work.
 Deleting a note is permanent; never delete it merely because it was marked
 done or acted upon. Use `notes delete <id>` only when explicitly requested.
 The HUD requires a second confirmation click before removal.
