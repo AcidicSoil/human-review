@@ -145,9 +145,10 @@ second confirmation; project files are untouched. An active handoff poll
 for a deleted notebook receives `{"status":"deleted"}`.
 
 **Report tool issue:** When one project's workflow exposes a bug in another
-project's tool, use **Report issue** on the source note. Choose the owning
-project directory, describe expected behavior, actual failure, and reproduction
-steps, then select **Send bug report**. The original note stays in its project,
+project's tool, use **Report issue** on the source note. Search the styled
+project list (names and complete paths distinguish similarly named projects),
+or enter an existing tool directory path directly. Describe expected behavior,
+actual failure, and reproduction steps, then select **Send bug report**. The original note stays in its project,
 and an independently actionable linked report appears in the tool owner's
 notebook. This also works when that existing tool directory has no notebook yet;
 unlike Move, reporting can create the destination notebook entry. It does not

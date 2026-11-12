@@ -62,9 +62,14 @@
         <form id="report-form">
           <p class="report-heading">Report tool issue</p>
           <p id="report-note-title" class="report-source-title"></p>
-          <label for="report-destination">Tool project directory</label>
-          <input id="report-destination" list="report-projects" placeholder="/path/to/tool-project" required>
-          <datalist id="report-projects"></datalist>
+          <label for="report-destination">Tool project</label>
+          <div id="report-project-picker" class="project-choice">
+            <input id="report-destination" class="project-picker report-destination"
+              role="combobox" aria-autocomplete="list" aria-expanded="false"
+              aria-controls="report-projects" autocomplete="off"
+              placeholder="Search project or enter directory path" required>
+            <div id="report-projects" class="project-results" role="listbox" hidden></div>
+          </div>
           <label for="report-expected">Expected behavior</label>
           <textarea id="report-expected" rows="2" maxlength="4000" required></textarea>
           <label for="report-actual">What actually happened</label>

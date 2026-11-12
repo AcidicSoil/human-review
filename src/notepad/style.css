@@ -1,4 +1,4 @@
-:root { color-scheme: dark; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: #0d1420; color: #e6edf7; }
+:root { color-scheme: dark; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: #0d1420; color: #e6edf7; --project-border: #355779; --project-surface: #192b40; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 300px; }
 button, textarea, select, input { font: inherit; }
@@ -10,7 +10,7 @@ button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-
 .symbol { border-radius: 12px; background: #263750; color: #b9d1fb; width: 44px; height: 44px; display: grid; place-items: center; font-size: 27px; line-height: 1; }
 .identity { flex: 1; min-width: 0; }
 h1 { font-size: 19px; line-height: 1.3; letter-spacing: -.03em; margin: 0; }
-.project-picker { width: 100%; min-width: 0; margin-top: 5px; padding: 5px 26px 5px 8px; border: 1px solid #355779; border-radius: 8px; background: #192b40; color: #d9e8ff; font-size: 12px; text-overflow: ellipsis; }
+.project-picker { width: 100%; min-width: 0; margin-top: 5px; padding: 5px 26px 5px 8px; border: 1px solid var(--project-border); border-radius: 8px; background: var(--project-surface); color: #d9e8ff; font-size: 12px; text-overflow: ellipsis; }
 .project-delete { flex: none; border: 1px solid #5b4957; background: transparent; color: #e8b8c4; border-radius: 8px; padding: 7px 9px; font-size: 12px; }
 .project-delete:hover:not(:disabled) { background: #3d2c39; border-color: #925e72; }
 .project-confirm { padding: 12px; border: 1px solid #5b4957; border-radius: 11px; background: #1d2534; }
@@ -70,7 +70,15 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
 .report-panel[hidden] { display: none; }
 .report-panel form { display: flex; flex-direction: column; gap: 8px; }
 .report-panel label { color: #a8bcd8; font-size: 12px; }
-.report-panel input, .report-panel textarea { width: 100%; min-height: 0; padding: 9px; border: 1px solid #405a79; border-radius: 8px; background: #111d2d; color: inherit; }
+.report-panel textarea { width: 100%; min-height: 0; padding: 9px; border: 1px solid #405a79; border-radius: 8px; background: #111d2d; color: inherit; }
+.report-panel .report-destination { margin: 0; padding: 10px 12px; font-size: 13px; }
+.project-choice { position: relative; }
+.project-results { position: absolute; z-index: 4; top: calc(100% + 4px); inset-inline: 0; max-height: 220px; overflow-y: auto; padding: 4px; border: 1px solid var(--project-border); border-radius: 9px; background: var(--project-surface); box-shadow: 0 10px 25px #0005; }
+.project-results[hidden] { display: none; }
+.project-option { display: flex; flex-direction: column; width: 100%; padding: 9px 12px; border: 0; border-radius: 7px; background: transparent; color: #e6edf7; text-align: left; }
+.project-option:hover, .project-option[aria-selected="true"], .project-option:focus-visible { background: #304967; }
+.project-option strong { font-size: 13px; font-weight: 600; }
+.project-option small { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a8bcd8; font-size: 11px; }
 .report-panel textarea { min-height: 60px; }
 .report-heading { font-size: 17px; font-weight: 650; margin: 0; }
 .report-source-title { margin: 0 0 8px; color: #9fb6d0; overflow-wrap: anywhere; }

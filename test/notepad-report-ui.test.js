@@ -11,6 +11,7 @@ const script = fs.readFileSync(path.join(root, "src/notepad/client.js"), "utf8")
 test("HUD reports tool failures, triages fixes, and preserves source verification", async () => {
   const source = "/projects/consumer";
   const owner = "/projects/tool-owner";
+  const sameName = "/workspace/other/tool-owner";
   const original = {
     id: "source-1", text: "Valid usage fails", status: "pending", author: "agent",
     createdAt: "2026-11-12T01:00:00Z",
@@ -35,7 +36,9 @@ test("HUD reports tool failures, triages fixes, and preserves source verificatio
       const path = new URL(url, window.location.href);
       const project = path.searchParams.get("scope");
       const method = init.method || "GET";
-      if (path.pathname === "/api/notepad/scopes") return response({ scopes: [...items.keys()] });
+      if (path.pathname === "/api/notepad/scopes") {
+        return response({ scopes: [...items.keys(), owner, sameName] });
+      }
       if (path.pathname === "/api/notepad" && method === "GET") {
         const notes = items.get(project) || [];
         return response({ notes: notes.map(note => note.reportedTo ? {
@@ -73,7 +76,34 @@ test("HUD reports tool failures, triages fixes, and preserves source verificatio
     const doc = window.document;
     click(".report-note");
     assert.equal(doc.getElementById("report-panel").hidden, false);
-    doc.getElementById("report-destination").value = owner;
+    const picker = doc.getElementById("report-destination");
+    const choices = doc.getElementById("report-projects");
+    assert.equal(picker.getAttribute("role"), "combobox");
+    assert.equal(choices.getAttribute("role"), "listbox");
+    picker.focus();
+    assert.equal(picker.getAttribute("aria-expanded"), "true");
+    picker.value = "/new/tool-without-notebook";
+    picker.dispatchEvent(new window.Event("input", { bubbles: true }));
+    assert.equal(picker.value, "/new/tool-without-notebook", "manual paths remain usable");
+    picker.value = "tool-owner";
+    picker.dispatchEvent(new window.Event("input", { bubbles: true }));
+    const options = [...choices.querySelectorAll(".project-option")];
+    assert.equal(options.length, 2, "duplicate names remain distinguishable");
+    assert.ok(options.some(option => option.textContent.includes(sameName)));
+    assert.ok(options.some(option => option.textContent.includes(owner)));
+    picker.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    picker.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    assert.equal(picker.value, owner);
+    assert.equal(picker.getAttribute("aria-expanded"), "false");
+    picker.value = "tool-owner";
+    picker.dispatchEvent(new window.Event("input", { bubbles: true }));
+    const mouseChoice = [...choices.querySelectorAll(".project-option")]
+      .find(option => option.textContent.includes(sameName));
+    mouseChoice.focus();
+    mouseChoice.click();
+    assert.equal(picker.value, sameName, "mouse selection uses the full project path");
+    assert.equal(picker.getAttribute("aria-expanded"), "false", "selection closes the chooser");
+    picker.value = owner;
     doc.getElementById("report-expected").value = "Accept valid inputs";
     doc.getElementById("report-actual").value = "Rejected valid inputs";
     doc.getElementById("report-steps").value = "Run the tool";

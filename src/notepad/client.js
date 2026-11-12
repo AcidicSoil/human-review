@@ -22,6 +22,7 @@ const reportPanel = document.getElementById("report-panel");
 const reportForm = document.getElementById("report-form");
 const reportDestination = document.getElementById("report-destination");
 const reportProjects = document.getElementById("report-projects");
+const reportPicker = document.getElementById("report-project-picker");
 const filters = [...document.querySelectorAll("[data-filter]")];
 
 let notes = [];
@@ -38,6 +39,7 @@ let moving = false;
 let moveMode = null;
 let reportingNoteId = null;
 let reporting = false;
+let activeReportProject = -1;
 let projects = [];
 let confirmingNotebookDelete = false;
 let deletingNotebook = false;
@@ -64,9 +66,53 @@ function renderScopeOptions(select, values, placeholder = false) {
     option.title = value;
     select.append(option);
   }
-  if (select.tagName !== "DATALIST") {
-    select.value = options.includes(previous) ? previous : options[0] || "";
-  }
+  select.value = options.includes(previous) ? previous : options[0] || "";
+}
+
+function closeReportChoices() {
+  reportProjects.hidden = true;
+  reportDestination.setAttribute("aria-expanded", "false");
+  reportDestination.removeAttribute("aria-activedescendant");
+  activeReportProject = -1;
+}
+
+function setActiveReportProject(index) {
+  const options = [...reportProjects.querySelectorAll(".project-option")];
+  activeReportProject = Math.max(-1, Math.min(index, options.length - 1));
+  options.forEach((option, position) => {
+    option.setAttribute("aria-selected", String(position === activeReportProject));
+  });
+  if (activeReportProject < 0) reportDestination.removeAttribute("aria-activedescendant");
+  else reportDestination.setAttribute("aria-activedescendant", options[activeReportProject].id);
+}
+
+function renderReportChoices() {
+  const query = reportDestination.value.toLowerCase().trim();
+  const matches = projects.filter(project =>
+    project !== scope && project.toLowerCase().includes(query))
+    .sort((a, b) => notebookName(a).localeCompare(notebookName(b)) || a.localeCompare(b))
+    .slice(0, 30);
+  const options = matches.map((project, index) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.id = "report-project-option-" + index;
+    option.className = "project-option";
+    option.setAttribute("role", "option");
+    const name = document.createElement("strong");
+    name.textContent = notebookName(project);
+    const directory = document.createElement("small");
+    directory.textContent = project;
+    option.append(name, directory);
+    option.addEventListener("click", () => {
+      reportDestination.value = project;
+      reportDestination.focus();
+      closeReportChoices();
+    });
+    return option;
+  });
+  reportProjects.replaceChildren(...options);
+  if (!options.length) reportProjects.textContent = "No matching notebooks — enter an existing directory path.";
+  setActiveReportProject(-1);
 }
 
 function renderMovePanel() {
@@ -91,7 +137,7 @@ function renderProjects() {
   notebookConfirm.hidden = !confirmingNotebookDelete;
   document.getElementById("notebook-delete-name").textContent = scope;
   renderMovePanel();
-  renderScopeOptions(reportProjects, projects.filter(project => project !== scope));
+  if (!reportProjects.hidden) renderReportChoices();
 }
 
 function switchScope(next, nextFilter = "pending") {
@@ -109,6 +155,7 @@ function switchScope(next, nextFilter = "pending") {
   moveMode = null;
   reportingNoteId = null;
   reportPanel.hidden = true;
+  closeReportChoices();
   reportForm.reset();
   filter = nextFilter;
   const url = new URL(location.href);
@@ -379,6 +426,7 @@ function render() {
         report.setAttribute("aria-label", "Report issue: " + note.text.slice(0, 70));
         report.addEventListener("click", () => {
           reportingNoteId = note.id;
+          closeReportChoices();
           reportForm.reset();
           document.getElementById("report-note-title").textContent = note.text;
           reportPanel.hidden = false;
@@ -494,9 +542,39 @@ confirmMove.addEventListener("click", async () => {
   }
 });
 
+reportDestination.addEventListener("focus", () => {
+  reportProjects.hidden = false;
+  reportDestination.setAttribute("aria-expanded", "true");
+  renderReportChoices();
+});
+reportDestination.addEventListener("input", () => {
+  reportProjects.hidden = false;
+  reportDestination.setAttribute("aria-expanded", "true");
+  renderReportChoices();
+});
+reportDestination.addEventListener("keydown", event => {
+  if (event.key === "Escape") closeReportChoices();
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    if (reportProjects.hidden) reportDestination.dispatchEvent(new Event("focus"));
+    const direction = event.key === "ArrowDown" ? 1 : -1;
+    const count = reportProjects.querySelectorAll(".project-option").length;
+    setActiveReportProject(activeReportProject < 0 && direction < 0
+      ? count - 1 : activeReportProject + direction);
+  }
+  if (event.key === "Enter" && !reportProjects.hidden && activeReportProject >= 0) {
+    event.preventDefault();
+    reportProjects.querySelectorAll(".project-option")[activeReportProject].click();
+  }
+});
+reportPicker.addEventListener("focusout", event => {
+  if (!reportPicker.contains(event.relatedTarget)) closeReportChoices();
+});
+
 document.getElementById("cancel-report").addEventListener("click", () => {
   if (reporting) return;
   reportingNoteId = null;
+  closeReportChoices();
   reportPanel.hidden = true;
   reportForm.reset();
 });
@@ -527,6 +605,7 @@ reportForm.addEventListener("submit", async event => {
       { scope: destination, noteId: report.id, status: report.status }],
     } : note);
     reportingNoteId = null;
+    closeReportChoices();
     reportPanel.hidden = true;
     reportForm.reset();
     render();
