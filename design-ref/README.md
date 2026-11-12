@@ -5,7 +5,29 @@ The editable FigCraft source is
 These are design references, not runtime dependencies or executable reviews.
 
 The editable document contains four original exploratory frames, six LOA inspector
-states, and one Notepad HUD state matching the shipped non-blocking notebook:
+states, and one Notepad HUD state matching the shipped non-blocking notebook.
+
+A separate [cross-project bug-report prototype](notepad-cross-project-reports.figcraft)
+shows the proposed reporting flow before implementation. It contains four native,
+editable FigCraft screens with click-through transitions (use FigCraft's prototype
+player). This is a design proposal, **not implemented Notepad behavior**:
+
+| Screen | User journey |
+| --- | --- |
+| 12 — Source issue | Keep the unfinished note in its source project and choose Report to tool project |
+| 13 — Report issue | Choose the tool owner, enter expected/actual behavior and steps, and submit |
+| 14 — Tool owner triage | Receive the linked report and mark a fix available |
+| 15 — Source verification | Display the tool's fix status without automatically completing the source note |
+
+[Full flow preview](notepad-cross-project-overview.png). The owner notebook and the
+source note remain independently actionable; the sample uses `crawl-targets` and
+`portless` as illustrative projects, not hardcoded requirements. To inspect it:
+
+```sh
+figcraft design-ref/notepad-cross-project-reports.figcraft
+```
+
+The original editable document's existing screens are:
 
 | FigCraft frame | Design state |
 | --- | --- |

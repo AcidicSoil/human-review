@@ -179,7 +179,7 @@ into a chat product.
 
 ![Compact Notepad HUD](design-ref/notepad-hud.png)
 
-[Editable Notepad HUD frame in FigCraft](design-ref/human-review-ui-concepts.figcraft) · [FigCraft rendering](design-ref/notepad-hud.figcraft.png)
+[Editable Notepad HUD frame in FigCraft](design-ref/human-review-ui-concepts.figcraft) · [FigCraft rendering](design-ref/notepad-hud.figcraft.png) · [Cross-project bug-report prototype](design-ref/notepad-cross-project-reports.figcraft) ([preview](design-ref/notepad-cross-project-overview.png))
 
 ## Ordinary HTML, Markdown, and localhost review
 
