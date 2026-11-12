@@ -179,18 +179,20 @@ including completed and filtered notes. Both require choosing an existing
 destination and confirming Move here. Empty notebooks remain available after
 moves; no new destination notebooks are created. Prior handoffs stay in their
 original notebook; moves do not notify agents.
-When another project's tool fails during intended use, capture the unfinished
-issue in the current notebook, then run \`notes report <id> --to /tool/path
---expected "Expected" --actual "Failure" --steps "Reproduce"\` or use the
-HUD's Report issue action. Search tool projects by name or path in the styled
-project picker; use the displayed full paths to distinguish duplicate names,
-or enter an existing directory directly when it has no notebook. Verify the
-actual tool owner before selecting it. The tool-owning project receives a
-linked note containing source context and reproduction steps, even if its
-existing project directory has no notebook yet. The source note stays pending. When the tool
-owner verifies a fix and marks the report Done, the source displays Fix
-available but remains pending until independently verified. Reporting does not
-create project files, move notes, or send a review handoff.
+When another project's tool fails during intended use, proactively record the
+error in the **calling project's** notebook (reuse an existing matching note).
+Identify the actual tool-owning repository path, then report the source note
+using \`notes report <source-id> --scope /calling/project --to /tool/repo
+--expected "Expected" --actual "Failure" --steps "Commands attempted"\`.
+The HUD picker searches project names/full paths and accepts existing
+absolute directories without notebooks. Never invent failure details or
+expose secrets. Owner agents must inspect \`notes list --scope /tool/repo\`
+for pending \`bugReport\` notes even without an inbox handoff, reproduce the
+issue, and mark **the owner report ID** done only after testing. The source
+agent sees \`reportedTo[].status\` and completes **its original note ID** only
+after independently verifying the fix. Reopen regressions; no automatic
+cross-project code edits or handoffs. Follow the installed
+\`human-review-notepad\` skill for the full reporter/owner workflow.
 Deleting a complete notebook requires explicit user confirmation and never
 touches project files. Check and maintain notes proactively, including
 unfinished work related to the current assignment. Mark verified work done with

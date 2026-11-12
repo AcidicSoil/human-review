@@ -1,7 +1,7 @@
 interface:
   display_name: "Human Review Notepad"
-  short_description: "Capture and manage project notes without blocking"
-  default_prompt: "Use $human-review-notepad to keep a project notebook open and capture deferred work safely."
+  short_description: "Track unfinished work and cross-project tool bugs"
+  default_prompt: "Use $human-review-notepad to check unfinished notes proactively, report tool failures to their verified owning project, and track fixes through source verification."
 policy:
   products: [CHAT, CODEX]
   allow_implicit_invocation: true

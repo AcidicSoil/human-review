@@ -19,13 +19,13 @@
       "Visually review HTML, Markdown, and localhost pages",
       "Edit content directly and send comments to your agent",
       "Review plans and structured Lists of Actions offline",
-      "Capture project notes and explicitly delivered handoffs without blocking"
+      "Track unfinished project notes, cross-project tool bug reports, linked fixes, and delivered handoffs"
     ],
     "defaultPrompt": [
       "ordinary-review: Review this HTML, Markdown, or localhost page and apply my browser feedback.",
       "planning-review: Turn this plan, spec, PRD, or roadmap into an editable Human Review artifact.",
       "loa-review: Turn this task or LOA into a reviewable action list with plugin and skill references.",
-      "human-review-notepad: Open the project Notepad HUD, capture deferred findings, and handle user-sent notes on request."
+      "human-review-notepad: Proactively check unfinished notes, report tool failures to their owning project, and verify linked fixes in the calling project."
     ],
     "brandColor": "#E4572E",
     "brandColorDark": "#FF8A65",

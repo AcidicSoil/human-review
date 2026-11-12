@@ -210,16 +210,20 @@ notebook remains selectable when empty, and moves cannot create new notebooks.
 Existing sent handoffs stay in their original notebook; moving notes does not
 notify or authorize an agent.
 When another project's tool fails during intended use, proactively record the
-failure in the current notebook and use **Report issue** or `notes report` to
-send a linked report to the tool-owning project. Include expected behavior,
-actual failure and steps to reproduce. In the HUD, search the tool project by
-name or path; options include full directory paths to distinguish projects with
-the same name. Enter an existing directory directly when it has no notebook.
-Verify ownership before submitting. Reporting retains the originating note
-and creates no project files. Tool owners mark reports **Fix available** (Done) after repairing;
-source notes display that status but remain pending until the reporting project
-verifies the fix. Inspect incoming reports with `notes list --scope /tool/path`
-without waiting for a handoff.
+failure in the **calling project's notebook** and use **Report issue** or
+`notes report <source-id> --scope /calling/project --to /actual/tool/repo`
+with expected, actual and reproduction details. Verify the tool owner's
+repository path; the HUD picker searches names and full paths, and accepts
+existing directories without notebooks. Avoid duplicate source notes and never
+invent reproduction evidence. The linked owner report contains `bugReport`
+metadata; owner agents find pending reports with
+`notes list --scope /actual/tool/repo` without an inbox handoff. After
+reproducing, fixing and testing, the owner marks **its report ID** done (Fix
+available); the calling project sees `reportedTo[].status` and verifies the
+original workflow before completing **its source note ID**. Keep failures
+pending if unverified. See the installed `human-review-notepad` skill for
+the exact reporter/owner command sequence. Neither report creation nor note
+review authorizes unrelated work or modifies project files.
 Only on explicit user request, the adjacent Delete button can remove one
 project's entire notebook, including notes and handoffs, after confirmation;
 it never deletes project files. An agent waiting on that notebook receives

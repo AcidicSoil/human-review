@@ -43,21 +43,56 @@ human-review notes delete <note-id>
 
 ## Cross-project tool bugs
 
-When a tool belonging to another project fails during intended use, record the
-unfinished issue in the current project's notebook immediately. **Report issue**
-on that note in the HUD, or run `notes report` with the tool owner's directory,
-expected behavior, observed failure, and reproducible steps. Search the project
-picker by name or directory; it shows full paths to distinguish duplicate names.
-Select the verified tool owner, or enter its existing directory path directly if
-it has no notebook. Never infer ownership from a project name alone. Reporting
-creates no project files.
+**When using another project's tool fails, report it proactively.** Do not wait
+for a user to ask or send a handoff. Keep the original unfinished-work note in
+the calling project's notebook.
 
-The tool owner's notebook receives a linked actionable report. Agents working on
-that tool should check these incoming notes proactively and fix reproducible
-problems in their own project. After verifying the repair, mark the report Done
-(**Mark fix available**). The reporter then sees **Fix available — verify**.
-The original note stays pending until the reporting project confirms the fix
-in its own environment. No automatic handoff or unrelated work execution occurs.
+**Reporting agent:**
+
+1. Check `human-review notes list --scope /calling/project` for the same failure.
+   Reuse its note ID; otherwise add a note with the tool, actual command,
+   observed error, relevant version/configuration, and impact. Exclude secrets.
+2. Identify the **actual tool-owning repository** from its executable/source
+   location, not the name alone. In the HUD, search by name or full path; enter
+   an existing absolute directory path when the owner has no notebook yet.
+3. Run the report command below using the **source note ID and source scope**.
+   Describe the expected result, observed failure, and the commands/actions
+   performed to reproduce it. State uncertainties instead of inventing details.
+
+```sh
+human-review notes report <source-note-id> \
+  --scope /calling/project \
+  --to /actual/tool/repository \
+  --expected "What should have happened" \
+  --actual "What happened, including the error" \
+  --steps "Exact commands/actions attempted"
+```
+
+Reporting creates one linked owner note without moving the original, changing
+either repository's files, or sending a handoff. Repeating a report for the
+same source note and owner returns its existing report rather than duplicating
+it. The source note exposes the linked report through `reportedTo`.
+
+**Tool-owner agent:**
+
+1. At session start and checkpoints, run
+   `human-review notes list --scope /actual/tool/repository`. Inspect pending
+   notes with `bugReport`: `sourceScope`, `sourceNoteId`, `expected`,
+   `actual`, and `steps` identify the reporter and failure. These reports
+   do **not** require an inbox handoff.
+2. Reproduce and address relevant reports in the **owning repository**, not by
+   modifying the calling project. Keep blocked or unreproduced reports pending;
+   update their note with findings when useful.
+3. After the fix passes relevant tests, run
+   `human-review notes done <owner-report-id> --scope /actual/tool/repository`.
+   In the HUD this is **Mark fix available**. Use `notes reopen` if it regresses.
+
+**Reporting agent after a fix:** Recheck the original workflow when
+`reportedTo[].status` becomes `done` (**Fix available — verify**). Only then
+mark the **source note** done with its own ID and `--scope /calling/project`.
+If the fix still fails, keep that note pending and reopen/update the owner report.
+Never confuse the two IDs or scopes. Continue only work in the current
+assignment; notes are not authorization for unrelated or destructive tasks.
 
 ## Project notebooks
 
