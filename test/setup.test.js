@@ -7,6 +7,11 @@ import test from "node:test";
 
 import { installSkills, invocation, isTransientBin, mergeAgentsBlock } from "../src/setup.js";
 
+const FOCUSED_SKILLS = [
+  "human-review", "ordinary-review", "planning-review", "loa-review",
+  "host-workspace-operator", "human-review-notepad",
+];
+
 test("global setup installs the skill and local planning runtime for every agent root", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-setup-"));
 
@@ -31,7 +36,7 @@ test("global setup installs the skill and local planning runtime for every agent
       assert.equal(fs.existsSync(loaGenerator), true);
       assert.equal(fs.existsSync(loaClient), true);
       assert.equal(fs.existsSync(loaRunner), true);
-      for (const name of ["human-review", "ordinary-review", "planning-review", "loa-review", "host-workspace-operator"]) {
+      for (const name of FOCUSED_SKILLS) {
         for (const relative of ["agents/openai.yaml", ...(name === "human-review" ? [] : ["SKILL.md"])]) {
           const expected = fs.readFileSync(path.join(import.meta.dirname, "..", "skills", name, relative), "utf8");
           const actual = fs.readFileSync(path.join(home, root, "skills", name, relative), "utf8");
@@ -60,7 +65,7 @@ test("global setup installs the skill and local planning runtime for every agent
 
 test("setup refreshes linked Claude skills without replacing links", () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "human-review-linked-"));
-  const names = ["human-review", "ordinary-review", "planning-review", "loa-review", "host-workspace-operator"];
+  const names = FOCUSED_SKILLS;
   try {
     for (const name of names) {
       const shared = path.join(home, ".agents", "skills", name);

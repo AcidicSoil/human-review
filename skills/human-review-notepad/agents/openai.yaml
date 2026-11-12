@@ -1,0 +1,7 @@
+interface:
+  display_name: "Human Review Notepad"
+  short_description: "Capture and manage project notes without blocking"
+  default_prompt: "Use $human-review-notepad to keep a project notebook open and capture deferred work safely."
+policy:
+  products: [CHAT, CODEX]
+  allow_implicit_invocation: true

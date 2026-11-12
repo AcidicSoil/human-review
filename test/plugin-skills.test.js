@@ -23,6 +23,11 @@ const cases = [
     command: "human-review-loa.mjs",
     forbidden: ["human-review-plan.mjs"],
   },
+  {
+    name: "human-review-notepad",
+    command: "human-review notes open",
+    forbidden: ["human-review-plan.mjs", "human-review-loa.mjs"],
+  },
 ];
 for (const entry of cases) {
   test(`${entry.name} is a discoverable Human Review plugin skill`, () => {
@@ -54,6 +59,21 @@ test("plugin starter prompts surface every focused review skill", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, ".codex-plugin", "plugin.json"), "utf8"));
   const prompts = manifest.interface.defaultPrompt.join("\n");
   for (const entry of cases) assert.match(prompts, new RegExp(entry.name));
+});
+
+test("notepad skill describes automatic capture and permission-gated processing", () => {
+  const skill = fs.readFileSync(path.join(skillsRoot, "human-review-notepad", "SKILL.md"), "utf8");
+  assert.match(skill, /session start|start of .*project session/i);
+  assert.match(skill, /notes add/);
+  assert.match(skill, /notes inbox/);
+  assert.match(skill, /notes ack/);
+  assert.match(skill, /notes poll.*--timeout/);
+  assert.match(skill, /notes done/);
+  assert.match(skill, /notes delete/);
+  assert.match(skill, /--scope/);
+  assert.match(skill, /Move all/);
+  assert.match(skill, /explicit.*request|explicit.*instruction/i);
+  assert.match(skill, /never .*automatical|do not automatically/i);
 });
 
 test("loa-review defaults to the approved prototype catalog contract", () => {

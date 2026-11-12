@@ -32,8 +32,8 @@ You can also install it with `npx`:
 npx -y human-review setup --global
 ```
 
-Setup synchronizes **all five Human Review skills** (Human Review, Ordinary Review,
-Planning Review, LOA Review, and Host Workspace Operator) into Claude Code, Codex,
+Setup synchronizes **all six Human Review skills** (Human Review, Ordinary Review,
+Planning Review, LOA Review, Notepad, and Host Workspace Operator) into Claude Code, Codex,
 and shared agents when run with `--global`. It preserves existing skill-directory
 symlinks and unrelated files, and refreshes each skill's agent metadata. The
 umbrella Human Review skill also installs the planning/LOA runtimes **inside its
@@ -71,13 +71,15 @@ After selecting or @-mentioning **Human Review**, name the entry skill in the sa
 @Human Review — ordinary-review: Review ./prototype.html and apply my browser feedback.
 @Human Review — planning-review: Turn docs/implementation-plan.md into an editable review artifact.
 @Human Review — loa-review: Build a reviewable LOA for shipping the settings feature. Populate the component rail from my installed Codex plugins and skills.
+@Human Review — human-review-notepad: Open my project Notepad, capture deferred observations, and handle only explicitly sent handoffs.
 ```
 
-The plugin exposes three focused entry skills:
+The plugin exposes four focused entry skills:
 
 - `ordinary-review` — HTML, rendered Markdown, or localhost pages with the live feedback loop.
 - `planning-review` — plans, specs, PRDs, roadmaps, and implementation proposals.
 - `loa-review` — structured Lists of Actions with plugin/skill composition.
+- `human-review-notepad` — persistent project notes, non-blocking capture, and explicit user handoffs.
 
 The existing `human-review` skill remains as a backwards-compatible umbrella and shared runtime support.
 
