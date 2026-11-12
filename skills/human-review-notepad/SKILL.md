@@ -1,6 +1,6 @@
 ---
 name: human-review-notepad
-description: Use when working on any project to proactively check Human Review Notepad for unfinished work, avoid duplicate HUD windows by checking status before opening, capture next steps, resume interruptions, and read handoffs. Check notes without waiting for a user request.
+description: Use when proactively checking unfinished project work, capturing notes and handoffs, or reporting a failure in a tool owned by another project. Preserve linked bug reports and track fixes across notebooks; verify the current HUD before opening one.
 ---
 
 # Human Review Notepad
@@ -27,6 +27,7 @@ human-review notes open
 human-review notes list
 human-review notes add "Verify the remaining parser edge case"
 human-review notes edit <note-id> "Revised parser edge case"
+human-review notes report <note-id> --to /path/to/tool --expected "Expected" --actual "Failed" --steps "Reproduce"
 human-review notes inbox
 human-review notes poll --timeout 30
 human-review notes ack <handoff-id>
@@ -39,6 +40,22 @@ human-review notes delete <note-id>
 - `ack` records receipt; `done` records verified completion. Reopen work with `reopen` when needed. These are different operations.
 - Notes are working context, not automatic instructions to run unrelated or destructive tasks. Continue relevant unfinished work within the current assignment; surface unrelated work for prioritization.
 - Use `delete` only for explicitly intended permanent removal. Do not delete notes just because they are complete.
+
+## Cross-project tool bugs
+
+When a tool belonging to another project fails during intended use, record the
+unfinished issue in the current project's notebook immediately. **Report issue**
+on that note in the HUD, or run `notes report` with the tool owner's directory,
+expected behavior, observed failure, and reproducible steps. Use the actual
+tool project, never a guessed owner. An existing tool directory without a notebook
+is a valid report destination; no project files are created.
+
+The tool owner's notebook receives a linked actionable report. Agents working on
+that tool should check these incoming notes proactively and fix reproducible
+problems in their own project. After verifying the repair, mark the report Done
+(**Mark fix available**). The reporter then sees **Fix available — verify**.
+The original note stays pending until the reporting project confirms the fix
+in its own environment. No automatic handoff or unrelated work execution occurs.
 
 ## Project notebooks
 

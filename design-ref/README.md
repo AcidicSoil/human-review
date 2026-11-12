@@ -8,9 +8,10 @@ The editable document contains four original exploratory frames, six LOA inspect
 states, and one Notepad HUD state matching the shipped non-blocking notebook.
 
 A separate [cross-project bug-report prototype](notepad-cross-project-reports.figcraft)
-shows the proposed reporting flow before implementation. It contains four native,
-editable FigCraft screens with click-through transitions (use FigCraft's prototype
-player). This is a design proposal, **not implemented Notepad behavior**:
+documents the implemented cross-project reporting workflow. It contains four
+native, editable FigCraft screens with click-through transitions (use FigCraft's
+prototype player). The prototype remains a static design reference; the live
+HUD uses the same flow with its own controls:
 
 | Screen | User journey |
 | --- | --- |

@@ -22,6 +22,16 @@ function validText(text) {
   return text.trim();
 }
 
+function createNote(text, author, extra = {}) {
+  const noteText = validText(text);
+  if (author !== "agent" && author !== "user") throw new TypeError("Unknown note author.");
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(), text: noteText, author, status: "pending",
+    createdAt: now, updatedAt: now, ...extra,
+  };
+}
+
 /**
  * Durable, workspace-scoped notes, separate from review feedback batches.
  * The authenticated local server is the only writer; CLI and HUD use its API.
@@ -55,6 +65,19 @@ export class NotepadStore {
     return [...this.notebooks].sort((a, b) => a.localeCompare(b));
   }
 
+  listWithReports(scope) {
+    return this.list(scope).map(note => {
+      if (!note.reportedTo?.length) return note;
+      return {
+        ...note,
+        reportedTo: note.reportedTo.map(link => ({
+          ...link,
+          status: this.list(link.scope).find(item => item.id === link.noteId)?.status || "deleted",
+        })),
+      };
+    });
+  }
+
   deleteScope(scope) {
     validScope(scope);
     const notesDeleted = this.scopes[scope]?.length || 0;
@@ -69,19 +92,9 @@ export class NotepadStore {
 
   add(scope, text, author = "user") {
     validScope(scope);
-    const noteText = validText(text);
-    if (author !== "agent" && author !== "user") throw new TypeError("Unknown note author.");
     const notes = this.scopes[scope] || [];
     if (notes.length >= MAX_NOTES_PER_SCOPE) throw new RangeError("Notepad is full (1000 notes per scope).");
-    const now = new Date().toISOString();
-    const note = {
-      id: crypto.randomUUID(),
-      text: noteText,
-      author,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-    };
+    const note = createNote(text, author);
     this.scopes[scope] = [...notes, note];
     this.notebooks.add(scope);
     this.save();
@@ -150,6 +163,44 @@ export class NotepadStore {
     this.scopes[destination] = [...targetNotes, ...moved];
     this.save();
     return moved;
+  }
+
+  /** Report a tool failure without moving the originating note or sending a handoff. */
+  reportIssue(scope, noteId, destination, { expected, actual, steps } = {}) {
+    validScope(scope);
+    validScope(destination);
+    if (!path.isAbsolute(destination) || !fs.existsSync(destination) ||
+        !fs.statSync(destination).isDirectory() || path.resolve(scope) === path.resolve(destination)) {
+      throw new TypeError("Choose a different, existing tool project directory.");
+    }
+    destination = path.resolve(destination);
+    const details = {
+      expected: validText(expected), actual: validText(actual), steps: validText(steps),
+    };
+    const source = this.list(scope);
+    const original = source.find(note => note.id === noteId);
+    if (!original) return null;
+    const target = this.list(destination);
+    const existing = original.reportedTo?.find(link => link.scope === destination);
+    if (existing) {
+      const current = target.find(note => note.id === existing.noteId);
+      if (current) return current;
+    }
+    if (target.length >= MAX_NOTES_PER_SCOPE) {
+      throw new RangeError("Destination notebook is full (1000 notes per scope).");
+    }
+    const report = createNote(original.text, "agent", {
+      bugReport: { sourceScope: scope, sourceNoteId: noteId, ...details },
+    });
+    this.scopes[destination] = [...target, report];
+    this.scopes[scope] = source.map(note => note.id === noteId ? {
+      ...note,
+      reportedTo: [...(note.reportedTo || []).filter(link => link.scope !== destination),
+        { scope: destination, noteId: report.id }],
+    } : note);
+    this.notebooks.add(destination);
+    this.save();
+    return report;
   }
 
   /** Only explicitly selected note IDs enter a handoff. Handoffs never execute notes. */

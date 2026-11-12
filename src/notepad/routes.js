@@ -94,7 +94,7 @@ export function createNotepadRoute({ token, viewToken }) {
 
     if (route === "/api/notepad" && req.method === "GET") {
       try {
-        json(res, 200, { notes: notepad().list(scope), handoffs: notepad().outbox(scope) });
+        json(res, 200, { notes: notepad().listWithReports(scope), handoffs: notepad().outbox(scope) });
       } catch (error) {
         badInput(error, res, json);
       }
@@ -105,6 +105,17 @@ export function createNotepadRoute({ token, viewToken }) {
       try {
         const body = await readBody(req);
         json(res, 201, { note: notepad().add(scope, body.text, body.author || "user") });
+      } catch (error) {
+        badInput(error, res, json);
+      }
+      return true;
+    }
+
+    if (route === "/api/notepad/report" && req.method === "POST") {
+      try {
+        const body = await readBody(req);
+        const report = notepad().reportIssue(scope, body.noteId, body.destination, body);
+        json(res, report ? 201 : 404, report ? { report } : { error: "Unknown source note." });
       } catch (error) {
         badInput(error, res, json);
       }

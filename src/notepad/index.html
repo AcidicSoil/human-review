@@ -58,6 +58,25 @@
         <button id="confirm-move" class="primary" type="button" disabled>Move here</button>
         <button id="cancel-move" class="status" type="button">Cancel</button>
       </div>
+      <section id="report-panel" class="report-panel" aria-label="Report tool issue" hidden>
+        <form id="report-form">
+          <p class="report-heading">Report tool issue</p>
+          <p id="report-note-title" class="report-source-title"></p>
+          <label for="report-destination">Tool project directory</label>
+          <input id="report-destination" list="report-projects" placeholder="/path/to/tool-project" required>
+          <datalist id="report-projects"></datalist>
+          <label for="report-expected">Expected behavior</label>
+          <textarea id="report-expected" rows="2" maxlength="4000" required></textarea>
+          <label for="report-actual">What actually happened</label>
+          <textarea id="report-actual" rows="2" maxlength="4000" required></textarea>
+          <label for="report-steps">Steps to reproduce</label>
+          <textarea id="report-steps" rows="3" maxlength="4000" required></textarea>
+          <div class="report-actions">
+            <button id="send-report" class="primary" type="submit">Send bug report</button>
+            <button id="cancel-report" class="status" type="button">Cancel</button>
+          </div>
+        </form>
+      </section>
       <ul id="notes" class="notes"></ul>
       <p id="empty" class="empty" hidden>No notes yet.</p>
     </section>

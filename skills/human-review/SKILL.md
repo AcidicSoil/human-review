@@ -179,6 +179,7 @@ is required to read or check notes. Capture discoveries immediately:
 human-review notes status                              # verify before opening
 human-review notes add "Remember to verify the parser"  # agent capture
 human-review notes edit <id> "Revised parser note"       # revise existing note
+human-review notes report <id> --to /path/to/tool --expected "Expected" --actual "Failed" --steps "Reproduce"
 human-review notes open                                # user-facing HUD
 human-review notes list                                # check proactively
 human-review notes done <id>                           # after processing
@@ -208,6 +209,15 @@ Both operations preserve note status, author, ID, and timestamps. The source
 notebook remains selectable when empty, and moves cannot create new notebooks.
 Existing sent handoffs stay in their original notebook; moving notes does not
 notify or authorize an agent.
+When another project's tool fails during intended use, proactively record the
+failure in the current notebook and use **Report issue** or `notes report` to
+send a linked report to the tool-owning project. Include expected behavior,
+actual failure and steps to reproduce. Reporting retains the originating note,
+and can create a notebook entry for an existing tool directory, without changing
+project files. Tool owners mark reports **Fix available** (Done) after repairing;
+source notes display that status but remain pending until the reporting project
+verifies the fix. Inspect incoming reports with `notes list --scope /tool/path`
+without waiting for a handoff.
 Only on explicit user request, the adjacent Delete button can remove one
 project's entire notebook, including notes and handoffs, after confirmation;
 it never deletes project files. An agent waiting on that notebook receives

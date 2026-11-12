@@ -78,7 +78,7 @@ test("notepad instructions proactively check unfinished work without permission 
     assert.doesNotMatch(content, /do not automatically\s+monitor notes|never process notes\s+automatically/i);
   }
   const skill = fs.readFileSync(path.join(skillsRoot, "human-review-notepad", "SKILL.md"), "utf8");
-  for (const command of ["notes add", "notes edit", "notes inbox", "notes ack", "notes poll --timeout", "notes done", "notes delete"]) {
+  for (const command of ["notes add", "notes edit", "notes report", "notes inbox", "notes ack", "notes poll --timeout", "notes done", "notes delete"]) {
     assert.match(skill, new RegExp(command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(skill, /Move all/);

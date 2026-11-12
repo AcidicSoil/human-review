@@ -1,10 +1,10 @@
 :root { color-scheme: dark; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: #0d1420; color: #e6edf7; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 300px; }
-button, textarea, select { font: inherit; }
+button, textarea, select, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
-button:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid #7ba5ff; outline-offset: 2px; }
+button:focus-visible, textarea:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid #7ba5ff; outline-offset: 2px; }
 .hud { width: 100%; max-width: 520px; margin: 0 auto; min-height: 100dvh; padding: 18px; display: flex; flex-direction: column; gap: 18px; }
 .heading { display: flex; align-items: center; gap: 12px; }
 .symbol { border-radius: 12px; background: #263750; color: #b9d1fb; width: 44px; height: 44px; display: grid; place-items: center; font-size: 27px; line-height: 1; }
@@ -66,3 +66,16 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
 .note.is-selected { border-color: #7398d0; background: #1c2d43; }
 .note-choice { width: 16px; height: 16px; margin: 2px 2px 0 0; flex: none; accent-color: #7ba5ff; cursor: pointer; }
 .delivery-status { color: #bcd6f9 !important; font-weight: 650; }
+.report-panel { padding: 14px; border: 1px solid #355779; border-radius: 11px; background: #182638; }
+.report-panel[hidden] { display: none; }
+.report-panel form { display: flex; flex-direction: column; gap: 8px; }
+.report-panel label { color: #a8bcd8; font-size: 12px; }
+.report-panel input, .report-panel textarea { width: 100%; min-height: 0; padding: 9px; border: 1px solid #405a79; border-radius: 8px; background: #111d2d; color: inherit; }
+.report-panel textarea { min-height: 60px; }
+.report-heading { font-size: 17px; font-weight: 650; margin: 0; }
+.report-source-title { margin: 0 0 8px; color: #9fb6d0; overflow-wrap: anywhere; }
+.report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-status, .bug-details { margin-top: 8px; color: #bcd6f9; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-status { border-left: 2px solid #537dc9; padding-left: 8px; }
+.bug-details { color: #d0ddeb; }
+.note-main .status { margin-top: 7px; }

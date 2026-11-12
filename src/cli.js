@@ -23,6 +23,8 @@ const HELP = `human-review ${pkg.version}
   human-review notes open             Focus/reuse the existing HUD, or open the first
   human-review notes add <text>       Capture a note without interrupting review
   human-review notes edit <id> <text> Update existing note text
+  human-review notes report <id>      Report a tool failure to its owning project
+      --to <project-path> --expected <text> --actual <text> --steps <text>
   human-review notes list             Read saved notes (JSON)
   human-review notes done <id>        Mark a processed note complete
   human-review notes reopen <id>      Return a completed note to pending
@@ -304,6 +306,10 @@ function parseNotesArgs(args) {
   const values = [];
   let explicitScope;
   let timeoutSecs = null;
+  const report = {};
+  const reportOptions = {
+    "--to": "destination", "--expected": "expected", "--actual": "actual", "--steps": "steps",
+  };
   for (let index = 1; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--scope") {
@@ -312,18 +318,28 @@ function parseNotesArgs(args) {
       explicitScope = value;
     } else if (arg === "--timeout") {
       timeoutSecs = Number(args[++index]);
+    } else if (Object.hasOwn(reportOptions, arg)) {
+      const value = args[++index];
+      if (action !== "report" || !value || value.startsWith("--")) {
+        throw new Error(arg + " requires a value with notes report.");
+      }
+      report[reportOptions[arg]] = value;
     } else if (arg.startsWith("--")) {
       throw new Error("Unknown notes option: " + arg);
     } else {
       values.push(arg);
     }
   }
-  if (!["status", "open", "add", "edit", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
+  if (!["status", "open", "add", "edit", "report", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
     throw new Error("Unknown notes command: " + action);
   }
   if (action === "add" && values.length !== 1) throw new Error("Usage: human-review notes add <text> [--scope <workspace>]");
   if (action === "edit" && values.length !== 2) {
     throw new Error("Usage: human-review notes edit <id> <text> [--scope <workspace>]");
+  }
+  if (action === "report" && (values.length !== 1 ||
+      ["destination", "expected", "actual", "steps"].some(field => !report[field]?.trim()))) {
+    throw new Error("Usage: human-review notes report <id> --to <project-path> --expected <text> --actual <text> --steps <text> [--scope <workspace>]");
   }
   if (["done", "reopen", "delete", "ack"].includes(action) && values.length !== 1) {
     throw new Error("Usage: human-review notes " + action + " <id> [--scope <workspace>]");
@@ -334,7 +350,7 @@ function parseNotesArgs(args) {
   if (timeoutSecs !== null && (action !== "poll" || !Number.isFinite(timeoutSecs) || timeoutSecs <= 0)) {
     throw new Error("--timeout requires a positive number and is only available with notes poll.");
   }
-  return { action, scope: resolveNotesScope({ explicitScope }), value: values[0], editText: values[1], timeoutSecs };
+  return { action, scope: resolveNotesScope({ explicitScope }), value: values[0], editText: values[1], report, timeoutSecs };
 }
 
 /** The agent opts into listening. No incoming handoff automatically starts a task. */
@@ -369,7 +385,7 @@ async function pollNotes(scope, timeoutSecs) {
 }
 
 async function notesCommand(args) {
-  const { action, scope, value, editText, timeoutSecs } = parseNotesArgs(args);
+  const { action, scope, value, editText, report, timeoutSecs } = parseNotesArgs(args);
   if (action === "status") {
     const server = readServerRecord();
     let state = { open: false, opening: false, scopes: [] };
@@ -395,6 +411,10 @@ async function notesCommand(args) {
   else if (action === "add") {
     method = "POST";
     body = { text: value, author: "agent" };
+  } else if (action === "report") {
+    method = "POST";
+    route = "/api/notepad/report" + query;
+    body = { noteId: value, ...report };
   } else if (action === "done" || action === "reopen" || action === "edit") {
     method = "PATCH";
     route = "/api/notepad/" + encodeURIComponent(value) + query;
@@ -435,6 +455,7 @@ async function notesCommand(args) {
       : action === "inbox" ? payload.handoffs
       : action === "delete" ? payload
       : action === "ack" ? payload.handoff
+      : action === "report" ? payload.report
       : payload.note;
     process.stdout.write(JSON.stringify(output, null, 2) + "\n");
   }

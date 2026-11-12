@@ -18,6 +18,10 @@ const movePanel = document.getElementById("move-panel");
 const moveDestination = document.getElementById("move-destination");
 const confirmMove = document.getElementById("confirm-move");
 const selectedCount = document.getElementById("selected-count");
+const reportPanel = document.getElementById("report-panel");
+const reportForm = document.getElementById("report-form");
+const reportDestination = document.getElementById("report-destination");
+const reportProjects = document.getElementById("report-projects");
 const filters = [...document.querySelectorAll("[data-filter]")];
 
 let notes = [];
@@ -32,6 +36,8 @@ let selectedIds = new Set();
 let sending = false;
 let moving = false;
 let moveMode = null;
+let reportingNoteId = null;
+let reporting = false;
 let projects = [];
 let confirmingNotebookDelete = false;
 let deletingNotebook = false;
@@ -58,7 +64,9 @@ function renderScopeOptions(select, values, placeholder = false) {
     option.title = value;
     select.append(option);
   }
-  select.value = options.includes(previous) ? previous : options[0] || "";
+  if (select.tagName !== "DATALIST") {
+    select.value = options.includes(previous) ? previous : options[0] || "";
+  }
 }
 
 function renderMovePanel() {
@@ -83,9 +91,10 @@ function renderProjects() {
   notebookConfirm.hidden = !confirmingNotebookDelete;
   document.getElementById("notebook-delete-name").textContent = scope;
   renderMovePanel();
+  renderScopeOptions(reportProjects, projects.filter(project => project !== scope));
 }
 
-function switchScope(next) {
+function switchScope(next, nextFilter = "pending") {
   if (!next || next === scope) return;
   drafts.set(scope, input.value);
   scope = next;
@@ -98,7 +107,10 @@ function switchScope(next) {
   editingDraft = "";
   confirmingNotebookDelete = false;
   moveMode = null;
-  filter = "pending";
+  reportingNoteId = null;
+  reportPanel.hidden = true;
+  reportForm.reset();
+  filter = nextFilter;
   const url = new URL(location.href);
   url.searchParams.set("scope", scope);
   history.replaceState(null, "", url);
@@ -200,6 +212,35 @@ function renderInlineEditor(note, text, actions, notePath, viewedScope) {
   actions.append(save, cancel);
 }
 
+function renderReportLinks(note, body) {
+  const projectLink = (label, destination) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "status " + (label === "View source" ? "view-source" : "view-report");
+    button.textContent = label;
+    button.addEventListener("click", () => switchScope(destination, "all"));
+    body.append(button);
+  };
+  if (note.bugReport) {
+    const details = document.createElement("div");
+    details.className = "bug-details";
+    const { sourceScope, expected, actual, steps } = note.bugReport;
+    details.textContent = "From " + notebookName(sourceScope) +
+      "\nExpected: " + expected + "\nObserved: " + actual + "\nReproduce: " + steps;
+    body.append(details);
+    projectLink("View source", sourceScope);
+  }
+  for (const link of note.reportedTo || []) {
+    const status = document.createElement("div");
+    status.className = "report-status";
+    const state = link.status === "done" ? "Fix available — verify" :
+      link.status === "deleted" ? "Report removed" : "Pending";
+    status.textContent = notebookName(link.scope) + ": " + state;
+    body.append(status);
+    projectLink("View report", link.scope);
+  }
+}
+
 function render() {
   const viewedScope = scope;
   const pending = notes.filter(note => note.status === "pending");
@@ -239,6 +280,7 @@ function render() {
     const byline = document.createElement("small");
     byline.textContent = `${note.author === "agent" ? "Agent" : "You"} · ${new Date(note.createdAt).toLocaleString()}`;
     body.append(text, byline);
+    renderReportLinks(note, body);
     const latest = [...handoffs].reverse().find(handoff => handoff.notes.some(item => item.id === note.id));
     if (latest) {
       const delivery = document.createElement("small");
@@ -286,8 +328,11 @@ function render() {
       button.type = "button";
       button.className = "status";
       const isDone = note.status === "done";
-      button.textContent = isDone ? "Reopen" : "Done";
-      button.setAttribute("aria-label", `${isDone ? "Reopen" : "Mark done"}: ${note.text.slice(0, 70)}`);
+      const title = isDone ? "Reopen" :
+        note.bugReport ? "Mark fix available" : "Done";
+      button.textContent = title;
+      button.classList.toggle("fix-available", !!note.bugReport && !isDone);
+      button.setAttribute("aria-label", title + ": " + note.text.slice(0, 70));
       button.addEventListener("click", async () => {
         button.disabled = true;
         try {
@@ -325,7 +370,23 @@ function render() {
         confirmingDeleteId = note.id;
         render();
       });
-      actions.append(button, edit, remove);
+      actions.append(button, edit);
+      if (!note.bugReport) {
+        const report = document.createElement("button");
+        report.type = "button";
+        report.className = "status report-note";
+        report.textContent = "Report issue";
+        report.setAttribute("aria-label", "Report issue: " + note.text.slice(0, 70));
+        report.addEventListener("click", () => {
+          reportingNoteId = note.id;
+          reportForm.reset();
+          document.getElementById("report-note-title").textContent = note.text;
+          reportPanel.hidden = false;
+          reportDestination.focus();
+        });
+        actions.append(report);
+      }
+      actions.append(remove);
     }
     row.append(choice, body, actions);
     list.append(row);
@@ -430,6 +491,53 @@ confirmMove.addEventListener("click", async () => {
     moving = false;
     updateSelection();
     renderProjects();
+  }
+});
+
+document.getElementById("cancel-report").addEventListener("click", () => {
+  if (reporting) return;
+  reportingNoteId = null;
+  reportPanel.hidden = true;
+  reportForm.reset();
+});
+
+reportForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (reporting || !reportingNoteId) return;
+  const origin = scope;
+  const noteId = reportingNoteId;
+  const destination = reportDestination.value.trim();
+  const details = {
+    noteId, destination,
+    expected: document.getElementById("report-expected").value,
+    actual: document.getElementById("report-actual").value,
+    steps: document.getElementById("report-steps").value,
+  };
+  reporting = true;
+  document.getElementById("send-report").disabled = true;
+  document.getElementById("cancel-report").disabled = true;
+  try {
+    const { report } = await request("POST",
+      "/api/notepad/report?scope=" + encodeURIComponent(origin), details);
+    if (scope !== origin) return;
+    notes = notes.map(note => note.id === noteId ? {
+      ...note,
+      reportedTo: [...(note.reportedTo || []).filter(link =>
+        link.scope !== destination || link.noteId !== report.id),
+      { scope: destination, noteId: report.id, status: report.status }],
+    } : note);
+    reportingNoteId = null;
+    reportPanel.hidden = true;
+    reportForm.reset();
+    render();
+    await refresh();
+    message.textContent = "Reported to " + notebookName(destination);
+  } catch (error) {
+    if (scope === origin) message.textContent = error.message;
+  } finally {
+    reporting = false;
+    document.getElementById("send-report").disabled = false;
+    document.getElementById("cancel-report").disabled = false;
   }
 });
 

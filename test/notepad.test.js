@@ -228,6 +228,15 @@ test("CLI adds, lists, completes and reopens notes through the authenticated ser
   const reopened = await run("reopen", note.id, "--scope", scope);
   assert.equal(reopened.code, 0, reopened.stderr);
   assert.equal(JSON.parse(reopened.stdout).status, "pending");
+  const owner = path.join(tmp, "tool-owner");
+  fs.mkdirSync(owner, { recursive: true });
+  const reported = await run("report", note.id, "--to", owner, "--expected", "Works",
+    "--actual", "Throws", "--steps", "Run tool", "--scope", scope);
+  assert.equal(reported.code, 0, reported.stderr);
+  const report = JSON.parse(reported.stdout);
+  assert.equal(report.bugReport.sourceNoteId, note.id);
+  assert.equal(JSON.parse((await run("list", "--scope", owner)).stdout)[0].id, report.id);
+  assert.equal(JSON.parse((await run("list", "--scope", scope)).stdout)[0].reportedTo[0].status, "pending");
   const removed = await run("delete", note.id, "--scope", scope);
   assert.equal(removed.code, 0, removed.stderr);
   assert.equal(JSON.parse(removed.stdout).deletedId, note.id);
@@ -266,6 +275,7 @@ test("CLI help documents the manual notepad lifecycle", async () => {
   assert.match(output.stdout, /notes open/);
   assert.match(output.stdout, /notes add <text>/);
   assert.match(output.stdout, /notes edit <id> <text>/);
+  assert.match(output.stdout, /notes report <id>/);
   assert.match(output.stdout, /notes list/);
   assert.match(output.stdout, /notes done <id>/);
   assert.match(output.stdout, /notes delete <id>/);
