@@ -1,15 +1,15 @@
 /**
- * Tracks open Notepad browser windows per workspace.
+ * Tracks live Notepad browser windows across all project scopes.
  *
  * A browser's authenticated streaming connection is its live registration.
- * Launch reservations cover the short interval before the first connection,
- * so simultaneous CLI invocations don't each open a window.
+ * One launch reservation prevents duplicate HUDs even when different agents
+ * request different project scopes concurrently.
  *
  * This does not own Human Review's session or feedback state.
  */
 export function createNotepadWindowRegistry({ now = Date.now, launchGraceMs = 20000 } = {}) {
   const connections = new Map();
-  const launching = new Map();
+  let launchingUntil = 0;
 
   function connect(scope, response) {
     let active = connections.get(scope);
@@ -18,7 +18,7 @@ export function createNotepadWindowRegistry({ now = Date.now, launchGraceMs = 20
       connections.set(scope, active);
     }
     active.add(response);
-    launching.delete(scope);
+    launchingUntil = 0;
 
     response.writeHead(200, {
       "content-type": "application/x-ndjson; charset=utf-8",
@@ -38,14 +38,22 @@ export function createNotepadWindowRegistry({ now = Date.now, launchGraceMs = 20
   }
 
   function activate(scope) {
-    const active = connections.get(scope);
+    const active = connections.get(scope) || connections.values().next().value;
     if (active?.size) {
-      active.values().next().value.write('{"event":"focus"}\n');
+      active.values().next().value.write(JSON.stringify({ event: "focus", scope }) + "\n");
       return { action: "reused" };
     }
-    if ((launching.get(scope) || 0) > now()) return { action: "opening" };
-    launching.set(scope, now() + launchGraceMs);
+    if (launchingUntil > now()) return { action: "opening" };
+    launchingUntil = now() + launchGraceMs;
     return { action: "launch" };
+  }
+
+  function status() {
+    return {
+      open: connections.size > 0,
+      opening: connections.size === 0 && launchingUntil > now(),
+      scopes: [...connections.keys()],
+    };
   }
 
   function hasOpenWindows() {
@@ -57,8 +65,8 @@ export function createNotepadWindowRegistry({ now = Date.now, launchGraceMs = 20
       for (const response of active) response.end();
     }
     connections.clear();
-    launching.clear();
+    launchingUntil = 0;
   }
 
-  return { connect, activate, hasOpenWindows, close };
+  return { connect, activate, status, hasOpenWindows, close };
 }

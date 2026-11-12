@@ -93,6 +93,7 @@ is executed or scheduled automatically, and ordinary review Send/Poll remains
 independent.
 
 ```sh
+human-review notes status
 human-review notes open
 human-review notes add "Investigate the cache policy later"
 human-review notes list
@@ -110,12 +111,16 @@ the current working directory is the scope. Set `HUMAN_REVIEW_DEFAULT_SCOPE` to
 use a fixed notebook, or pass `--scope <workspace>` to override it for one command.
 Precedence is explicit `--scope`, environment default, Git root, then current
 directory. Use the same scope for every command that should share a notebook.
-The HUD can pop out into a compact browser window; leave it alongside your
-conversation. Repeating `notes open` **reuses the live window for that
-workspace** instead of opening duplicates. It requests focus on that window
-(browser/OS restrictions can prevent bringing it to the foreground).
-A different workspace gets its own window. Closing a window releases its
-registration; simultaneous agent launches reserve one opening for 20 seconds.
+Before launching, run `human-review notes status` to inspect the registered
+HUD without starting a browser or server. `open: true` means reuse the
+existing window; `notes open --scope /project/path` focuses it and switches the
+project without spawning a duplicate. `opening: true` means another agent is
+launching it; recheck status instead of opening another instance. Launch only
+when neither is true. If status cannot verify an older running server, check
+the existing browser window instead of assuming it is closed. `notes open`
+also enforces reuse globally across concurrent agents and project scopes.
+The HUD can pop out into a compact browser window when the user requests it.
+Browser/OS restrictions can prevent focus; closing it releases registration.
 User changes appear immediately; agent additions appear on the next refresh.
 The project selector lists existing notebooks, including empty notebooks and
 projects with the same folder name (shown with their paths). Switching changes

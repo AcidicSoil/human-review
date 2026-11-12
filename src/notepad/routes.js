@@ -51,6 +51,11 @@ export function createNotepadRoute({ token, viewToken }) {
       return true;
     }
 
+    if (route === "/api/notepad/window/status" && req.method === "GET") {
+      json(res, 200, windows.status());
+      return true;
+    }
+
     if (route === "/api/notepad/window/activate" && req.method === "POST") {
       try {
         notepad().list(scope);

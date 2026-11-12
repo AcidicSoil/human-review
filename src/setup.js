@@ -161,10 +161,15 @@ For non-blocking capture during a task, use
 \`npx -y human-review notes open\`. Notes default to the Git repository root,
 or the current directory outside Git. \`HUMAN_REVIEW_DEFAULT_SCOPE\` selects a
 fixed default, and \`--scope <workspace>\` overrides it for one command.
-At session start, \`notes open\` reuses an already-open workspace window and
-requests focus instead of spawning duplicates. Proactively check unfinished
-work with \`notes list\` and \`notes inbox\` at session start and natural
-checkpoints; no user permission is needed to read notes. The HUD project dropdown
+At session start, run \`npx -y human-review notes status\` before opening
+anything. Status is read-only: if \`open: true\`, reuse the existing HUD via
+\`notes open --scope /project/path\` to focus/switch it without spawning another
+window; if \`opening: true\`, recheck status while another launch is reserved.
+Only open the first HUD if neither is true. If status cannot verify an older
+running server, check the browser HUD before opening. Never manually open
+another HUD URL or window. Proactively check unfinished work with \`notes list\` and
+\`notes inbox\` at natural checkpoints; no user permission is needed to read
+notes. The HUD project dropdown
 switches existing notebooks in one window. To move notes, the user checks
 selected notes and presses Move, or presses Move all for the entire notebook
 including completed and filtered notes. Both require choosing an existing

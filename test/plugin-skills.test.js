@@ -69,6 +69,9 @@ test("notepad instructions proactively check unfinished work without permission 
   ]) {
     const content = fs.readFileSync(file, "utf8");
     assert.match(content, /notes list/);
+    assert.match(content, /notes status/);
+    assert.match(content, /open: true/);
+    assert.match(content, /opening: true/);
     assert.match(content, /session start|start of .*project session/i);
     assert.match(content, /proactive|check.*(notes|unfinished)/i);
     assert.doesNotMatch(content, /notes list[^\n]*only on request|only run[^\n]*notes list[^\n]*when/i);

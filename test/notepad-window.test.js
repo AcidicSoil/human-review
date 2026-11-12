@@ -63,12 +63,12 @@ async function waitFor(predicate) {
   assert.fail("Expected window event did not arrive");
 }
 
-function cli(...args) {
+function cliWithEnv(args, extraEnv={}) {
   return new Promise((resolve,reject)=>{
     const child=spawn(process.execPath,["src/cli.js","notes",...args],{
       cwd:root,
       env:{...process.env,PATH:directory+"/bin:"+process.env.PATH,
-        BROWSER:directory+"/bin/browser-stub", OPEN_LOG:directory+"/open.log"},
+        BROWSER:directory+"/bin/browser-stub", OPEN_LOG:directory+"/open.log",...extraEnv},
     });
     let output="", errors="";
     child.stdout.on("data",chunk=>output+=chunk);
@@ -78,7 +78,29 @@ function cli(...args) {
   });
 }
 
-test("open distinguishes new, already opening, active, and closed windows per scope", async t=>{
+const cli=(...args)=>cliWithEnv(args);
+
+test("notepad status checks existing windows without opening one", async t => {
+  const server=await start(0);
+  t.after(()=>server.dispose());
+  const statusUrl="/api/notepad/window/status";
+  assert.equal((await request(server,statusUrl,"GET","")).status,401);
+  assert.deepEqual((await request(server,statusUrl)).body,{open:false,opening:false,scopes:[]});
+  const before=await cli("status");
+  assert.equal(before.status,0,before.errors);
+  assert.deepEqual(JSON.parse(before.output),{open:false,opening:false,scopes:[]});
+  const scope="/project/live-window";
+  await request(server,"/api/notepad/window/activate?scope="+encodeURIComponent(scope),"POST");
+  const opening=await cli("status");
+  assert.deepEqual(JSON.parse(opening.output),{open:false,opening:true,scopes:[]});
+  const listener=await observe(server,scope);
+  t.after(()=>listener.req.destroy());
+  const active=await cli("status");
+  assert.deepEqual(JSON.parse(active.output),{open:true,opening:false,scopes:[scope]});
+  assert.ok(!fs.existsSync(directory+"/open.log"),"status must never invoke browser");
+});
+
+test("open reuses any active HUD window and switches its project", async t=>{
   const server=await start(0);
   t.after(()=>server.dispose());
   const endpoint="/api/notepad/window/activate?scope=";
@@ -86,19 +108,26 @@ test("open distinguishes new, already opening, active, and closed windows per sc
   assert.equal((await request(server,"/api/notepad/window/connect?scope=one","GET","")).status,401);
   assert.deepEqual((await request(server,endpoint+"one","POST")).body,{action:"launch"});
   assert.deepEqual((await request(server,endpoint+"one","POST")).body,{action:"opening"});
-  assert.deepEqual((await request(server,endpoint+"two","POST")).body,{action:"launch"});
+  assert.deepEqual((await request(server,endpoint+"two","POST")).body,{action:"opening"});
   const listener=await observe(server,"one");
   t.after(()=>listener.req.destroy());
   assert.equal(listener.events[0].event,"ready");
   assert.deepEqual((await request(server,endpoint+"one","POST")).body,{action:"reused"});
-  await waitFor(()=>listener.events.some(item=>item.event==="focus"));
-  assert.deepEqual((await request(server,endpoint+"two","POST")).body,{action:"opening"});
+  await waitFor(()=>listener.events.some(item=>item.event==="focus" && item.scope==="one"));
+  assert.deepEqual((await request(server,endpoint+"two","POST")).body,{action:"reused"});
+  await waitFor(()=>listener.events.some(item=>item.event==="focus" && item.scope==="two"));
   listener.req.destroy();
-  await new Promise(resolve=>setTimeout(resolve,80));
+  let state;
+  for (let i=0;i<30;i++) {
+    state=(await request(server,"/api/notepad/window/status")).body;
+    if (!state.open) break;
+    await new Promise(resolve=>setTimeout(resolve,20));
+  }
+  assert.deepEqual(state,{open:false,opening:false,scopes:[]});
   assert.deepEqual((await request(server,endpoint+"one","POST")).body,{action:"launch"});
 });
 
-test("notes open launches only once per scope and reuses an active window", async t=>{
+test("notes open never launches a second HUD for another project", async t=>{
   const server=await start(0);
   t.after(()=>server.dispose());
   const bin=path.join(directory,"bin");
@@ -118,12 +147,26 @@ test("notes open launches only once per scope and reuses an active window", asyn
   const third=await cli("open","--scope",scope);
   assert.equal(third.status,0,third.errors);
   assert.match(third.output,/reus/i);
-  await waitFor(()=>listener.events.some(event=>event.event==="focus"));
+  await waitFor(()=>listener.events.some(event=>event.event==="focus" && event.scope===scope));
   assert.equal(fs.readFileSync(directory+"/open.log","utf8").trim().split("\n").length,1);
-  const different=await cli("open","--scope",path.join(directory,"workspace-two"));
+  const nextScope=path.join(directory,"workspace-two");
+  const different=await cli("open","--scope",nextScope);
   assert.equal(different.status,0,different.errors);
-  await new Promise(resolve=>setTimeout(resolve,80));
-  assert.equal(fs.readFileSync(directory+"/open.log","utf8").trim().split("\n").length,2);
+  assert.match(different.output,/reus/i);
+  await waitFor(()=>listener.events.some(event=>event.event==="focus" && event.scope===nextScope));
+  assert.equal(fs.readFileSync(directory+"/open.log","utf8").trim().split("\n").length,1);
+});
+
+test("two agents opening different projects simultaneously launch one browser", async t => {
+  const server=await start(0);
+  t.after(()=>server.dispose());
+  fs.writeFileSync(directory+"/open.log","");
+  const first=path.join(directory,"race-one");
+  const second=path.join(directory,"race-two");
+  const results=await Promise.all([cli("open","--scope",first),cli("open","--scope",second)]);
+  for (const result of results) assert.equal(result.status,0,result.errors);
+  await new Promise(resolve=>setTimeout(resolve,100));
+  assert.equal(fs.readFileSync(directory+"/open.log","utf8").trim().split("\n").length,1);
 });
 
 test("two agents opening the same workspace simultaneously launch one browser", async t => {
@@ -146,4 +189,26 @@ test("stalled browser launches can be retried after the reservation expires", as
   now = 111;
   assert.deepEqual(windows.activate("scope"), { action: "launch" });
   windows.close();
+});
+
+test("status does not start a server when none exists", async () => {
+  const stateDir=path.join(directory,"no-server-state");
+  const result=await cliWithEnv(["status"],{HUMAN_REVIEW_STATE_DIR:stateDir});
+  assert.equal(result.status,0,result.errors);
+  assert.deepEqual(JSON.parse(result.output),{open:false,opening:false,scopes:[]});
+  assert.equal(fs.existsSync(stateDir),false,"read-only status cannot create state");
+});
+
+test("status fails closed when an older server cannot report HUD windows", async t => {
+  const stateDir=path.join(directory,"legacy-server");
+  fs.mkdirSync(stateDir,{recursive:true});
+  const stub=http.createServer((_req,res)=>{res.writeHead(200);res.end("ok");});
+  await new Promise(resolve=>stub.listen(0,"127.0.0.1",resolve));
+  t.after(()=>stub.close());
+  fs.writeFileSync(path.join(stateDir,"server.json"),JSON.stringify({
+    port:stub.address().port,protocol:17,token:"legacy",
+  }));
+  const result=await cliWithEnv(["status"],{HUMAN_REVIEW_STATE_DIR:stateDir});
+  assert.equal(result.status,1);
+  assert.match(result.errors,/outdated.*cannot verify/i);
 });

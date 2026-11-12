@@ -163,11 +163,20 @@ Do not ask the user to restate edits, comments, or section actions in chat. The 
 ## Notepad HUD (non-blocking)
 
 Use the installed Human Review CLI proactively for unfinished project work.
-At session start, open the HUD, check saved notes and inbox, then revisit notes
-at natural checkpoints or whenever they can inform the current task. No user
-request is required to read or check notes. Capture discoveries immediately:
+At session start, **check `notes status` before opening the HUD**. This
+read-only command reports `open`, `opening`, and active project `scopes` without
+starting a server or browser. If `open: true`, reuse the registered HUD:
+`notes open --scope /project/path` focuses that same window and switches projects
+without spawning a duplicate. If `opening: true`, another launch is reserved;
+recheck status rather than opening anything. Only open the first HUD when both
+are false. If status cannot verify an older running server, inspect the
+existing browser HUD instead of assuming none is open. Never manually open a
+second HUD URL/window.
+Check saved notes and inbox proactively at natural checkpoints; no user request
+is required to read or check notes. Capture discoveries immediately:
 
 ```sh
+human-review notes status                              # verify before opening
 human-review notes add "Remember to verify the parser"  # agent capture
 human-review notes open                                # user-facing HUD
 human-review notes list                                # check proactively
@@ -182,10 +191,10 @@ The default notebook is scoped to the Git repository root, including when
 invoked from a subdirectory. Outside Git, the current directory is the scope.
 `HUMAN_REVIEW_DEFAULT_SCOPE` selects a fixed default; explicit
 `--scope <workspace>` takes precedence on individual commands.
-Run `notes open` at session start without creating duplicate windows: when a
-window is registered for that workspace, the CLI requests focus rather than
-launching another. A different workspace opens separately. Browser/OS focus
-restrictions may require the user to foreground the existing window manually.
+One registered HUD serves all projects. The CLI reuses/focuses that window even
+when requesting another project notebook, and reserves launches globally so
+simultaneous agents cannot spawn duplicate HUDs. Browser/OS focus restrictions
+may require the user to foreground the existing window manually.
 The HUD persists notes and refreshes while visible. Its project selector
 switches between saved notebook scopes in the same window, retaining drafts.
 To move selected notes, check their boxes, press **Move**, choose an existing

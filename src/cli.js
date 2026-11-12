@@ -19,7 +19,8 @@ const HELP = `human-review ${pkg.version}
       --ack                        Acknowledge the last batch, then wait for the next
       --timeout <secs>             Give up with {"status":"timeout"} after this long (default: wait for Send)
   human-review status <target>        Report whether feedback is waiting, without blocking
-  human-review notes open             Open the workspace notepad HUD
+  human-review notes status           Check for an existing HUD without opening one
+  human-review notes open             Focus/reuse the existing HUD, or open the first
   human-review notes add <text>       Capture a note without interrupting review
   human-review notes list             Read saved notes (JSON)
   human-review notes done <id>        Mark a processed note complete
@@ -316,14 +317,14 @@ function parseNotesArgs(args) {
       values.push(arg);
     }
   }
-  if (!["open", "add", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
+  if (!["status", "open", "add", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
     throw new Error("Unknown notes command: " + action);
   }
   if (action === "add" && values.length !== 1) throw new Error("Usage: human-review notes add <text> [--scope <workspace>]");
   if (["done", "reopen", "delete", "ack"].includes(action) && values.length !== 1) {
     throw new Error("Usage: human-review notes " + action + " <id> [--scope <workspace>]");
   }
-  if (["open", "list", "inbox", "poll"].includes(action) && values.length) {
+  if (["status", "open", "list", "inbox", "poll"].includes(action) && values.length) {
     throw new Error("Unexpected notes argument: " + values[0]);
   }
   if (timeoutSecs !== null && (action !== "poll" || !Number.isFinite(timeoutSecs) || timeoutSecs <= 0)) {
@@ -365,6 +366,20 @@ async function pollNotes(scope, timeoutSecs) {
 
 async function notesCommand(args) {
   const { action, scope, value, timeoutSecs } = parseNotesArgs(args);
+  if (action === "status") {
+    const server = readServerRecord();
+    let state = { open: false, opening: false, scopes: [] };
+    if (server && await alive(server.port)) {
+      if (server.protocol !== SERVER_PROTOCOL) {
+        throw new Error("The running Human Review server is outdated; cannot verify existing HUD windows. Check the browser before opening another.");
+      }
+      const response = await request(server, { method: "GET", path: "/api/notepad/window/status" });
+      if (response.status !== 200) throw new Error("Could not check the Notepad window.");
+      state = JSON.parse(response.raw);
+    }
+    process.stdout.write(JSON.stringify(state, null, 2) + "\n");
+    return;
+  }
   if (action === "poll") return pollNotes(scope, timeoutSecs);
   const server = await ensureServer();
   const query = "?scope=" + encodeURIComponent(scope);

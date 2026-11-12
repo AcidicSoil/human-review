@@ -451,7 +451,13 @@ async function observeWindow(viewedScope, signal) {
         while ((index = pending.indexOf("\n")) !== -1) {
           const line = pending.slice(0, index).trim();
           pending = pending.slice(index + 1);
-          if (!signal.aborted && line && JSON.parse(line).event === "focus") window.focus();
+          if (!signal.aborted && line) {
+            const event = JSON.parse(line);
+            if (event.event === "focus") {
+              if (event.scope && event.scope !== scope) switchScope(event.scope);
+              window.focus();
+            }
+          }
         }
       }
     } catch (error) {

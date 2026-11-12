@@ -200,3 +200,52 @@ test("HUD switches notebooks in place and confirms whole-project deletion", asyn
     window.close();
   }
 });
+
+test("HUD receives focus and switches to the requested project without opening a tab", async () => {
+  const first="/project/window-first";
+  const second="/project/window-second";
+  const markup=fs.readFileSync(path.join(root,"src/notepad/index.html"),"utf8");
+  const script=fs.readFileSync(path.join(root,"src/notepad/client.js"),"utf8");
+  const dom=new JSDOM(markup.replace("__TOKEN__","test-token"), {
+    url:"http://localhost/notepad/preview?scope="+encodeURIComponent(first),
+    runScripts:"outside-only",
+  });
+  const {window}=dom;
+  const streams=[];
+  let focused=0;
+  const flush=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));};
+  try {
+    window.setInterval=()=>0;
+    window.ReadableStream=class {};
+    window.TextDecoder=TextDecoder;
+    window.focus=()=>{focused++;};
+    window.fetch=async url=>{
+      const parsed=new URL(url,window.location.href);
+      if(parsed.pathname==="/api/notepad/window/connect"){
+        const feed={scope:parsed.searchParams.get("scope")};
+        streams.push(feed);
+        return {ok:true,body:{getReader:()=>({
+          read:()=>new Promise(resolve=>{
+            feed.send=event=>resolve({value:new TextEncoder().encode(JSON.stringify(event)+"\n"),done:false});
+          }),
+        })}};
+      }
+      const body=parsed.pathname==="/api/notepad/scopes"
+        ?{scopes:[first,second]}
+        :{notes:[{id:"note-"+parsed.searchParams.get("scope"),text:parsed.searchParams.get("scope"),
+          status:"pending",author:"user",createdAt:"2026-11-11T00:00:00Z"}],handoffs:[]};
+      return {ok:true,json:async()=>body};
+    };
+    window.eval(script);
+    await flush();
+    assert.equal(streams[0]?.scope,first);
+    streams[0].send({event:"focus",scope:second});
+    await flush();
+    assert.equal(new URL(window.location.href).searchParams.get("scope"),second);
+    assert.equal(window.document.querySelector("#notes .note-text").textContent,second);
+    assert.ok(streams.some(stream=>stream.scope===second),"HUD re-registers new scope");
+    assert.equal(focused,1);
+  }finally{
+    window.close();
+  }
+});
