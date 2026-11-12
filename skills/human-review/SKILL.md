@@ -212,9 +212,11 @@ notify or authorize an agent.
 When another project's tool fails during intended use, proactively record the
 failure in the current notebook and use **Report issue** or `notes report` to
 send a linked report to the tool-owning project. Include expected behavior,
-actual failure and steps to reproduce. Reporting retains the originating note,
-and can create a notebook entry for an existing tool directory, without changing
-project files. Tool owners mark reports **Fix available** (Done) after repairing;
+actual failure and steps to reproduce. In the HUD, search the tool project by
+name or path; options include full directory paths to distinguish projects with
+the same name. Enter an existing directory directly when it has no notebook.
+Verify ownership before submitting. Reporting retains the originating note
+and creates no project files. Tool owners mark reports **Fix available** (Done) after repairing;
 source notes display that status but remain pending until the reporting project
 verifies the fix. Inspect incoming reports with `notes list --scope /tool/path`
 without waiting for a handoff.

@@ -182,9 +182,12 @@ original notebook; moves do not notify agents.
 When another project's tool fails during intended use, capture the unfinished
 issue in the current notebook, then run \`notes report <id> --to /tool/path
 --expected "Expected" --actual "Failure" --steps "Reproduce"\` or use the
-HUD's Report issue action. The tool-owning project receives a linked note
-containing source context and reproduction steps, even if its existing project
-directory has no notebook yet. The source note stays pending. When the tool
+HUD's Report issue action. Search tool projects by name or path in the styled
+project picker; use the displayed full paths to distinguish duplicate names,
+or enter an existing directory directly when it has no notebook. Verify the
+actual tool owner before selecting it. The tool-owning project receives a
+linked note containing source context and reproduction steps, even if its
+existing project directory has no notebook yet. The source note stays pending. When the tool
 owner verifies a fix and marks the report Done, the source displays Fix
 available but remains pending until independently verified. Reporting does not
 create project files, move notes, or send a review handoff.

@@ -46,9 +46,11 @@ human-review notes delete <note-id>
 When a tool belonging to another project fails during intended use, record the
 unfinished issue in the current project's notebook immediately. **Report issue**
 on that note in the HUD, or run `notes report` with the tool owner's directory,
-expected behavior, observed failure, and reproducible steps. Use the actual
-tool project, never a guessed owner. An existing tool directory without a notebook
-is a valid report destination; no project files are created.
+expected behavior, observed failure, and reproducible steps. Search the project
+picker by name or directory; it shows full paths to distinguish duplicate names.
+Select the verified tool owner, or enter its existing directory path directly if
+it has no notebook. Never infer ownership from a project name alone. Reporting
+creates no project files.
 
 The tool owner's notebook receives a linked actionable report. Agents working on
 that tool should check these incoming notes proactively and fix reproducible
