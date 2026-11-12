@@ -186,7 +186,9 @@ export function createNotepadRoute({ token, viewToken }) {
     if (noteRoute && req.method === "PATCH") {
       try {
         const body = await readBody(req);
-        const note = notepad().setStatus(scope, noteRoute[1], body.status);
+        const note = Object.hasOwn(body, "text")
+          ? notepad().edit(scope, noteRoute[1], body.text)
+          : notepad().setStatus(scope, noteRoute[1], body.status);
         json(res, note ? 200 : 404, note ? { note } : { error: "Unknown note." });
       } catch (error) {
         badInput(error, res, json);

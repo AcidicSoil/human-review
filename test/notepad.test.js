@@ -49,6 +49,29 @@ test("notes persist independently per workspace and can be completed manually", 
   assert.equal(store.setStatus("/workspace/two", first.id, "done"), null);
 });
 
+test("editing a note preserves identity, status and sent handoff snapshots", () => {
+  const store = new NotepadStore();
+  const source = store.add("edit-source", "Original work", "agent");
+  store.setStatus("edit-source", source.id, "done");
+  const before = store.list("edit-source")[0];
+  const handoff = store.send("edit-source", [source.id]);
+  const changed = store.edit("edit-source", source.id, "  Revised work  ");
+  assert.equal(changed.text, "Revised work");
+  assert.equal(changed.id, before.id);
+  assert.equal(changed.author, before.author);
+  assert.equal(changed.status, "done");
+  assert.equal(changed.createdAt, before.createdAt);
+  assert.ok(Date.parse(changed.updatedAt) >= Date.parse(before.updatedAt));
+  assert.equal(new NotepadStore().list("edit-source")[0].text, "Revised work");
+  assert.equal(store.outbox("edit-source")[0].notes[0].text, handoff.notes[0].text);
+  assert.equal(store.edit("another-project", source.id, "Nope"), null);
+  assert.equal(store.edit("edit-source", "missing-note", "Nope"), null);
+  for (const invalid of ["", "  ", "x".repeat(4001), 123]) {
+    assert.throws(() => store.edit("edit-source", source.id, invalid), TypeError);
+  }
+  assert.equal(store.list("edit-source")[0].text, "Revised work");
+});
+
 test("deleting a note removes only its own scope and persists across reload", () => {
   const store = new NotepadStore();
   const first = store.add("delete-one", "Delete this", "user");
@@ -79,6 +102,25 @@ test("DELETE requires authentication and preserves feedback state", async t => {
   assert.deepEqual((await call(server.port, server.token, "GET", route)).body.notes, []);
   assert.equal((await call(server.port, server.token, "DELETE", path + "?scope=delete-api")).status, 404);
   assert.equal((await call(server.port, server.token, "GET", "/api/status?target=delete-api")).body.feedback_waiting, false);
+});
+
+test("authenticated note editing changes only the requested notebook", async t => {
+  const server = await start(0);
+  t.after(() => server.dispose());
+  const first = (await call(server.port, server.token, "POST",
+    "/api/notepad?scope=edit-api", { text: "Before" })).body.note;
+  const route = "/api/notepad/" + first.id + "?scope=edit-api";
+  assert.equal((await call(server.port, "", "PATCH", route, { text: "Unauthorized" })).status, 401);
+  assert.equal((await call(server.port, server.token, "PATCH",
+    "/api/notepad/" + first.id + "?scope=wrong-project", { text: "Wrong" })).status, 404);
+  assert.equal((await call(server.port, server.token, "PATCH", route, { text: " " })).status, 400);
+  const result = await call(server.port, server.token, "PATCH", route, { text: "Updated" });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.note.text, "Updated");
+  assert.equal(result.body.note.status, "pending");
+  assert.equal(result.body.note.id, first.id);
+  assert.equal((await call(server.port, server.token, "GET",
+    "/api/notepad?scope=edit-api")).body.notes[0].text, "Updated");
 });
 
 test("note boundaries reject empty, large, invalid or unauthorized changes", () => {
@@ -177,6 +219,9 @@ test("CLI adds, lists, completes and reopens notes through the authenticated ser
   const listed = await run("list", "--scope", scope);
   assert.equal(listed.code, 0, listed.stderr);
   assert.deepEqual(JSON.parse(listed.stdout).map(item => item.id), [note.id]);
+  const edited = await run("edit", note.id, "  Investigate reuse  ", "--scope", scope);
+  assert.equal(edited.code, 0, edited.stderr);
+  assert.equal(JSON.parse(edited.stdout).text, "Investigate reuse");
   const completed = await run("done", note.id, "--scope", scope);
   assert.equal(completed.code, 0, completed.stderr);
   assert.equal(JSON.parse(completed.stdout).status, "done");
@@ -220,6 +265,7 @@ test("CLI help documents the manual notepad lifecycle", async () => {
   assert.equal(output.status, 0, output.stderr);
   assert.match(output.stdout, /notes open/);
   assert.match(output.stdout, /notes add <text>/);
+  assert.match(output.stdout, /notes edit <id> <text>/);
   assert.match(output.stdout, /notes list/);
   assert.match(output.stdout, /notes done <id>/);
   assert.match(output.stdout, /notes delete <id>/);

@@ -24,6 +24,9 @@ let notes = [];
 let filter = "pending";
 let updating = false;
 let confirmingDeleteId = null;
+let editingNoteId = null;
+let editingDraft = "";
+let savingEdit = false;
 let handoffs = [];
 let selectedIds = new Set();
 let sending = false;
@@ -91,6 +94,8 @@ function switchScope(next) {
   handoffs = [];
   selectedIds.clear();
   confirmingDeleteId = null;
+  editingNoteId = null;
+  editingDraft = "";
   confirmingNotebookDelete = false;
   moveMode = null;
   filter = "pending";
@@ -125,6 +130,74 @@ async function request(method, path, body) {
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.error || "Request failed.");
   return payload;
+}
+
+function renderInlineEditor(note, text, actions, notePath, viewedScope) {
+  const editor = document.createElement("textarea");
+  editor.className = "note-edit-input";
+  editor.setAttribute("aria-label", "Edit note");
+  editor.maxLength = 4000;
+  editor.rows = 4;
+  editor.value = editingDraft;
+  editor.disabled = savingEdit;
+
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "status edit-save";
+  save.textContent = "Save";
+  save.disabled = savingEdit || !editingDraft.trim();
+
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "status edit-cancel";
+  cancel.textContent = "Cancel";
+  cancel.disabled = savingEdit;
+  cancel.addEventListener("click", () => {
+    editingNoteId = null;
+    editingDraft = "";
+    render();
+  });
+
+  editor.addEventListener("input", () => {
+    editingDraft = editor.value;
+    save.disabled = !editingDraft.trim();
+  });
+  editor.addEventListener("keydown", event => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      save.click();
+    }
+    if (event.key === "Escape") cancel.click();
+  });
+
+  save.addEventListener("click", async () => {
+    if (savingEdit || !editingDraft.trim()) return;
+    savingEdit = true;
+    save.disabled = true;
+    cancel.disabled = true;
+    editor.disabled = true;
+    try {
+      const result = await request("PATCH", notePath, { text: editingDraft });
+      if (scope !== viewedScope) return;
+      notes = notes.map(item => item.id === note.id ? result.note : item);
+      editingNoteId = null;
+      editingDraft = "";
+      render();
+      message.textContent = "Note updated";
+    } catch (error) {
+      if (scope === viewedScope) message.textContent = error.message;
+    } finally {
+      savingEdit = false;
+      if (scope === viewedScope && editingNoteId === note.id) {
+        save.disabled = !editingDraft.trim();
+        cancel.disabled = false;
+        editor.disabled = false;
+      }
+    }
+  });
+
+  text.replaceWith(editor);
+  actions.append(save, cancel);
 }
 
 function render() {
@@ -177,7 +250,9 @@ function render() {
     actions.className = "note-actions";
     const notePath = `/api/notepad/${encodeURIComponent(note.id)}?scope=${encodeURIComponent(scope)}`;
 
-    if (confirmingDeleteId === note.id) {
+    if (editingNoteId === note.id) {
+      renderInlineEditor(note, text, actions, notePath, viewedScope);
+    } else if (confirmingDeleteId === note.id) {
       const cancel = document.createElement("button");
       cancel.type = "button";
       cancel.className = "status";
@@ -228,6 +303,19 @@ function render() {
           message.textContent = error.message;
         }
       });
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "status edit-note";
+      edit.textContent = "Edit";
+      edit.disabled = editingNoteId !== null;
+      edit.setAttribute("aria-label", "Edit: " + note.text.slice(0, 70));
+      edit.addEventListener("click", () => {
+        editingNoteId = note.id;
+        editingDraft = note.text;
+        confirmingDeleteId = null;
+        render();
+        list.querySelector(".note-edit-input")?.focus();
+      });
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "status delete";
@@ -237,7 +325,7 @@ function render() {
         confirmingDeleteId = note.id;
         render();
       });
-      actions.append(button, remove);
+      actions.append(button, edit, remove);
     }
     row.append(choice, body, actions);
     list.append(row);
@@ -257,9 +345,13 @@ async function refresh() {
     notes = result.notes;
     handoffs = result.handoffs || [];
     projects = available.scopes || [];
-    render();
+    if (editingNoteId && !notes.some(note => note.id === editingNoteId)) {
+      editingNoteId = null;
+      editingDraft = "";
+    }
+    if (!editingNoteId) render();
     renderProjects();
-    message.textContent = "Saved locally";
+    if (!editingNoteId) message.textContent = "Saved locally";
   } catch (error) {
     if (scope === viewedScope) message.textContent = error.message;
   } finally {

@@ -157,8 +157,11 @@ wait; stop this one silently. \`npx -y human-review status <target>\` reports
 instantly whether feedback is already waiting, without blocking.
 
 For non-blocking capture during a task, use
-\`npx -y human-review notes add "note text"\` or open the local HUD with
-\`npx -y human-review notes open\`. Notes default to the Git repository root,
+\`npx -y human-review notes add "note text"\`, or revise existing work with
+\`npx -y human-review notes edit <id> "revised text"\`. The HUD supports
+inline Edit, Save and Cancel. Edits preserve note identity/status and do not
+resend existing handoffs. Open the HUD with \`npx -y human-review notes open\`.
+Notes default to the Git repository root,
 or the current directory outside Git. \`HUMAN_REVIEW_DEFAULT_SCOPE\` selects a
 fixed default, and \`--scope <workspace>\` overrides it for one command.
 At session start, run \`npx -y human-review notes status\` before opening

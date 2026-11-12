@@ -22,6 +22,7 @@ const HELP = `human-review ${pkg.version}
   human-review notes status           Check for an existing HUD without opening one
   human-review notes open             Focus/reuse the existing HUD, or open the first
   human-review notes add <text>       Capture a note without interrupting review
+  human-review notes edit <id> <text> Update existing note text
   human-review notes list             Read saved notes (JSON)
   human-review notes done <id>        Mark a processed note complete
   human-review notes reopen <id>      Return a completed note to pending
@@ -317,10 +318,13 @@ function parseNotesArgs(args) {
       values.push(arg);
     }
   }
-  if (!["status", "open", "add", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
+  if (!["status", "open", "add", "edit", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
     throw new Error("Unknown notes command: " + action);
   }
   if (action === "add" && values.length !== 1) throw new Error("Usage: human-review notes add <text> [--scope <workspace>]");
+  if (action === "edit" && values.length !== 2) {
+    throw new Error("Usage: human-review notes edit <id> <text> [--scope <workspace>]");
+  }
   if (["done", "reopen", "delete", "ack"].includes(action) && values.length !== 1) {
     throw new Error("Usage: human-review notes " + action + " <id> [--scope <workspace>]");
   }
@@ -330,7 +334,7 @@ function parseNotesArgs(args) {
   if (timeoutSecs !== null && (action !== "poll" || !Number.isFinite(timeoutSecs) || timeoutSecs <= 0)) {
     throw new Error("--timeout requires a positive number and is only available with notes poll.");
   }
-  return { action, scope: resolveNotesScope({ explicitScope }), value: values[0], timeoutSecs };
+  return { action, scope: resolveNotesScope({ explicitScope }), value: values[0], editText: values[1], timeoutSecs };
 }
 
 /** The agent opts into listening. No incoming handoff automatically starts a task. */
@@ -365,7 +369,7 @@ async function pollNotes(scope, timeoutSecs) {
 }
 
 async function notesCommand(args) {
-  const { action, scope, value, timeoutSecs } = parseNotesArgs(args);
+  const { action, scope, value, editText, timeoutSecs } = parseNotesArgs(args);
   if (action === "status") {
     const server = readServerRecord();
     let state = { open: false, opening: false, scopes: [] };
@@ -391,10 +395,11 @@ async function notesCommand(args) {
   else if (action === "add") {
     method = "POST";
     body = { text: value, author: "agent" };
-  } else if (action === "done" || action === "reopen") {
+  } else if (action === "done" || action === "reopen" || action === "edit") {
     method = "PATCH";
     route = "/api/notepad/" + encodeURIComponent(value) + query;
-    body = { status: action === "done" ? "done" : "pending" };
+    body = action === "edit" ? { text: editText }
+      : { status: action === "done" ? "done" : "pending" };
   } else if (action === "delete") {
     method = "DELETE";
     route = "/api/notepad/" + encodeURIComponent(value) + query;

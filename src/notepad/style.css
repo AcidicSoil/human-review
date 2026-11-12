@@ -34,6 +34,7 @@ textarea::placeholder { color: #8b9bb4; }
 .note { display: flex; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid #283c55; border-radius: 11px; background: #152131; }
 .note-main { flex: 1; min-width: 0; }
 .note-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-edit-input { display: block; min-height: 110px; padding: 10px; border: 1px solid #537dc9; border-radius: 8px; background: #111d2d; }
 .note small { display: block; margin-top: 7px; color: #96a9c6; font-size: 11px; }
 .status { flex: none; border: 1px solid #405a79; background: #263b54; border-radius: 8px; color: #c3dcfb; font-weight: 600; padding: 5px 9px; font-size: 12px; }
 .status:hover { background: #334e70; }

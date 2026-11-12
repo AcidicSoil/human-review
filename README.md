@@ -96,6 +96,7 @@ independent.
 human-review notes status
 human-review notes open
 human-review notes add "Investigate the cache policy later"
+human-review notes edit <note-id> "Revised investigation"
 human-review notes list
 human-review notes done <note-id>
 human-review notes reopen <note-id>
@@ -122,6 +123,10 @@ also enforces reuse globally across concurrent agents and project scopes.
 The HUD can pop out into a compact browser window when the user requests it.
 Browser/OS restrictions can prevent focus; closing it releases registration.
 User changes appear immediately; agent additions appear on the next refresh.
+Select **Edit** on any note to revise its text inline, then **Save** or **Cancel**.
+Use Ctrl/⌘+Enter to save or Escape to cancel. Changes preserve the original
+note ID, author, status and creation time; previously sent handoffs keep their
+original snapshot and are not resent.
 The project selector lists existing notebooks, including empty notebooks and
 projects with the same folder name (shown with their paths). Switching changes
 the notebook inside the same window, preserves unsaved drafts for each project,

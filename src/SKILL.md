@@ -178,6 +178,7 @@ is required to read or check notes. Capture discoveries immediately:
 ```sh
 human-review notes status                              # verify before opening
 human-review notes add "Remember to verify the parser"  # agent capture
+human-review notes edit <id> "Revised parser note"       # revise existing note
 human-review notes open                                # user-facing HUD
 human-review notes list                                # check proactively
 human-review notes done <id>                           # after processing
@@ -195,7 +196,10 @@ One registered HUD serves all projects. The CLI reuses/focuses that window even
 when requesting another project notebook, and reserves launches globally so
 simultaneous agents cannot spawn duplicate HUDs. Browser/OS focus restrictions
 may require the user to foreground the existing window manually.
-The HUD persists notes and refreshes while visible. Its project selector
+The HUD persists notes and refreshes while visible. Edit a note inline with
+**Edit → Save** (or **Cancel**), or use `notes edit <id> <text>` from the CLI.
+Editing preserves its ID, author, status and creation timestamp, and does not
+alter or resend existing handoffs. Its project selector
 switches between saved notebook scopes in the same window, retaining drafts.
 To move selected notes, check their boxes, press **Move**, choose an existing
 destination notebook, and confirm **Move here**. **Move all** moves every note

@@ -15,7 +15,7 @@ Treat Notepad as the project's live record of unfinished work. **Read and check 
    - Both false: Run `human-review notes open` to launch the first HUD. The CLI protects concurrent launches.
    If status cannot verify a running older server, inspect the existing browser HUD before opening anything. Never manually open another HUD URL or browser window while one exists.
 2. Run `human-review notes list` and `human-review notes inbox`; review notes at natural checkpoints and whenever useful. No user permission is required to check notes.
-3. Capture unfinished work, blockers, observations, ideas, and next actions immediately with `human-review notes add "Actionable note"`. Include enough context for another agent to resume.
+3. Capture unfinished work, blockers, observations, ideas, and next actions with `human-review notes add "Actionable note"`. Revise existing notes using `human-review notes edit <id> "Updated text"` instead of creating duplicates. In the HUD, use **Edit**, then **Save** or **Cancel**. Editing keeps the original note identity and completion state; sent handoffs remain historical snapshots.
 4. Use relevant notes to plan or continue work already within the active project/task. Keep notes current, and mark completed work done **after verification**. Avoid duplicating existing notes.
 5. Keep the HUD open during the session. Note review is non-blocking; do not stall unrelated work solely to review the backlog.
 
@@ -26,6 +26,7 @@ human-review notes status
 human-review notes open
 human-review notes list
 human-review notes add "Verify the remaining parser edge case"
+human-review notes edit <note-id> "Revised parser edge case"
 human-review notes inbox
 human-review notes poll --timeout 30
 human-review notes ack <handoff-id>

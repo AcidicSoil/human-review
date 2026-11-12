@@ -67,3 +67,67 @@ test("note deletion requires explicit inline confirmation and supports cancellat
     window.close();
   }
 });
+
+test("inline editing saves or cancels without losing drafts during refresh", async () => {
+  const original = {
+    id: "note-edit", text: "Unfinished work", author: "user",
+    status: "pending", createdAt: "2026-11-08T10:00:00Z",
+    updatedAt: "2026-11-08T10:00:00Z",
+  };
+  let note = { ...original };
+  const requests = [];
+  const dom = new JSDOM(page.replace("__TOKEN__", "test-token"), {
+    url: "http://localhost/notepad/preview?scope=edit-ui",
+    runScripts: "outside-only",
+  });
+  const { window } = dom;
+  let refresh;
+  const response = (status, data) => ({ ok: status < 400, status, json: async () => data });
+  const flush = async () => {
+    for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve));
+  };
+  try {
+    window.setInterval = callback => { refresh = callback; return 0; };
+    window.fetch = async (url, init = {}) => {
+      const method = init.method || "GET";
+      if (method === "GET") return response(200, url === "/api/notepad/scopes"
+        ? { scopes: ["edit-ui"] } : { notes: [note], handoffs: [] });
+      if (method === "PATCH") {
+        const body = JSON.parse(init.body);
+        requests.push(body);
+        note = { ...note, text: body.text.trim(), updatedAt: "2026-11-12T12:00:00Z" };
+        return response(200, { note });
+      }
+      throw new Error("Unexpected request " + method);
+    };
+    window.eval(script);
+    await flush();
+    const doc = window.document;
+    doc.querySelector(".edit-note").click();
+    let editor = doc.querySelector(".note-edit-input");
+    assert.equal(editor.value, "Unfinished work");
+    editor.value = "Discard this draft";
+    editor.dispatchEvent(new window.Event("input", { bubbles: true }));
+    refresh();
+    await flush();
+    assert.equal(doc.querySelector(".note-edit-input"), editor, "refresh preserves active editor");
+    assert.equal(editor.value, "Discard this draft");
+    doc.querySelector(".edit-cancel").click();
+    assert.equal(doc.querySelector(".note-text").textContent, "Unfinished work");
+    assert.equal(requests.length, 0);
+
+    doc.querySelector(".edit-note").click();
+    editor = doc.querySelector(".note-edit-input");
+    editor.value = "  Revised unfinished work  ";
+    editor.dispatchEvent(new window.Event("input", { bubbles: true }));
+    doc.querySelector(".edit-save").click();
+    await flush();
+    assert.deepEqual(requests, [{ text: "  Revised unfinished work  " }]);
+    assert.equal(doc.querySelector(".note-text").textContent, "Revised unfinished work");
+    assert.equal(doc.querySelector(".note-edit-input"), null);
+    assert.equal(note.id, original.id);
+    assert.equal(note.status, original.status);
+  } finally {
+    window.close();
+  }
+});
