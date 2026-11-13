@@ -1,7 +1,7 @@
 interface:
   display_name: "Human Review Notepad"
-  short_description: "Track unfinished work and cross-project tool bugs"
-  default_prompt: "Use $human-review-notepad to check unfinished notes proactively, report tool failures to their verified owning project, and track fixes through source verification."
+  short_description: "Check project issue inboxes and close verified fixes"
+  default_prompt: "Use $human-review-notepad at the start of project work: check the owning repository's incoming Issue Inbox and handoff inbox, resolve actionable bug reports before new changes, test fixes, and mark owner reports done."
 policy:
   products: [CHAT, CODEX]
   allow_implicit_invocation: true

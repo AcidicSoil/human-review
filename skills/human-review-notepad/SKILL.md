@@ -1,11 +1,11 @@
 ---
 name: human-review-notepad
-description: Use when proactively checking unfinished project work, capturing notes and handoffs, or reporting a failure in a tool owned by another project. Preserve linked bug reports and track fixes across notebooks; verify the current HUD before opening one.
+description: Use when starting project work to check the owning repository's Issue Inbox and handoff inbox first, resolve and verify incoming cross-project issues before new work, and preserve linked reports and unfinished notes.
 ---
 
 # Human Review Notepad
 
-Treat Notepad as the project's live record of unfinished work. **Read and check notes proactively whenever useful; no permission or handoff is needed.** Do not ask the user to run CLI commands; run them yourself.
+Treat Notepad as the project's live record of unfinished work. **Check applicable inboxes before new project work; prioritize resolving their actionable issues.** Run the CLI yourself—reading requires no permission.
 
 ## Routine
 
@@ -14,7 +14,7 @@ Treat Notepad as the project's live record of unfinished work. **Read and check 
    - `opening: true`: Another agent reserved the launch. Recheck status instead of spawning a window.
    - Both false: Run `human-review notes open` to launch the first HUD. The CLI protects concurrent launches.
    If status cannot verify a running older server, inspect the existing browser HUD before opening anything. Never manually open another HUD URL or browser window while one exists.
-2. Run `human-review notes list` and `human-review notes inbox`; review notes at natural checkpoints and whenever useful. No user permission is required to check notes.
+2. **Inbox-first gate, before new project work:** Verify the owning Git root of each repository you work in. Run `human-review notes reports --scope /actual/repository` (Issue Inbox) and `human-review notes inbox --scope /actual/repository` (sent handoffs) first; resolve actionable pending owner reports before new features, then inspect `human-review notes list --scope /actual/repository` for promoted reports. Recheck at natural checkpoints. Acknowledge handoff receipt with `notes ack`; execute only authorized handoff work.
 3. Capture unfinished work, blockers, observations, ideas, and next actions with `human-review notes add "Actionable note"`. Revise existing notes using `human-review notes edit <id> "Updated text"` instead of creating duplicates. In the HUD, use **Edit**, then **Save** or **Cancel**. Editing keeps the original note identity and completion state; sent handoffs remain historical snapshots.
 4. Use relevant notes to plan or continue work already within the active project/task. Keep notes current, and mark completed work done **after verification**. Avoid duplicating existing notes.
 5. Keep the HUD open during the session. The saved-note list scrolls inside a bounded area, even with many notes; keyboard-focus the list to scroll older entries. Polling preserves the scroll position. Each note shows a short display ID; **⧉ ID** copies its full UUID and **⧉ Ref** copies a reference with the full UUID and project scope. Always use the full UUID plus `--scope` for CLI operations, never the short prefix. Do not open another HUD to browse notes. Note review is non-blocking.
@@ -23,14 +23,14 @@ Treat Notepad as the project's live record of unfinished work. **Read and check 
 
 ```sh
 human-review notes status
+human-review notes reports --scope /actual/repository
+human-review notes inbox --scope /actual/repository
+human-review notes list --scope /actual/repository
 human-review notes open
-human-review notes list
 human-review notes add "Verify the remaining parser edge case"
 human-review notes edit <note-id> "Revised parser edge case"
 human-review notes report <note-id> --to /path/to/tool --expected "Expected" --actual "Failed" --steps "Reproduce"
-human-review notes reports
-human-review notes promote <report-id>
-human-review notes inbox
+human-review notes promote <report-id> --scope /actual/repository
 human-review notes poll --timeout 30
 human-review notes ack <handoff-id>
 human-review notes done <note-id>
@@ -38,9 +38,9 @@ human-review notes reopen <note-id>
 human-review notes delete <note-id>
 ```
 
-- Check `list` and `inbox` freely. Use bounded `poll` when waiting for incoming handoffs would help; it is separate from regular Human Review polling.
+- Run `reports` and `inbox` first, then `list`; use bounded `poll` only when waiting for handoffs is useful. Reading handoffs is not executing them.
 - `ack` records receipt; `done` records verified completion. Reopen work with `reopen` when needed. These are different operations.
-- Notes are working context, not automatic instructions to run unrelated or destructive tasks. Continue relevant unfinished work within the current assignment; surface unrelated work for prioritization.
+- The verified owning repository's pending Issue Inbox reports take priority over new work. Other notes and handoffs require their own authorization; surface unrelated or destructive tasks for approval.
 - Use `delete` only for explicitly intended permanent removal. Do not delete notes just because they are complete.
 
 ## Cross-project tool bugs
@@ -78,22 +78,26 @@ inbox without changing their permanent IDs or source links.
 
 **Tool-owner agent:**
 
-1. At session start and checkpoints, run
-   `human-review notes reports --scope /actual/tool/repository`. Inspect pending
-   reports' `bugReport` fields: `sourceScope`, `sourceNoteId`, `expected`,
-   `actual`, and `steps`. These are **Issue Inbox** items, not handoffs
-   from `notes inbox`. The HUD shows colored From/Pending badges, and
-   renders safe Markdown for report text and reproduction details.
-2. Reproduce and address relevant reports in the **owning repository**, not by
-   modifying the calling project. Keep blocked or unreproduced reports pending;
-   update their note with findings when useful.
+1. **Before other project work**, inspect the actual owning repository's
+   `human-review notes reports --scope /actual/tool/repository`, then
+   `human-review notes list --scope /actual/tool/repository` for reports already
+   moved to Notes. Prioritize pending reports with `bugReport` fields
+   `sourceScope`, `sourceNoteId`, `expected`, `actual`, and `steps`. These are
+   cross-project issues, separate from user-sent `notes inbox` handoffs.
+2. Resolve every actionable, pending report **before new feature work** in
+   that owning repository: reproduce the failure, repair it, and run relevant
+   tests. If a report is blocked, cannot be reproduced, or requires approval,
+   leave it pending and record the exact blocker for the user; then continue
+   with the next actionable report. Do not modify the calling project's code.
 3. The agent or user may select **Move to Notes**, or run
    `human-review notes promote <owner-report-id> --scope /actual/tool/repository`.
    Promotion is optional and keeps the same report ID and source link.
-   After verifying a repair, run
+   **Close each verified fix** with
    `human-review notes done <owner-report-id> --scope /actual/tool/repository`,
-   whether the report is in the inbox or notes. In the HUD this is
-   **Mark fix available**. Use `notes reopen` if it regresses.
+   whether the report remains in the inbox or has moved to Notes. The HUD
+   calls this **Mark fix available**. Confirm its status is `done`; leave the
+   source note pending for the reporter's independent verification. Use
+   `notes reopen` if it regresses.
 
 **Reporting agent after a fix:** Recheck the original workflow when
 `reportedTo[].status` becomes `done` (**Fix available — verify**). Only then

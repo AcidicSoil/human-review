@@ -168,10 +168,14 @@ and an independently actionable report appears in the owning project's **Issue
 Inbox**, separate from its ordinary Notes. Existing linked reports migrate
 there without losing their IDs or status. The recipient can select **Move to
 Notes** at any time, retaining the report ID and source link, or run
-`notes promote <report-id> --scope /tool/project`. Agents inspect
-`notes reports --scope /tool/project`; `notes inbox` still lists explicitly
-sent handoffs, a separate channel. This also works when the owning tool
-directory has no notebook. Reporting does not modify project files or send a
+`notes promote <report-id> --scope /tool/project`.
+
+Agents **check their applicable Issue Inboxes first, before new project work**:
+`notes reports --scope /tool/project`, followed by the separately scoped
+`notes inbox` for handoffs, then `notes list` for promoted reports. They fix
+pending actionable owner reports before new features, verify repairs, and mark
+the owner reports done. This also works when the owning tool directory has
+no notebook. Reporting does not modify project files or send a
 handoff. The inbox cards show readable **From** and **Pending/Fix available**
 badges with full directory paths on hover, alongside safe Markdown formatting
 for note text, headings, lists, code, and reproduction details. The owner

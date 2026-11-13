@@ -172,21 +172,28 @@ recheck status rather than opening anything. Only open the first HUD when both
 are false. If status cannot verify an older running server, inspect the
 existing browser HUD instead of assuming none is open. Never manually open a
 second HUD URL/window.
-Check saved notes and inbox proactively at natural checkpoints; no user request
-is required to read or check notes. Capture discoveries immediately:
+**Inbox-first, before new project work:** Verify the owning Git root for each
+project you are actively working in. Run `notes reports --scope /repo` for
+incoming issues, `notes inbox --scope /repo` for user-sent handoffs, then
+`notes list --scope /repo` for promoted reports and unfinished work. Resolve
+actionable pending issues in their owning repository before new features:
+reproduce, repair, test, then `notes done <report-id> --scope /repo` only after
+verification. Leave blocked reports pending with the actual blocker, and
+recheck at natural checkpoints. Handoffs are separate: acknowledge receipt
+with `notes ack`, and execute only authorized work. Capture discoveries:
 
 ```sh
-human-review notes status                              # verify before opening
-human-review notes add "Remember to verify the parser"  # agent capture
-human-review notes edit <id> "Revised parser note"       # revise existing note
+human-review notes status                               # verify before opening
+human-review notes reports --scope /actual/repo         # issue inbox first
+human-review notes inbox --scope /actual/repo           # user-sent handoffs
+human-review notes list --scope /actual/repo            # promoted reports and notes
+human-review notes open                                 # user-facing HUD
+human-review notes add "Remember to verify the parser"   # agent capture
+human-review notes edit <id> "Revised parser note"        # revise existing note
 human-review notes report <id> --to /path/to/tool --expected "Expected" --actual "Failed" --steps "Reproduce"
-human-review notes reports --scope /tool/repo          # check incoming issue inbox
-human-review notes promote <id> --scope /tool/repo      # move report to notes
-human-review notes open                                # user-facing HUD
-human-review notes list                                # check proactively
+human-review notes promote <id> --scope /actual/repo     # optional move to notes
 human-review notes done <id>                           # after processing
 human-review notes delete <id>                         # only when user requests deletion
-human-review notes inbox                               # read user-sent handoffs
 human-review notes poll --timeout 30                    # bounded listener when useful
 human-review notes ack <handoff-id>                     # acknowledge receipt, not completion
 ```
@@ -223,16 +230,12 @@ with expected, actual and reproduction details. Verify the tool owner's
 repository path; the HUD picker searches names and full paths, and accepts
 existing directories without notebooks. Avoid duplicate source notes and never
 invent reproduction evidence. The linked owner report contains `bugReport`
-metadata; owner agents check the separate **Issue Inbox** using
-`notes reports --scope /actual/tool/repo`, not the handoff `notes inbox`.
-The report may be promoted to project Notes using **Move to Notes** or
-`notes promote <owner-report-id> --scope /actual/tool/repo`; this preserves
-the ID and source link. Cards render sanitized Markdown and readable
-From/Pending/Fix available badges. After fixing and testing, the owner
-marks **its report ID** done; the caller sees `reportedTo[].status`
-and verifies the original workflow before completing **its source note ID**.
-Keep failures pending when unverified. See `human-review-notepad`
-for details. Neither receipt nor viewing authorizes unrelated work.
+metadata. The inbox-first gate applies to these reports. **Move to Notes**
+(or `notes promote <owner-report-id> --scope /actual/tool/repo`) is optional
+and preserves the ID and source link. After a verified fix, the owner marks
+**its report ID** done; the caller sees `reportedTo[].status` and independently
+verifies the original workflow before completing **its source note ID**.
+See `human-review-notepad` for the full reporting and closure procedure.
 Only on explicit user request, the adjacent Delete button can remove one
 project's entire notebook, including notes, incoming reports and handoffs, after confirmation;
 it never deletes project files. An agent waiting on that notebook receives

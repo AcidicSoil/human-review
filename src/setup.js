@@ -175,9 +175,15 @@ anything. Status is read-only: if \`open: true\`, reuse the existing HUD via
 window; if \`opening: true\`, recheck status while another launch is reserved.
 Only open the first HUD if neither is true. If status cannot verify an older
 running server, check the browser HUD before opening. Never manually open
-another HUD URL or window. Proactively check unfinished work with \`notes list\` and
-\`notes inbox\` at natural checkpoints; no user permission is needed to read
-notes. The HUD project dropdown
+another HUD URL or window. **Inbox-first, before new project work:** Verify
+the actual owning Git root. Run \`notes reports --scope /repo\` for incoming
+issues and \`notes inbox --scope /repo\` for user-sent handoffs, then
+\`notes list --scope /repo\` for promoted reports and unfinished notes. Resolve
+actionable pending owner reports before unrelated feature work: reproduce,
+repair, test, then \`notes done <report-id> --scope /repo\` only after verifying.
+Keep blocked reports pending with specific findings and recheck at checkpoints.
+Acknowledge handoff receipt with \`notes ack\`; act only on authorized handoffs.
+The HUD project dropdown
 switches existing notebooks in one window. To move notes, the user checks
 selected notes and presses Move, or presses Move all for the entire notebook
 including completed and filtered notes. Both require choosing an existing

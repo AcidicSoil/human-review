@@ -25,7 +25,7 @@
       "ordinary-review: Review this HTML, Markdown, or localhost page and apply my browser feedback.",
       "planning-review: Turn this plan, spec, PRD, or roadmap into an editable Human Review artifact.",
       "loa-review: Turn this task or LOA into a reviewable action list with plugin and skill references.",
-      "human-review-notepad: Proactively check unfinished notes, report tool failures to their owning project, and verify linked fixes in the calling project."
+      "human-review-notepad: Check project Issue Inbox and handoffs first, resolve actionable owner reports before new work, verify fixes, and close reports with their original IDs."
     ],
     "brandColor": "#E4572E",
     "brandColorDark": "#FF8A65",

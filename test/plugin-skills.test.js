@@ -43,7 +43,7 @@ for (const entry of cases) {
     assert.match(skill, new RegExp(`^---\\nname: ${entry.name}\\n`, "m"));
     assert.match(skill, /description: Use when /);
     assert.match(skill, new RegExp(entry.command.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.match(skill, /Do not ask the user to run/);
+    assert.match(skill, /Do not ask the user to run|Run the CLI yourself/);
     for (const forbidden of entry.forbidden) assert.doesNotMatch(skill, new RegExp(forbidden));
     assert.match(agent, /products: \[CHAT, CODEX\]/);
     assert.match(agent, /allow_implicit_invocation: true/);
@@ -70,6 +70,10 @@ test("notepad instructions proactively check unfinished work without permission 
     const content = fs.readFileSync(file, "utf8");
     assert.match(content, /notes list/);
     assert.match(content, /notes status/);
+    assert.match(content, /Inbox-first(?: gate)?, before new project work/i);
+    assert.match(content, /notes reports/);
+    assert.match(content, /notes inbox/);
+    assert.match(content, /notes done/);
     assert.match(content, /open: true/);
     assert.match(content, /opening: true/);
     assert.match(content, /session start|start of .*project session/i);
