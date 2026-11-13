@@ -131,7 +131,17 @@ note ID, author, status and creation time; previously sent handoffs keep their
 original snapshot and are not resent. Saved notes scroll within a bounded,
 keyboard-focusable area instead of extending the page; use Tab and the keyboard
 or a mouse/touch scroll to browse older notes. Automatic refresh keeps your
-scroll position, including with large notebooks.
+scroll position, including with large notebooks. Each note displays a short
+`#xxxxxxxx` ID with **⧉ ID** (copy full UUID) and **⧉ Ref** (copy the full
+project-scoped reference). The copied reference is plain text, not a URL:
+
+```text
+Human Review note: 550e8400-e29b-41d4-a716-446655440000
+Project: /path/to/project
+```
+
+Agents use the full UUID with `--scope /path/to/project`; the short ID
+is display-only. Clipboard copying requires browser permission.
 The project selector lists existing notebooks, including empty notebooks and
 projects with the same folder name (shown with their paths). Switching changes
 the notebook inside the same window, preserves unsaved drafts for each project,

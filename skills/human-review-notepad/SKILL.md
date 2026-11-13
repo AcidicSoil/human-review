@@ -17,7 +17,7 @@ Treat Notepad as the project's live record of unfinished work. **Read and check 
 2. Run `human-review notes list` and `human-review notes inbox`; review notes at natural checkpoints and whenever useful. No user permission is required to check notes.
 3. Capture unfinished work, blockers, observations, ideas, and next actions with `human-review notes add "Actionable note"`. Revise existing notes using `human-review notes edit <id> "Updated text"` instead of creating duplicates. In the HUD, use **Edit**, then **Save** or **Cancel**. Editing keeps the original note identity and completion state; sent handoffs remain historical snapshots.
 4. Use relevant notes to plan or continue work already within the active project/task. Keep notes current, and mark completed work done **after verification**. Avoid duplicating existing notes.
-5. Keep the HUD open during the session. The saved-note list scrolls inside a bounded area, even with many notes; keyboard-focus the list to scroll older entries. Polling preserves the scroll position. Do not open another HUD to browse notes. Note review is non-blocking.
+5. Keep the HUD open during the session. The saved-note list scrolls inside a bounded area, even with many notes; keyboard-focus the list to scroll older entries. Polling preserves the scroll position. Each note shows a short display ID; **⧉ ID** copies its full UUID and **⧉ Ref** copies a reference with the full UUID and project scope. Always use the full UUID plus `--scope` for CLI operations, never the short prefix. Do not open another HUD to browse notes. Note review is non-blocking.
 
 ## CLI
 

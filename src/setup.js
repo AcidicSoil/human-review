@@ -161,6 +161,9 @@ For non-blocking capture during a task, use
 \`npx -y human-review notes edit <id> "revised text"\`. The HUD supports
 inline Edit, Save and Cancel. Saved notes scroll inside a bounded,
 keyboard-focusable list without growing the page; refresh preserves position.
+Each note shows a short ID; use the HUD's Copy ID control for its full UUID,
+or Copy Ref for a plain-text reference with full UUID and project scope.
+CLI operations always use the full UUID plus \`--scope /project/path\`.
 Edits preserve note identity/status and do not resend existing handoffs.
 Open the HUD with \`npx -y human-review notes open\`.
 Notes default to the Git repository root,

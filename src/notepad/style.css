@@ -36,6 +36,13 @@ textarea::placeholder { color: #8b9bb4; }
 .note-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .note-edit-input { display: block; min-height: 110px; padding: 10px; border: 1px solid #537dc9; border-radius: 8px; background: #111d2d; }
 .note small { display: block; margin-top: 7px; color: #96a9c6; font-size: 11px; }
+.note-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-top: 7px; }
+.note-meta small { margin: 0; }
+.note-identifiers { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.note-short-id { color: #a8c5ed; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.note-copy { border: 1px solid #405a79; border-radius: 6px; padding: 2px 5px; background: #23374c; color: #c3dcfb; font-size: 11px; white-space: nowrap; }
+.note-copy:hover { background: #334e70; }
+.note-copy:focus-visible { outline: 2px solid #7ba5ff; outline-offset: 2px; }
 .status { flex: none; border: 1px solid #405a79; background: #263b54; border-radius: 8px; color: #c3dcfb; font-weight: 600; padding: 5px 9px; font-size: 12px; }
 .status:hover { background: #334e70; }
 .note-actions { display: flex; flex: none; flex-direction: column; align-items: stretch; gap: 5px; }

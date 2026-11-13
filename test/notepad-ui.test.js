@@ -178,3 +178,64 @@ test("a long notebook scrolls within the HUD and stays at its position after ref
     window.close();
   }
 });
+
+test("copy buttons expose stable IDs and project-scoped references", async () => {
+  const id = "550e8400-e29b-41d4-a716-446655440000";
+  const project = "/projects/tool owner";
+  const clipboard = [];
+  let copyError = false;
+  const dom = new JSDOM(page.replace("__TOKEN__", "test-token"), {
+    url: "http://localhost/notepad/preview?scope=" + encodeURIComponent(project),
+    runScripts: "outside-only",
+  });
+  const { window } = dom;
+  const flush = async () => {
+    for (let i = 0; i < 5; i++) await new Promise(resolve => setImmediate(resolve));
+  };
+  try {
+    window.setInterval = () => 0;
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async value => {
+        if (copyError) throw new Error("denied");
+        clipboard.push(value);
+      } },
+    });
+    window.fetch = async url => ({
+      ok: true, status: 200,
+      json: async () => url === "/api/notepad/scopes"
+        ? { scopes: [project] }
+        : { notes: [{
+          id, text: "Tool fails", author: "agent", status: "pending",
+          createdAt: "2026-11-12T10:00:00Z",
+          bugReport: { sourceScope: "/projects/caller", sourceNoteId: "source-note",
+            expected: "works", actual: "fails", steps: "run tool" },
+        }], handoffs: [] },
+    });
+    window.eval(script);
+    await flush();
+    const doc = window.document;
+    const shortId = doc.querySelector(".note-short-id");
+    assert.equal(shortId.textContent, "#550e8400");
+    assert.equal(shortId.title, id);
+    const copyId = doc.querySelector(".note-copy-id");
+    const copyReference = doc.querySelector(".note-copy-reference");
+    assert.equal(copyId.type, "button");
+    assert.match(copyId.getAttribute("aria-label"), /copy.*note id/i);
+    assert.match(copyReference.getAttribute("aria-label"), /copy.*reference/i);
+    copyId.click();
+    await flush();
+    assert.deepEqual(clipboard, [id]);
+    assert.match(doc.getElementById("message").textContent, /copied/i);
+    copyReference.click();
+    await flush();
+    assert.equal(clipboard[1], "Human Review note: " + id + "\nProject: " + project);
+    copyError = true;
+    copyReference.click();
+    await flush();
+    assert.equal(clipboard.length, 2, "a denied clipboard write cannot claim success");
+    assert.match(doc.getElementById("message").textContent, /could not copy/i);
+  } finally {
+    window.close();
+  }
+});

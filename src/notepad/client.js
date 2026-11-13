@@ -289,6 +289,26 @@ function renderReportLinks(note, body) {
   }
 }
 
+function createCopyButton(kind, value) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "note-copy note-copy-" + kind;
+  const isId = kind === "id";
+  button.textContent = isId ? "⧉ ID" : "⧉ Ref";
+  button.title = isId ? "Copy full note ID" : "Copy project-scoped note reference";
+  button.setAttribute("aria-label", isId ? "Copy full note ID" : "Copy project-scoped reference");
+  button.addEventListener("click", async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(value);
+      message.textContent = isId ? "Note ID copied" : "Note reference copied";
+    } catch {
+      message.textContent = "Could not copy — check clipboard permissions";
+    }
+  });
+  return button;
+}
+
 function render() {
   const viewedScope = scope;
   const pending = notes.filter(note => note.status === "pending");
@@ -328,7 +348,19 @@ function render() {
     text.textContent = note.text;
     const byline = document.createElement("small");
     byline.textContent = `${note.author === "agent" ? "Agent" : "You"} · ${new Date(note.createdAt).toLocaleString()}`;
-    body.append(text, byline);
+    const metadata = document.createElement("div");
+    metadata.className = "note-meta";
+    const identifiers = document.createElement("div");
+    identifiers.className = "note-identifiers";
+    const shortId = document.createElement("span");
+    shortId.className = "note-short-id";
+    shortId.textContent = "#" + note.id.slice(0, 8);
+    shortId.title = note.id;
+    identifiers.append(shortId,
+      createCopyButton("id", note.id),
+      createCopyButton("reference", `Human Review note: ${note.id}\nProject: ${viewedScope}`));
+    metadata.append(byline, identifiers);
+    body.append(text, metadata);
     renderReportLinks(note, body);
     const latest = [...handoffs].reverse().find(handoff => handoff.notes.some(item => item.id === note.id));
     if (latest) {
