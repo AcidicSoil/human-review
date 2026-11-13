@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import { NotepadStore } from "./store.js";
+import { presentNote } from "./markdown.js";
 import { createNotepadWindowRegistry } from "./windows.js";
 
 const template = new URL("./index.html", import.meta.url);
@@ -94,7 +95,11 @@ export function createNotepadRoute({ token, viewToken }) {
 
     if (route === "/api/notepad" && req.method === "GET") {
       try {
-        json(res, 200, { notes: notepad().listWithReports(scope), handoffs: notepad().outbox(scope) });
+        json(res, 200, {
+          notes: notepad().listWithReports(scope).map(presentNote),
+          reports: notepad().listReports(scope).map(presentNote),
+          handoffs: notepad().outbox(scope),
+        });
       } catch (error) {
         badInput(error, res, json);
       }
@@ -104,7 +109,7 @@ export function createNotepadRoute({ token, viewToken }) {
     if (route === "/api/notepad" && req.method === "POST") {
       try {
         const body = await readBody(req);
-        json(res, 201, { note: notepad().add(scope, body.text, body.author || "user") });
+        json(res, 201, { note: presentNote(notepad().add(scope, body.text, body.author || "user")) });
       } catch (error) {
         badInput(error, res, json);
       }
@@ -115,7 +120,27 @@ export function createNotepadRoute({ token, viewToken }) {
       try {
         const body = await readBody(req);
         const report = notepad().reportIssue(scope, body.noteId, body.destination, body);
-        json(res, report ? 201 : 404, report ? { report } : { error: "Unknown source note." });
+        json(res, report ? 201 : 404, report ? { report: presentNote(report) } : { error: "Unknown source note." });
+      } catch (error) {
+        badInput(error, res, json);
+      }
+      return true;
+    }
+
+    if (route === "/api/notepad/reports" && req.method === "GET") {
+      try {
+        json(res, 200, { reports: notepad().listReports(scope).map(presentNote) });
+      } catch (error) {
+        badInput(error, res, json);
+      }
+      return true;
+    }
+
+    const promoteRoute = route.match(/^\/api\/notepad\/reports\/([a-f0-9-]+)\/promote$/);
+    if (promoteRoute && req.method === "POST") {
+      try {
+        const note = notepad().promoteReport(scope, promoteRoute[1]);
+        json(res, note ? 200 : 404, note ? { note: presentNote(note) } : { error: "Unknown inbox report." });
       } catch (error) {
         badInput(error, res, json);
       }
@@ -200,7 +225,7 @@ export function createNotepadRoute({ token, viewToken }) {
         const note = Object.hasOwn(body, "text")
           ? notepad().edit(scope, noteRoute[1], body.text)
           : notepad().setStatus(scope, noteRoute[1], body.status);
-        json(res, note ? 200 : 404, note ? { note } : { error: "Unknown note." });
+        json(res, note ? 200 : 404, note ? { note: presentNote(note) } : { error: "Unknown note." });
       } catch (error) {
         badInput(error, res, json);
       }

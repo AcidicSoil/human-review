@@ -65,7 +65,7 @@ test("moving the last note retains an empty notebook across restarts", () => {
   assert.deepEqual(reloaded.move(destination, source, [note.id]).map(item => item.id), [note.id]);
   assert.equal(reloaded.list(source)[0].id, note.id);
   assert.deepEqual(reloaded.deleteScope(destination), {
-    scope: destination, notesDeleted: 1, handoffsDeleted: 0,
+    scope: destination, notesDeleted: 1, reportsDeleted: 0, handoffsDeleted: 0,
   });
   assert.ok(!new NotepadStore().listScopes().includes(destination));
 });

@@ -17,6 +17,7 @@ test("HUD reports tool failures, triages fixes, and preserves source verificatio
     createdAt: "2026-11-12T01:00:00Z",
   };
   const items = new Map([[source, [original]]]);
+  const inboxes = new Map();
   const sent = [];
   const dom = new JSDOM(html.replace("__TOKEN__", "token"), {
     url: "http://localhost/notepad/preview?scope=" + encodeURIComponent(source),
@@ -43,9 +44,12 @@ test("HUD reports tool failures, triages fixes, and preserves source verificatio
         const notes = items.get(project) || [];
         return response({ notes: notes.map(note => note.reportedTo ? {
           ...note, reportedTo: note.reportedTo.map(link => ({
-            ...link, status: items.get(link.scope)?.find(target => target.id === link.noteId)?.status || "deleted",
+            ...link,
+          status: [...(inboxes.get(link.scope) || []), ...(items.get(link.scope) || [])]
+            .find(target => target.id === link.noteId)?.status || "deleted",
+          inInbox: !!inboxes.get(link.scope)?.some(target => target.id === link.noteId),
           })),
-        } : note), handoffs: [] });
+        } : note), reports: inboxes.get(project) || [], handoffs: [] });
       }
       if (path.pathname === "/api/notepad/report" && method === "POST") {
         const data = JSON.parse(init.body);
@@ -56,16 +60,21 @@ test("HUD reports tool failures, triages fixes, and preserves source verificatio
           bugReport: { sourceScope: source, sourceNoteId: original.id,
             expected: data.expected, actual: data.actual, steps: data.steps },
         };
-        items.set(owner, [report]);
+        inboxes.set(owner, [report]);
         original.reportedTo = [{ scope: owner, noteId: report.id }];
         return response({ report }, 201);
       }
-      if (path.pathname === "/api/notepad/report" && method === "PATCH") {
-        throw new Error("Reports are normal notes, not a separate status API");
+      if (path.pathname.includes("/promote") && method === "POST") {
+        const id = path.pathname.split("/").at(-2);
+        const report = inboxes.get(project).find(note => note.id === id);
+        inboxes.set(project, inboxes.get(project).filter(note => note.id !== id));
+        items.set(project, [...(items.get(project) || []), { ...report, promotedAt: "now" }]);
+        return response({ note: report });
       }
       if (path.pathname.startsWith("/api/notepad/") && method === "PATCH") {
         const id = path.pathname.split("/").at(-1);
-        const note = items.get(project).find(note => note.id === id);
+        const note = (inboxes.get(project) || items.get(project) || [])
+          .find(note => note.id === id);
         note.status = JSON.parse(init.body).status;
         return response({ note });
       }
@@ -112,7 +121,8 @@ test("HUD reports tool failures, triages fixes, and preserves source verificatio
     assert.equal(sent.length, 1);
     assert.equal(sent[0].noteId, original.id);
     assert.equal(items.get(source).length, 1);
-    assert.equal(items.get(owner).length, 1);
+    assert.equal(inboxes.get(owner).length, 1);
+    assert.equal(items.get(owner), undefined, "owner notes remain empty");
     assert.equal(doc.getElementById("report-panel").hidden, true);
     assert.match(doc.querySelector(".report-status").textContent, /Pending/i);
 
@@ -120,9 +130,18 @@ test("HUD reports tool failures, triages fixes, and preserves source verificatio
     await flush();
     assert.equal(new URL(window.location.href).searchParams.get("scope"), owner);
     assert.match(doc.querySelector(".bug-details").textContent, /Rejected valid inputs/);
+    assert.equal(doc.querySelector('[data-view="inbox"]').getAttribute("aria-pressed"), "true");
+    assert.match(doc.querySelector(".badge-source").textContent, /From consumer/);
+    assert.match(doc.querySelector(".badge-pending").textContent, /Pending/);
     click(".fix-available");
     await flush();
-    assert.equal(items.get(owner)[0].status, "done");
+    assert.equal(inboxes.get(owner)[0].status, "done");
+    assert.match(doc.querySelector(".badge-done").textContent, /Fix available/);
+    click(".promote-report");
+    await flush();
+    assert.equal(inboxes.get(owner).length, 0);
+    assert.equal(items.get(owner)[0].id, "report-1", "promotion preserves the ID");
+    assert.equal(doc.querySelector('[data-view="notes"]').getAttribute("aria-pressed"), "true");
     click(".view-source");
     await flush();
     assert.equal(new URL(window.location.href).searchParams.get("scope"), source);

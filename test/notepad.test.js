@@ -235,7 +235,13 @@ test("CLI adds, lists, completes and reopens notes through the authenticated ser
   assert.equal(reported.code, 0, reported.stderr);
   const report = JSON.parse(reported.stdout);
   assert.equal(report.bugReport.sourceNoteId, note.id);
+  assert.deepEqual(JSON.parse((await run("list", "--scope", owner)).stdout), []);
+  assert.equal(JSON.parse((await run("reports", "--scope", owner)).stdout)[0].id, report.id);
+  const promoted = await run("promote", report.id, "--scope", owner);
+  assert.equal(promoted.code, 0, promoted.stderr);
+  assert.equal(JSON.parse(promoted.stdout).id, report.id);
   assert.equal(JSON.parse((await run("list", "--scope", owner)).stdout)[0].id, report.id);
+  assert.deepEqual(JSON.parse((await run("reports", "--scope", owner)).stdout), []);
   assert.equal(JSON.parse((await run("list", "--scope", scope)).stdout)[0].reportedTo[0].status, "pending");
   const removed = await run("delete", note.id, "--scope", scope);
   assert.equal(removed.code, 0, removed.stderr);
@@ -276,6 +282,8 @@ test("CLI help documents the manual notepad lifecycle", async () => {
   assert.match(output.stdout, /notes add <text>/);
   assert.match(output.stdout, /notes edit <id> <text>/);
   assert.match(output.stdout, /notes report <id>/);
+  assert.match(output.stdout, /notes reports/);
+  assert.match(output.stdout, /notes promote <id>/);
   assert.match(output.stdout, /notes list/);
   assert.match(output.stdout, /notes done <id>/);
   assert.match(output.stdout, /notes delete <id>/);

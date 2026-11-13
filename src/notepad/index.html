@@ -20,11 +20,18 @@
       <button id="popout" class="popout" type="button" title="Open compact window" aria-label="Open compact notepad window">↗</button>
     </header>
     <div id="notebook-delete-confirm" class="project-confirm" hidden>
-      <p>Delete all notes and handoffs for <strong id="notebook-delete-name"></strong>? This cannot be undone.</p>
+      <p>Delete all notes, incoming issue reports, and handoffs for <strong id="notebook-delete-name"></strong>? This cannot be undone.</p>
       <div class="project-confirm-actions">
         <button id="cancel-delete-notebook" class="status" type="button">Cancel</button>
         <button id="confirm-delete-notebook" class="status delete confirm" type="button">Delete notebook</button>
       </div>
+    </div>
+
+    <div class="notebook-views" role="group" aria-label="Project notebook sections">
+      <button type="button" class="notebook-view active" data-view="notes" aria-pressed="true">Notes</button>
+      <button type="button" class="notebook-view" data-view="inbox" aria-pressed="false">
+        Issue Inbox <span id="inbox-count" class="inbox-count">0</span>
+      </button>
     </div>
 
     <form id="capture" class="capture">

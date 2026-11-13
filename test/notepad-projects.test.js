@@ -44,10 +44,10 @@ test("lists only persisted notebooks and deletes only the selected scope", () =>
 
   assert.deepEqual(store.listScopes(), ["/project/first", "/project/second", "/project/third"]);
   assert.deepEqual(store.deleteScope("/project/third"), {
-    scope: "/project/third", notesDeleted: 0, handoffsDeleted: 0,
+    scope: "/project/third", notesDeleted: 0, reportsDeleted: 0, handoffsDeleted: 0,
   });
   assert.deepEqual(store.deleteScope("/project/second"), {
-    scope: "/project/second", notesDeleted: 1, handoffsDeleted: 1,
+    scope: "/project/second", notesDeleted: 1, reportsDeleted: 0, handoffsDeleted: 1,
   });
   assert.equal(store.deleteScope("/project/second"), null);
   assert.deepEqual(new NotepadStore().listScopes(), ["/project/first"]);
@@ -98,7 +98,7 @@ test("project notebook API requires authentication and does not touch other note
   assert.equal((await request(server, "DELETE", route, null, false)).status, 401);
   assert.equal((await request(server, "DELETE", base + "/scope")).status, 400);
   const deleted = await request(server, "DELETE", route);
-  assert.deepEqual(deleted.body, { scope: second, notesDeleted: 1, handoffsDeleted: 1 });
+  assert.deepEqual(deleted.body, { scope: second, notesDeleted: 1, reportsDeleted: 0, handoffsDeleted: 1 });
   assert.equal((await request(server, "DELETE", route)).status, 404);
   assert.equal((await request(server, "GET", base + "?scope=" + encodeURIComponent(second))).body.notes.length, 0);
   assert.equal((await request(server, "GET", base + "?scope=" + encodeURIComponent(first))).body.notes.length, 1);

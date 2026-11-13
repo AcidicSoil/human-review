@@ -44,14 +44,26 @@ export class NotepadStore {
         throw new Error("Unsupported notepad file format.");
       }
       this.scopes = Object.assign(Object.create(null), stored.scopes);
+      this.reports = Object.assign(Object.create(null), stored.reports || {});
       this.handoffs = Object.assign(Object.create(null), stored.handoffs || {});
-      // Legacy files already retained empty scopes after their final note moved.
+      // Existing reports were stored as ordinary notes. Preserve their IDs
+      // and source links while migrating them into their owner's inbox.
+      for (const [scope, notes] of Object.entries(this.scopes)) {
+        const incoming = notes.filter(note => note.bugReport && !note.promotedAt);
+        if (!incoming.length) continue;
+        const present = new Set((this.reports[scope] || []).map(note => note.id));
+        this.reports[scope] = [
+          ...(this.reports[scope] || []), ...incoming.filter(note => !present.has(note.id)),
+        ];
+        this.scopes[scope] = notes.filter(note => !incoming.includes(note));
+      }
       this.notebooks = new Set(stored.notebooks || [
-        ...Object.keys(this.scopes), ...Object.keys(this.handoffs),
+        ...Object.keys(this.scopes), ...Object.keys(this.reports), ...Object.keys(this.handoffs),
       ]);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
       this.scopes = Object.create(null);
+      this.reports = Object.create(null);
       this.handoffs = Object.create(null);
       this.notebooks = new Set();
     }
@@ -59,6 +71,10 @@ export class NotepadStore {
 
   list(scope) {
     return [...(this.scopes[validScope(scope)] || [])];
+  }
+
+  listReports(scope) {
+    return [...(this.reports[validScope(scope)] || [])];
   }
 
   listScopes() {
@@ -70,10 +86,11 @@ export class NotepadStore {
       if (!note.reportedTo?.length) return note;
       return {
         ...note,
-        reportedTo: note.reportedTo.map(link => ({
-          ...link,
-          status: this.list(link.scope).find(item => item.id === link.noteId)?.status || "deleted",
-        })),
+        reportedTo: note.reportedTo.map(link => {
+          const incoming = this.listReports(link.scope).find(item => item.id === link.noteId);
+          const target = incoming || this.list(link.scope).find(item => item.id === link.noteId);
+          return { ...link, status: target?.status || "deleted", inInbox: !!incoming };
+        }),
       };
     });
   }
@@ -82,12 +99,14 @@ export class NotepadStore {
     validScope(scope);
     const notesDeleted = this.scopes[scope]?.length || 0;
     const handoffsDeleted = this.handoffs[scope]?.length || 0;
+    const reportsDeleted = this.reports[scope]?.length || 0;
     if (!this.notebooks.has(scope)) return null;
     this.notebooks.delete(scope);
     delete this.scopes[scope];
+    delete this.reports[scope];
     delete this.handoffs[scope];
     this.save();
-    return { scope, notesDeleted, handoffsDeleted };
+    return { scope, notesDeleted, reportsDeleted, handoffsDeleted };
   }
 
   add(scope, text, author = "user") {
@@ -112,21 +131,23 @@ export class NotepadStore {
 
   updateNote(scope, id, changes) {
     validScope(scope);
-    const notes = this.scopes[scope] || [];
+    const bucket = this.list(scope).some(note => note.id === id) ? this.scopes : this.reports;
+    const notes = bucket[scope] || [];
     const index = notes.findIndex(note => note.id === id);
     if (index === -1) return null;
     const note = { ...notes[index], ...changes, updatedAt: new Date().toISOString() };
-    this.scopes[scope] = notes.map((item, at) => at === index ? note : item);
+    bucket[scope] = notes.map((item, at) => at === index ? note : item);
     this.save();
     return note;
   }
 
   remove(scope, id) {
     validScope(scope);
-    const notes = this.scopes[scope] || [];
-    const removed = notes.find((note) => note.id === id);
+    const bucket = this.list(scope).some(note => note.id === id) ? this.scopes : this.reports;
+    const notes = bucket[scope] || [];
+    const removed = notes.find(note => note.id === id);
     if (!removed) return null;
-    this.scopes[scope] = notes.filter((note) => note.id !== id);
+    bucket[scope] = notes.filter(note => note.id !== id);
     this.save();
     return removed;
   }
@@ -165,6 +186,22 @@ export class NotepadStore {
     return moved;
   }
 
+  /** Promote an inbox report without changing its permanent ID or source link. */
+  promoteReport(scope, id) {
+    validScope(scope);
+    const report = this.listReports(scope).find(item => item.id === id);
+    if (!report) return null;
+    const notes = this.list(scope);
+    if (notes.length >= MAX_NOTES_PER_SCOPE) {
+      throw new RangeError("Notepad is full (1000 notes per scope).");
+    }
+    const promoted = { ...report, promotedAt: new Date().toISOString() };
+    this.reports[scope] = this.listReports(scope).filter(item => item.id !== id);
+    this.scopes[scope] = [...notes, promoted];
+    this.save();
+    return promoted;
+  }
+
   /** Report a tool failure without moving the originating note or sending a handoff. */
   reportIssue(scope, noteId, destination, { expected, actual, steps } = {}) {
     validScope(scope);
@@ -180,19 +217,20 @@ export class NotepadStore {
     const source = this.list(scope);
     const original = source.find(note => note.id === noteId);
     if (!original) return null;
-    const target = this.list(destination);
+    const target = this.listReports(destination);
     const existing = original.reportedTo?.find(link => link.scope === destination);
     if (existing) {
-      const current = target.find(note => note.id === existing.noteId);
+      const current = [...target, ...this.list(destination)]
+        .find(note => note.id === existing.noteId);
       if (current) return current;
     }
     if (target.length >= MAX_NOTES_PER_SCOPE) {
-      throw new RangeError("Destination notebook is full (1000 notes per scope).");
+      throw new RangeError("Destination inbox is full (1000 reports per scope).");
     }
     const report = createNote(original.text, "agent", {
       bugReport: { sourceScope: scope, sourceNoteId: noteId, ...details },
     });
-    this.scopes[destination] = [...target, report];
+    this.reports[destination] = [...target, report];
     this.scopes[scope] = source.map(note => note.id === noteId ? {
       ...note,
       reportedTo: [...(note.reportedTo || []).filter(link => link.scope !== destination),
@@ -243,7 +281,8 @@ export class NotepadStore {
   save() {
     ensureStateDir();
     atomicWrite(FILE(), JSON.stringify({
-      version: 1, notebooks: this.listScopes(), scopes: this.scopes, handoffs: this.handoffs,
+      version: 1, notebooks: this.listScopes(), scopes: this.scopes,
+      reports: this.reports, handoffs: this.handoffs,
     }, null, 2) + "\n");
   }
 }

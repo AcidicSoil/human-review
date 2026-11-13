@@ -24,8 +24,15 @@ const reportDestination = document.getElementById("report-destination");
 const reportProjects = document.getElementById("report-projects");
 const reportPicker = document.getElementById("report-project-picker");
 const filters = [...document.querySelectorAll("[data-filter]")];
+const viewButtons = [...document.querySelectorAll("[data-view]")];
+const capture = document.getElementById("capture");
+const filterBar = document.querySelector(".filters");
+const sendRow = document.querySelector(".send-row");
+const empty = document.getElementById("empty");
 
 let notes = [];
+let reports = [];
+let view = "notes";
 let filter = "pending";
 let updating = false;
 let confirmingDeleteId = null;
@@ -118,7 +125,7 @@ function renderReportChoices() {
 function renderMovePanel() {
   const destinations = projects.filter(project => project !== scope);
   renderScopeOptions(moveDestination, destinations, true);
-  movePanel.hidden = !moveMode;
+  movePanel.hidden = !moveMode || view === "inbox";
   moveButton.disabled = !selectedIds.size || !destinations.length || sending || moving;
   moveAllButton.disabled = !notes.length || !destinations.length || sending || moving;
   moveDestination.disabled = moving;
@@ -140,12 +147,13 @@ function renderProjects() {
   if (!reportProjects.hidden) renderReportChoices();
 }
 
-function switchScope(next, nextFilter = "pending") {
+function switchScope(next, nextFilter = "pending", nextView = "notes") {
   if (!next || next === scope) return;
   drafts.set(scope, input.value);
   scope = next;
   input.value = drafts.get(next) || "";
   notes = [];
+  reports = [];
   handoffs = [];
   selectedIds.clear();
   confirmingDeleteId = null;
@@ -158,6 +166,7 @@ function switchScope(next, nextFilter = "pending") {
   closeReportChoices();
   reportForm.reset();
   filter = nextFilter;
+  view = nextView;
   list.scrollTop = 0;
   const url = new URL(location.href);
   url.searchParams.set("scope", scope);
@@ -260,32 +269,62 @@ function renderInlineEditor(note, text, actions, notePath, viewedScope) {
   actions.append(save, cancel);
 }
 
+function showMarkdown(element, html, raw) {
+  if (!html) {
+    element.textContent = raw;
+  } else if (typeof element.setHTML === "function") {
+    element.setHTML(html);
+  } else {
+    // The API sanitizes this HTML with an allowlist before returning it.
+    element.innerHTML = html;
+  }
+}
+
+function createBadge(kind, label, project) {
+  const badge = document.createElement("span");
+  badge.className = "note-badge badge-" + kind;
+  badge.textContent = label;
+  badge.title = project;
+  return badge;
+}
+
 function renderReportLinks(note, body) {
-  const projectLink = (label, destination) => {
+  const projectLink = (label, destination, destinationView = "notes") => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "status " + (label === "View source" ? "view-source" : "view-report");
     button.textContent = label;
-    button.addEventListener("click", () => switchScope(destination, "all"));
+    button.addEventListener("click", () => switchScope(destination, "all", destinationView));
     body.append(button);
   };
   if (note.bugReport) {
     const details = document.createElement("div");
     details.className = "bug-details";
-    const { sourceScope, expected, actual, steps } = note.bugReport;
-    details.textContent = "From " + notebookName(sourceScope) +
-      "\nExpected: " + expected + "\nObserved: " + actual + "\nReproduce: " + steps;
+    for (const [key, title] of [
+      ["expected", "Expected"],
+      ["actual", "Observed"],
+      ["steps", "Reproduce"],
+    ]) {
+      const label = document.createElement("strong");
+      label.textContent = title;
+      const value = document.createElement("div");
+      value.className = "note-markdown";
+      showMarkdown(value, note.bugReportHtml?.[key], note.bugReport[key]);
+      details.append(label, value);
+    }
     body.append(details);
-    projectLink("View source", sourceScope);
+    projectLink("View source", note.bugReport.sourceScope);
   }
   for (const link of note.reportedTo || []) {
     const status = document.createElement("div");
     status.className = "report-status";
-    const state = link.status === "done" ? "Fix available — verify" :
+    const kind = link.status === "done" ? "done" :
+      link.status === "deleted" ? "removed" : "pending";
+    const label = link.status === "done" ? "Fix available — verify" :
       link.status === "deleted" ? "Report removed" : "Pending";
-    status.textContent = notebookName(link.scope) + ": " + state;
+    status.append(createBadge(kind, label + " · " + notebookName(link.scope), link.scope));
     body.append(status);
-    projectLink("View report", link.scope);
+    projectLink("View report", link.scope, link.inInbox ? "inbox" : "notes");
   }
 }
 
@@ -309,26 +348,41 @@ function createCopyButton(kind, value) {
   return button;
 }
 
-function render() {
-  const viewedScope = scope;
-  const pending = notes.filter(note => note.status === "pending");
-  document.getElementById("count").textContent = String(pending.length);
-  for (const item of filters) {
-    const active = item.dataset.filter === filter;
-    item.classList.toggle("active", active);
-    item.setAttribute("aria-pressed", String(active));
-  }
+function createStatusButton(note, notePath, viewedScope, inInbox) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "status";
+  const isDone = note.status === "done";
+  const title = isDone ? "Reopen" : note.bugReport ? "Mark fix available" : "Done";
+  button.textContent = title;
+  button.classList.toggle("fix-available", !!note.bugReport && !isDone);
+  button.setAttribute("aria-label", title + ": " + note.text.slice(0, 70));
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const result = await request("PATCH", notePath, {
+        status: isDone ? "pending" : "done",
+      });
+      if (scope !== viewedScope) return;
+      const bucket = inInbox ? reports : notes;
+      const updated = bucket.map(item => item.id === note.id ? result.note : item);
+      if (inInbox) reports = updated;
+      else notes = updated;
+      render();
+      message.textContent = "Saved";
+    } catch (error) {
+      button.disabled = false;
+      message.textContent = error.message;
+    }
+  });
+  return button;
+}
 
-  const knownIds = new Set(notes.map(note => note.id));
-  selectedIds = new Set([...selectedIds].filter(id => knownIds.has(id)));
-  updateSelection();
-  const visible = notes.filter(note => filter === "all" || note.status === filter);
-  const scrollPosition = list.scrollTop;
-  list.replaceChildren();
-  document.getElementById("empty").hidden = visible.length !== 0;
-  for (const note of [...visible].reverse()) {
-    const row = document.createElement("li");
-    row.className = "note";
+function createNoteCard(note, viewedScope, inInbox) {
+  const row = document.createElement("li");
+  row.className = "note";
+  row.classList.toggle("inbox-report", inInbox);
+  if (!inInbox) {
     const choice = document.createElement("input");
     choice.type = "checkbox";
     choice.className = "note-choice";
@@ -341,138 +395,189 @@ function render() {
       row.classList.toggle("is-selected", choice.checked);
       updateSelection();
     });
-    const body = document.createElement("div");
-    body.className = "note-main";
-    const text = document.createElement("p");
-    text.className = "note-text";
-    text.textContent = note.text;
-    const byline = document.createElement("small");
-    byline.textContent = `${note.author === "agent" ? "Agent" : "You"} · ${new Date(note.createdAt).toLocaleString()}`;
-    const metadata = document.createElement("div");
-    metadata.className = "note-meta";
-    const identifiers = document.createElement("div");
-    identifiers.className = "note-identifiers";
-    const shortId = document.createElement("span");
-    shortId.className = "note-short-id";
-    shortId.textContent = "#" + note.id.slice(0, 8);
-    shortId.title = note.id;
-    identifiers.append(shortId,
-      createCopyButton("id", note.id),
-      createCopyButton("reference", `Human Review note: ${note.id}\nProject: ${viewedScope}`));
-    metadata.append(byline, identifiers);
-    body.append(text, metadata);
-    renderReportLinks(note, body);
-    const latest = [...handoffs].reverse().find(handoff => handoff.notes.some(item => item.id === note.id));
+    row.append(choice);
+  }
+
+  const body = document.createElement("div");
+  body.className = "note-main";
+  if (note.bugReport) {
+    const header = document.createElement("div");
+    header.className = "report-head";
+    const sourceScope = note.bugReport.sourceScope;
+    header.append(
+      createBadge("source", "From " + notebookName(sourceScope), sourceScope),
+      createBadge(note.status === "done" ? "done" : "pending",
+        (note.status === "done" ? "Fix available" : "Pending") + " · " +
+        notebookName(viewedScope), viewedScope),
+    );
+    body.append(header);
+  }
+
+  const text = document.createElement("div");
+  text.className = "note-text note-markdown";
+  showMarkdown(text, note.html, note.text);
+  const byline = document.createElement("small");
+  byline.textContent = `${note.author === "agent" ? "Agent" : "You"} · ${new Date(note.createdAt).toLocaleString()}`;
+  const metadata = document.createElement("div");
+  metadata.className = "note-meta";
+  const identifiers = document.createElement("div");
+  identifiers.className = "note-identifiers";
+  const shortId = document.createElement("span");
+  shortId.className = "note-short-id";
+  shortId.textContent = "#" + note.id.slice(0, 8);
+  shortId.title = note.id;
+  identifiers.append(shortId,
+    createCopyButton("id", note.id),
+    createCopyButton("reference", `Human Review note: ${note.id}\nProject: ${viewedScope}`));
+  metadata.append(byline, identifiers);
+  body.append(text, metadata);
+  renderReportLinks(note, body);
+
+  if (!inInbox) {
+    const latest = [...handoffs].reverse().find(handoff =>
+      handoff.notes.some(item => item.id === note.id));
     if (latest) {
       const delivery = document.createElement("small");
       delivery.className = "delivery-status";
       delivery.textContent = latest.status === "acknowledged" ? "Agent received" : "Awaiting agent";
       body.append(delivery);
     }
-    const actions = document.createElement("div");
-    actions.className = "note-actions";
-    const notePath = `/api/notepad/${encodeURIComponent(note.id)}?scope=${encodeURIComponent(scope)}`;
-
-    if (editingNoteId === note.id) {
-      renderInlineEditor(note, text, actions, notePath, viewedScope);
-    } else if (confirmingDeleteId === note.id) {
-      const cancel = document.createElement("button");
-      cancel.type = "button";
-      cancel.className = "status";
-      cancel.textContent = "Cancel";
-      cancel.addEventListener("click", () => {
-        confirmingDeleteId = null;
-        render();
-      });
-      const confirm = document.createElement("button");
-      confirm.type = "button";
-      confirm.className = "status delete confirm";
-      confirm.textContent = "Delete now";
-      confirm.setAttribute("aria-label", `Confirm delete: ${note.text.slice(0, 70)}`);
-      confirm.addEventListener("click", async () => {
-        confirm.disabled = true;
-        try {
-          const result = await request("DELETE", notePath);
-          if (scope !== viewedScope) return;
-          notes = notes.filter(item => item.id !== result.deletedId);
-          confirmingDeleteId = null;
-          render();
-          message.textContent = "Note deleted";
-        } catch (error) {
-          confirm.disabled = false;
-          message.textContent = error.message;
-        }
-      });
-      actions.append(cancel, confirm);
-    } else {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "status";
-      const isDone = note.status === "done";
-      const title = isDone ? "Reopen" :
-        note.bugReport ? "Mark fix available" : "Done";
-      button.textContent = title;
-      button.classList.toggle("fix-available", !!note.bugReport && !isDone);
-      button.setAttribute("aria-label", title + ": " + note.text.slice(0, 70));
-      button.addEventListener("click", async () => {
-        button.disabled = true;
-        try {
-          const result = await request("PATCH", notePath, {
-            status: isDone ? "pending" : "done",
-          });
-          if (scope !== viewedScope) return;
-          notes = notes.map(item => item.id === note.id ? result.note : item);
-          render();
-          message.textContent = "Saved";
-        } catch (error) {
-          button.disabled = false;
-          message.textContent = error.message;
-        }
-      });
-      const edit = document.createElement("button");
-      edit.type = "button";
-      edit.className = "status edit-note";
-      edit.textContent = "Edit";
-      edit.disabled = editingNoteId !== null;
-      edit.setAttribute("aria-label", "Edit: " + note.text.slice(0, 70));
-      edit.addEventListener("click", () => {
-        editingNoteId = note.id;
-        editingDraft = note.text;
-        confirmingDeleteId = null;
-        render();
-        list.querySelector(".note-edit-input")?.focus();
-      });
-      const remove = document.createElement("button");
-      remove.type = "button";
-      remove.className = "status delete";
-      remove.textContent = "Delete";
-      remove.setAttribute("aria-label", `Delete: ${note.text.slice(0, 70)}`);
-      remove.addEventListener("click", () => {
-        confirmingDeleteId = note.id;
-        render();
-      });
-      actions.append(button, edit);
-      if (!note.bugReport) {
-        const report = document.createElement("button");
-        report.type = "button";
-        report.className = "status report-note";
-        report.textContent = "Report issue";
-        report.setAttribute("aria-label", "Report issue: " + note.text.slice(0, 70));
-        report.addEventListener("click", () => {
-          reportingNoteId = note.id;
-          closeReportChoices();
-          reportForm.reset();
-          document.getElementById("report-note-title").textContent = note.text;
-          reportPanel.hidden = false;
-          reportDestination.focus();
-        });
-        actions.append(report);
-      }
-      actions.append(remove);
-    }
-    row.append(choice, body, actions);
-    list.append(row);
   }
+
+  const actions = document.createElement("div");
+  actions.className = "note-actions";
+  const notePath = `/api/notepad/${encodeURIComponent(note.id)}?scope=${encodeURIComponent(viewedScope)}`;
+
+  if (inInbox) {
+    actions.append(createStatusButton(note, notePath, viewedScope, true));
+    const promote = document.createElement("button");
+    promote.type = "button";
+    promote.className = "primary promote-report";
+    promote.textContent = "Move to Notes";
+    promote.addEventListener("click", async () => {
+      promote.disabled = true;
+      try {
+        const path = `/api/notepad/reports/${encodeURIComponent(note.id)}/promote?scope=${encodeURIComponent(viewedScope)}`;
+        const result = await request("POST", path);
+        if (scope !== viewedScope) return;
+        reports = reports.filter(item => item.id !== note.id);
+        notes.push(result.note);
+        view = "notes";
+        filter = "all";
+        render();
+        message.textContent = "Report moved to Notes";
+      } catch (error) {
+        promote.disabled = false;
+        message.textContent = error.message;
+      }
+    });
+    actions.append(promote);
+  } else if (editingNoteId === note.id) {
+    renderInlineEditor(note, text, actions, notePath, viewedScope);
+  } else if (confirmingDeleteId === note.id) {
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "status";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => {
+      confirmingDeleteId = null;
+      render();
+    });
+    const confirm = document.createElement("button");
+    confirm.type = "button";
+    confirm.className = "status delete confirm";
+    confirm.textContent = "Delete now";
+    confirm.setAttribute("aria-label", `Confirm delete: ${note.text.slice(0, 70)}`);
+    confirm.addEventListener("click", async () => {
+      confirm.disabled = true;
+      try {
+        const result = await request("DELETE", notePath);
+        if (scope !== viewedScope) return;
+        notes = notes.filter(item => item.id !== result.deletedId);
+        confirmingDeleteId = null;
+        render();
+        message.textContent = "Note deleted";
+      } catch (error) {
+        confirm.disabled = false;
+        message.textContent = error.message;
+      }
+    });
+    actions.append(cancel, confirm);
+  } else {
+    actions.append(createStatusButton(note, notePath, viewedScope, false));
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "status edit-note";
+    edit.textContent = "Edit";
+    edit.disabled = editingNoteId !== null;
+    edit.setAttribute("aria-label", "Edit: " + note.text.slice(0, 70));
+    edit.addEventListener("click", () => {
+      editingNoteId = note.id;
+      editingDraft = note.text;
+      confirmingDeleteId = null;
+      render();
+      list.querySelector(".note-edit-input")?.focus();
+    });
+    actions.append(edit);
+    if (!note.bugReport) {
+      const report = document.createElement("button");
+      report.type = "button";
+      report.className = "status report-note";
+      report.textContent = "Report issue";
+      report.setAttribute("aria-label", "Report issue: " + note.text.slice(0, 70));
+      report.addEventListener("click", () => {
+        reportingNoteId = note.id;
+        closeReportChoices();
+        reportForm.reset();
+        document.getElementById("report-note-title").textContent = note.text;
+        reportPanel.hidden = false;
+        reportDestination.focus();
+      });
+      actions.append(report);
+    }
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "status delete";
+    remove.textContent = "Delete";
+    remove.setAttribute("aria-label", `Delete: ${note.text.slice(0, 70)}`);
+    remove.addEventListener("click", () => {
+      confirmingDeleteId = note.id;
+      render();
+    });
+    actions.append(remove);
+  }
+  row.append(body, actions);
+  return row;
+}
+
+function render() {
+  const inbox = view === "inbox";
+  document.getElementById("count").textContent =
+    String(notes.filter(note => note.status === "pending").length);
+  document.getElementById("inbox-count").textContent = String(reports.length);
+  for (const button of viewButtons) {
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+  capture.hidden = inbox;
+  filterBar.hidden = inbox;
+  sendRow.hidden = inbox;
+  reportPanel.hidden = inbox || !reportingNoteId;
+  list.setAttribute("aria-label", inbox ? "Incoming issue reports" : "Saved notes list");
+  for (const item of filters) {
+    const active = item.dataset.filter === filter;
+    item.classList.toggle("active", active);
+    item.setAttribute("aria-pressed", String(active));
+  }
+  const knownIds = new Set(notes.map(note => note.id));
+  selectedIds = new Set([...selectedIds].filter(id => knownIds.has(id)));
+  updateSelection();
+  const visible = inbox ? reports : notes.filter(note => filter === "all" || note.status === filter);
+  const scrollPosition = list.scrollTop;
+  list.replaceChildren(...[...visible].reverse().map(note => createNoteCard(note, scope, inbox)));
+  empty.hidden = visible.length !== 0;
+  empty.textContent = inbox ? "No incoming issue reports." : "No notes yet.";
   list.scrollTop = scrollPosition;
 }
 
@@ -487,6 +592,7 @@ async function refresh() {
     ]);
     if (scope !== viewedScope) return;
     notes = result.notes;
+    reports = result.reports || [];
     handoffs = result.handoffs || [];
     projects = available.scopes || [];
     if (editingNoteId && !notes.some(note => note.id === editingNoteId)) {
@@ -688,6 +794,17 @@ for (const item of filters) item.addEventListener("click", () => {
   list.scrollTop = 0;
   render();
 });
+for (const button of viewButtons) button.addEventListener("click", () => {
+  if (view === button.dataset.view) return;
+  view = button.dataset.view;
+  if (view === "inbox") {
+    reportingNoteId = null;
+    closeReportChoices();
+    reportForm.reset();
+  }
+  list.scrollTop = 0;
+  render();
+});
 
 projectPicker.addEventListener("change", () => switchScope(projectPicker.value));
 
@@ -715,6 +832,7 @@ confirmNotebookDeletion.addEventListener("click", async () => {
     projects = projects.filter(item => item !== removedScope);
     confirmingNotebookDelete = false;
     notes = [];
+    reports = [];
     handoffs = [];
     selectedIds.clear();
     confirmingDeleteId = null;

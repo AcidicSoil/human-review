@@ -28,6 +28,8 @@ human-review notes list
 human-review notes add "Verify the remaining parser edge case"
 human-review notes edit <note-id> "Revised parser edge case"
 human-review notes report <note-id> --to /path/to/tool --expected "Expected" --actual "Failed" --steps "Reproduce"
+human-review notes reports
+human-review notes promote <report-id>
 human-review notes inbox
 human-review notes poll --timeout 30
 human-review notes ack <handoff-id>
@@ -68,24 +70,30 @@ human-review notes report <source-note-id> \
   --steps "Exact commands/actions attempted"
 ```
 
-Reporting creates one linked owner note without moving the original, changing
-either repository's files, or sending a handoff. Repeating a report for the
-same source note and owner returns its existing report rather than duplicating
-it. The source note exposes the linked report through `reportedTo`.
+Reporting creates one item in the owner's **Issue Inbox** without moving the
+original note, changing project files, or sending a handoff. Repeating a report
+for the same source note and owner returns the existing report. The source note
+exposes the link through `reportedTo`. Old owner reports migrate into the
+inbox without changing their permanent IDs or source links.
 
 **Tool-owner agent:**
 
 1. At session start and checkpoints, run
-   `human-review notes list --scope /actual/tool/repository`. Inspect pending
-   notes with `bugReport`: `sourceScope`, `sourceNoteId`, `expected`,
-   `actual`, and `steps` identify the reporter and failure. These reports
-   do **not** require an inbox handoff.
+   `human-review notes reports --scope /actual/tool/repository`. Inspect pending
+   reports' `bugReport` fields: `sourceScope`, `sourceNoteId`, `expected`,
+   `actual`, and `steps`. These are **Issue Inbox** items, not handoffs
+   from `notes inbox`. The HUD shows colored From/Pending badges, and
+   renders safe Markdown for report text and reproduction details.
 2. Reproduce and address relevant reports in the **owning repository**, not by
    modifying the calling project. Keep blocked or unreproduced reports pending;
    update their note with findings when useful.
-3. After the fix passes relevant tests, run
-   `human-review notes done <owner-report-id> --scope /actual/tool/repository`.
-   In the HUD this is **Mark fix available**. Use `notes reopen` if it regresses.
+3. The agent or user may select **Move to Notes**, or run
+   `human-review notes promote <owner-report-id> --scope /actual/tool/repository`.
+   Promotion is optional and keeps the same report ID and source link.
+   After verifying a repair, run
+   `human-review notes done <owner-report-id> --scope /actual/tool/repository`,
+   whether the report is in the inbox or notes. In the HUD this is
+   **Mark fix available**. Use `notes reopen` if it regresses.
 
 **Reporting agent after a fix:** Recheck the original workflow when
 `reportedTo[].status` becomes `done` (**Fix available — verify**). Only then
@@ -98,6 +106,6 @@ assignment; notes are not authorization for unrelated or destructive tasks.
 
 - Notebook scope: explicit `--scope /project/path` > `HUMAN_REVIEW_DEFAULT_SCOPE` > Git root > current directory.
 - The HUD project dropdown switches between existing notebooks. **Move** transfers selected notes; **Move all** transfers pending, completed, and filtered-out notes. Both use an existing destination and **Move here**.
-- Empty notebooks persist after moving the last note. **Delete notebook** permanently removes the selected notebook and its handoffs after confirmation; project files are not affected.
+- Empty notebooks persist after moving the last note. **Delete notebook** permanently removes the selected notebook, incoming reports and handoffs after confirmation; project files are not affected.
 
 If the CLI is unavailable, report that limitation rather than claiming notes were saved.

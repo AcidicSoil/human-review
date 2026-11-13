@@ -94,3 +94,41 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
 .report-status { border-left: 2px solid #537dc9; padding-left: 8px; }
 .bug-details { color: #d0ddeb; }
 .note-main .status { margin-top: 7px; }
+
+/* Project sections and incoming reports */
+.notebook-views { display: flex; gap: 6px; border-bottom: 1px solid #405a79; }
+.notebook-view { position: relative; flex: 1; padding: 9px 12px 12px; border: 0; background: transparent; color: #aabdd7; font-weight: 600; }
+.notebook-view:hover { color: #fff; }
+.notebook-view.active { color: #f1f6ff; }
+.notebook-view.active::after { content: ""; position: absolute; inset: auto 0 0; border-bottom: 3px solid #85b7ff; }
+.inbox-count { display: inline-block; min-width: 22px; padding: 1px 5px; border: 1px solid #6084ac; border-radius: 6px; color: #eef5ff; background: #2d4d70; font-variant-numeric: tabular-nums; }
+.capture[hidden], .filters[hidden], .send-row[hidden] { display: none; }
+.inbox-report { border-color: #44617f; }
+.report-head { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
+.note-badge { display: inline-block; max-width: 100%; padding: 3px 8px; border: 1px solid; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+.badge-source { background: #24466d; color: #e0f0ff; border-color: #719bc5; }
+.badge-pending { background: #5a401b; color: #ffefca; border-color: #ad813a; }
+.badge-done { background: #205544; color: #dbfff0; border-color: #68a28b; }
+.badge-removed { background: #61303e; color: #ffe2e6; border-color: #ba6a7b; }
+.inbox-report .primary { font-size: 12px; padding: 6px 8px; }
+
+/* Rendered user Markdown uses the same restrained card typography. */
+.note-markdown { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.note-markdown :first-child { margin-top: 0; }
+.note-markdown :last-child { margin-bottom: 0; }
+.note-markdown :is(p, ul, ol, blockquote) { margin-block: 5px; }
+.note-markdown :is(ul, ol) { padding-left: 20px; }
+.note-markdown :is(h1, h2, h3, h4, h5, h6) { font-size: 14px; line-height: 1.4; margin-block: 8px 5px; }
+.note-markdown a { color: #a8ceff; text-decoration: underline; text-underline-offset: 2px; }
+.note-markdown :not(pre) > code { padding: 1px 4px; border: 1px solid #44617b; border-radius: 4px; background: #24384b; }
+.note-markdown pre { max-width: 100%; padding: 10px; overflow-x: auto; border: 1px solid #3c5977; border-radius: 6px; background: #0b1726; }
+.note-markdown pre code { font-size: 12px; white-space: pre; }
+.note-markdown blockquote { padding-left: 9px; border-left: 3px solid #7099c7; color: #d1e1f8; }
+.note-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.note-markdown :is(th, td) { padding: 5px; border: 1px solid #56708e; }
+.bug-details { display: grid; gap: 4px; }
+.bug-details > strong { display: block; margin-top: 6px; color: #e1ecff; }
+@media (forced-colors: active) {
+  .note-badge, .inbox-count { background: Canvas; color: CanvasText; border-color: ButtonText; }
+  .notebook-view.active::after { border-color: Highlight; }
+}

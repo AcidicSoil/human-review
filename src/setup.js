@@ -191,13 +191,15 @@ using \`notes report <source-id> --scope /calling/project --to /tool/repo
 --expected "Expected" --actual "Failure" --steps "Commands attempted"\`.
 The HUD picker searches project names/full paths and accepts existing
 absolute directories without notebooks. Never invent failure details or
-expose secrets. Owner agents must inspect \`notes list --scope /tool/repo\`
-for pending \`bugReport\` notes even without an inbox handoff, reproduce the
-issue, and mark **the owner report ID** done only after testing. The source
-agent sees \`reportedTo[].status\` and completes **its original note ID** only
-after independently verifying the fix. Reopen regressions; no automatic
-cross-project code edits or handoffs. Follow the installed
-\`human-review-notepad\` skill for the full reporter/owner workflow.
+expose secrets. Incoming reports appear in the tool's separate **Issue Inbox**,
+queried with \`notes reports --scope /tool/repo\`; \`notes inbox\` remains for
+sent handoffs. Agents or users can use **Move to Notes** or
+\`notes promote <report-id> --scope /tool/repo\` without changing the ID or
+source link. Cards render sanitized Markdown and readable From/Pending badges.
+Owners mark the report done only after testing; the source agent then verifies
+the original workflow before completing its own note. Reopen regressions;
+no automatic cross-project edits or handoffs. Follow the installed
+\`human-review-notepad\` skill for the full workflow.
 Deleting a complete notebook requires explicit user confirmation and never
 touches project files. Check and maintain notes proactively, including
 unfinished work related to the current assignment. Mark verified work done with

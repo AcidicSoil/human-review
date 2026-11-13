@@ -180,6 +180,8 @@ human-review notes status                              # verify before opening
 human-review notes add "Remember to verify the parser"  # agent capture
 human-review notes edit <id> "Revised parser note"       # revise existing note
 human-review notes report <id> --to /path/to/tool --expected "Expected" --actual "Failed" --steps "Reproduce"
+human-review notes reports --scope /tool/repo          # check incoming issue inbox
+human-review notes promote <id> --scope /tool/repo      # move report to notes
 human-review notes open                                # user-facing HUD
 human-review notes list                                # check proactively
 human-review notes done <id>                           # after processing
@@ -221,16 +223,18 @@ with expected, actual and reproduction details. Verify the tool owner's
 repository path; the HUD picker searches names and full paths, and accepts
 existing directories without notebooks. Avoid duplicate source notes and never
 invent reproduction evidence. The linked owner report contains `bugReport`
-metadata; owner agents find pending reports with
-`notes list --scope /actual/tool/repo` without an inbox handoff. After
-reproducing, fixing and testing, the owner marks **its report ID** done (Fix
-available); the calling project sees `reportedTo[].status` and verifies the
-original workflow before completing **its source note ID**. Keep failures
-pending if unverified. See the installed `human-review-notepad` skill for
-the exact reporter/owner command sequence. Neither report creation nor note
-review authorizes unrelated work or modifies project files.
+metadata; owner agents check the separate **Issue Inbox** using
+`notes reports --scope /actual/tool/repo`, not the handoff `notes inbox`.
+The report may be promoted to project Notes using **Move to Notes** or
+`notes promote <owner-report-id> --scope /actual/tool/repo`; this preserves
+the ID and source link. Cards render sanitized Markdown and readable
+From/Pending/Fix available badges. After fixing and testing, the owner
+marks **its report ID** done; the caller sees `reportedTo[].status`
+and verifies the original workflow before completing **its source note ID**.
+Keep failures pending when unverified. See `human-review-notepad`
+for details. Neither receipt nor viewing authorizes unrelated work.
 Only on explicit user request, the adjacent Delete button can remove one
-project's entire notebook, including notes and handoffs, after confirmation;
+project's entire notebook, including notes, incoming reports and handoffs, after confirmation;
 it never deletes project files. An agent waiting on that notebook receives
 `{"status":"deleted"}` and stops waiting. Selecting notes and
 pressing **Send to agent** creates a durable notification on the separate note

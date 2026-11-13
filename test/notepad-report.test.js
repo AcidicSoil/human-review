@@ -49,10 +49,10 @@ test("a tool receives a linked actionable bug report; source tracks resolution",
   assert.equal(report.bugReport.sourceScope, source);
   assert.equal(report.bugReport.sourceNoteId, original.id);
   assert.equal(store.list(source)[0].id, original.id);
-  assert.equal(store.list(owner)[0].id, report.id);
+  assert.equal(store.listReports(owner)[0].id, report.id);
   assert.ok(store.listScopes().includes(owner), "reporting initializes owner notebook only");
   assert.equal(store.reportIssue(source, original.id, owner, details).id, report.id, "retries do not duplicate");
-  assert.equal(store.list(owner).length, 1);
+  assert.equal(store.listReports(owner).length, 1);
   assert.equal(new NotepadStore().listWithReports(source)[0].reportedTo[0].status, "pending");
   store.setStatus(owner, report.id, "done");
   assert.equal(new NotepadStore().listWithReports(source)[0].reportedTo[0].status, "done");
@@ -103,7 +103,8 @@ test("authenticated report API exposes bug status to originating project", async
   assert.equal(published.status, 201);
   assert.equal(published.body.report.bugReport.sourceScope, source);
   const receiving = await request(server, "GET", "/api/notepad?scope=" + encodeURIComponent(owner));
-  assert.equal(receiving.body.notes[0].id, published.body.report.id);
+  assert.equal(receiving.body.notes.length, 0);
+  assert.equal(receiving.body.reports[0].id, published.body.report.id);
   await request(server, "PATCH",
     "/api/notepad/" + published.body.report.id + "?scope=" + encodeURIComponent(owner),
     { status: "done" });

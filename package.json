@@ -51,7 +51,8 @@
     "access": "public"
   },
   "dependencies": {
-    "marked": "^18.0.7"
+    "marked": "^18.0.7",
+    "sanitize-html": "2.18.2"
   },
   "devDependencies": {
     "@platejs/basic-nodes": "53.0.0",

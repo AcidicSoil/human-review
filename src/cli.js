@@ -26,6 +26,8 @@ const HELP = `human-review ${pkg.version}
   human-review notes report <id>      Report a tool failure to its owning project
       --to <project-path> --expected <text> --actual <text> --steps <text>
   human-review notes list             Read saved notes (JSON)
+  human-review notes reports          Read the project's incoming issue inbox
+  human-review notes promote <id>     Move an inbox report into project notes
   human-review notes done <id>        Mark a processed note complete
   human-review notes reopen <id>      Return a completed note to pending
   human-review notes delete <id>      Permanently delete a note
@@ -330,7 +332,7 @@ function parseNotesArgs(args) {
       values.push(arg);
     }
   }
-  if (!["status", "open", "add", "edit", "report", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
+  if (!["status", "open", "add", "edit", "report", "reports", "promote", "list", "done", "reopen", "delete", "inbox", "poll", "ack"].includes(action)) {
     throw new Error("Unknown notes command: " + action);
   }
   if (action === "add" && values.length !== 1) throw new Error("Usage: human-review notes add <text> [--scope <workspace>]");
@@ -341,10 +343,10 @@ function parseNotesArgs(args) {
       ["destination", "expected", "actual", "steps"].some(field => !report[field]?.trim()))) {
     throw new Error("Usage: human-review notes report <id> --to <project-path> --expected <text> --actual <text> --steps <text> [--scope <workspace>]");
   }
-  if (["done", "reopen", "delete", "ack"].includes(action) && values.length !== 1) {
+  if (["done", "reopen", "delete", "ack", "promote"].includes(action) && values.length !== 1) {
     throw new Error("Usage: human-review notes " + action + " <id> [--scope <workspace>]");
   }
-  if (["status", "open", "list", "inbox", "poll"].includes(action) && values.length) {
+  if (["status", "open", "list", "reports", "inbox", "poll"].includes(action) && values.length) {
     throw new Error("Unexpected notes argument: " + values[0]);
   }
   if (timeoutSecs !== null && (action !== "poll" || !Number.isFinite(timeoutSecs) || timeoutSecs <= 0)) {
@@ -408,6 +410,11 @@ async function notesCommand(args) {
   let body;
   if (action === "open") route = "/api/notepad/open" + query;
   else if (action === "inbox") route = "/api/notepad/inbox" + query;
+  else if (action === "reports") route = "/api/notepad/reports" + query;
+  else if (action === "promote") {
+    method = "POST";
+    route = "/api/notepad/reports/" + encodeURIComponent(value) + "/promote" + query;
+  }
   else if (action === "add") {
     method = "POST";
     body = { text: value, author: "agent" };
@@ -452,6 +459,7 @@ async function notesCommand(args) {
     process.stdout.write(label + url + "\n");
   } else {
     const output = action === "list" ? payload.notes
+      : action === "reports" ? payload.reports
       : action === "inbox" ? payload.handoffs
       : action === "delete" ? payload
       : action === "ack" ? payload.handoff

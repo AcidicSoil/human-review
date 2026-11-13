@@ -100,6 +100,8 @@ human-review notes edit <note-id> "Revised investigation"
 human-review notes report <note-id> --to /path/to/tool-project \
   --expected "What should work" --actual "What failed" --steps "How to reproduce"
 human-review notes list
+human-review notes reports                         # incoming cross-project issues
+human-review notes promote <report-id>            # move inbox report into notes
 human-review notes done <note-id>
 human-review notes reopen <note-id>
 human-review notes delete <note-id>
@@ -153,8 +155,8 @@ Notes retain identity, status, author, and timestamps. The original notebook
 remains available even when its last note moves; moving cannot create a new
 destination notebook. Previously sent handoffs stay with their original project;
 moving notes never sends another handoff. Only **Delete** beside the project
-selector removes a notebook, including its notes and sent handoffs, after a
-second confirmation; project files are untouched. An active handoff poll
+selector removes a notebook, including its notes, incoming reports, and sent
+handoffs, after a second confirmation; project files are untouched. An active handoff poll
 for a deleted notebook receives `{"status":"deleted"}`.
 
 **Report tool issue:** When one project's workflow exposes a bug in another
@@ -162,14 +164,20 @@ project's tool, use **Report issue** on the source note. Search the styled
 project list (names and complete paths distinguish similarly named projects),
 or enter an existing tool directory path directly. Describe expected behavior,
 actual failure, and reproduction steps, then select **Send bug report**. The original note stays in its project,
-and an independently actionable linked report appears in the tool owner's
-notebook. This also works when that existing tool directory has no notebook yet;
-unlike Move, reporting can create the destination notebook entry. It does not
-modify the destination project's files or send a Human Review handoff. Tool
-owners see the source project and failure details, and select **Mark fix
-available** when resolved. The reporting project then sees **Fix available —
-verify**, but its original note remains pending until its own workflow confirms
-the repair. The CLI's `notes report` command supports the same workflow.
+and an independently actionable report appears in the owning project's **Issue
+Inbox**, separate from its ordinary Notes. Existing linked reports migrate
+there without losing their IDs or status. The recipient can select **Move to
+Notes** at any time, retaining the report ID and source link, or run
+`notes promote <report-id> --scope /tool/project`. Agents inspect
+`notes reports --scope /tool/project`; `notes inbox` still lists explicitly
+sent handoffs, a separate channel. This also works when the owning tool
+directory has no notebook. Reporting does not modify project files or send a
+handoff. The inbox cards show readable **From** and **Pending/Fix available**
+badges with full directory paths on hover, alongside safe Markdown formatting
+for note text, headings, lists, code, and reproduction details. The owner
+can mark **Fix available** directly in the inbox after testing. The source
+project then verifies the repair independently before marking its original note
+complete.
 
 Human Review opens the HUD, ordinary pages, and generated Planning/LOA artifacts
 with the executable configured in `BROWSER` (for example, `BROWSER=wslview` on
