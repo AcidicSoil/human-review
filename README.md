@@ -144,6 +144,10 @@ Project: /path/to/project
 
 Agents use the full UUID with `--scope /path/to/project`; the short ID
 is display-only. Clipboard copying requires browser permission.
+Notes and incoming issue reports **start collapsed**, showing their first line,
+status, and short ID. Activate the card's disclosure header to view Markdown,
+report details, and actions; multiple cards may stay open. Automatic refresh
+preserves the expanded cards and keyboard focus.
 The project selector lists existing notebooks, including empty notebooks and
 projects with the same folder name (shown with their paths). Switching changes
 the notebook inside the same window, preserves unsaved drafts for each project,

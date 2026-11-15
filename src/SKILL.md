@@ -208,7 +208,9 @@ simultaneous agents cannot spawn duplicate HUDs. Browser/OS focus restrictions
 may require the user to foreground the existing window manually.
 The HUD persists notes and refreshes while visible. Saved notes scroll
 inside a bounded, keyboard-focusable list without growing the page; refresh
-preserves its scroll position. Each note displays a short ID, with **⧉ ID** to
+preserves its scroll position. Note and Issue Inbox cards start collapsed;
+activate each summary to reveal Markdown and controls. Expanded cards retain
+their state through refresh. Each note displays a short ID, with **⧉ ID** to
 copy the full UUID and **⧉ Ref** to copy its UUID and project scope. These are
 plain-text references, not links; CLI actions require the full UUID and
 `--scope /project/path`, never the short ID. Edit a note inline with

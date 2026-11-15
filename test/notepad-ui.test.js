@@ -239,3 +239,74 @@ test("copy buttons expose stable IDs and project-scoped references", async () =>
     window.close();
   }
 });
+
+test("notes and issue reports start collapsed and preserve independently opened cards", async () => {
+  const project = "/workspace/notes";
+  const notes = [
+    { id: "note-a", text: "# First note\nDetailed content", author: "user",
+      status: "pending", createdAt: "2026-11-08T10:00:00Z" },
+    { id: "note-b", text: "Second note\nMore details", author: "agent",
+      status: "done", createdAt: "2026-11-08T10:01:00Z" },
+  ];
+  const reports = [{ id: "report-a", text: "Incoming **failure**", author: "agent",
+    status: "pending", createdAt: "2026-11-08T10:02:00Z",
+    bugReport: { sourceScope: "/workspace/caller", sourceNoteId: "a",
+      expected: "Works", actual: "Fails", steps: "Reproduce" } }];
+  const dom = new JSDOM(page.replace("__TOKEN__", "test-token"), {
+    url: "http://localhost/notepad/preview?scope=" + encodeURIComponent(project),
+    runScripts: "outside-only",
+  });
+  const { window } = dom;
+  let refresh;
+  const flush = async () => {
+    for (let i = 0; i < 6; i++) await new Promise(resolve => setImmediate(resolve));
+  };
+  try {
+    window.setInterval = callback => { refresh = callback; return 1; };
+    window.fetch = async url => ({
+      ok: true, status: 200,
+      json: async () => url === "/api/notepad/scopes" ? { scopes: [project] }
+        : { notes, reports, handoffs: [] },
+    });
+    window.eval(script);
+    await flush();
+    const doc = window.document;
+    doc.querySelector('[data-filter="all"]').click();
+    const cards = [...doc.querySelectorAll(".note-disclosure")];
+    assert.equal(cards.length, 2);
+    assert.ok(cards.every(card => !card.open), "all notes start collapsed");
+    assert.match(cards[0].querySelector("summary").textContent, /Second note/);
+    assert.match(cards[1].querySelector("summary").textContent, /First note/);
+    assert.equal(cards[0].querySelectorAll(".note-copy").length, 2);
+
+    cards[1].open = true;
+    await flush();
+    assert.equal(cards[0].open, false, "other notes stay closed");
+    const activeSummary = cards[1].querySelector("summary");
+    activeSummary.focus();
+    assert.equal(doc.activeElement, activeSummary);
+    refresh();
+    await flush();
+    const afterRefresh = [...doc.querySelectorAll(".note-disclosure")];
+    assert.equal(afterRefresh[1].open, true, "refresh preserves expanded note");
+    assert.equal(doc.activeElement, afterRefresh[1].querySelector("summary"),
+      "refresh restores disclosure keyboard focus");
+    assert.equal(afterRefresh[0].open, false);
+
+    doc.querySelector('[data-view="inbox"]').click();
+    let inbox = doc.querySelector(".note-disclosure");
+    assert.equal(inbox.open, false, "issue reports start collapsed");
+    assert.match(inbox.querySelector("summary").textContent, /From caller/);
+    inbox.open = true;
+    await flush();
+    refresh();
+    await flush();
+    inbox = doc.querySelector(".note-disclosure");
+    assert.equal(inbox.open, true, "refresh preserves expanded report");
+
+    doc.querySelector('[data-view="notes"]').click();
+    assert.equal(doc.querySelectorAll(".note-disclosure")[1].open, true);
+  } finally {
+    window.close();
+  }
+});

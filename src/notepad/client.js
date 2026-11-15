@@ -52,6 +52,11 @@ let confirmingNotebookDelete = false;
 let deletingNotebook = false;
 let windowConnection;
 const drafts = new Map();
+const expandedNotes = new Set();
+
+function expansionKey(scope, id) {
+  return scope + ":" + id;
+}
 
 function notebookName(value) {
   return value.replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) || value;
@@ -398,21 +403,45 @@ function createNoteCard(note, viewedScope, inInbox) {
     row.append(choice);
   }
 
+  const disclosure = document.createElement("details");
+  disclosure.className = "note-disclosure";
+  disclosure.dataset.noteId = note.id;
+  disclosure.dataset.scope = viewedScope;
+  const key = expansionKey(viewedScope, note.id);
+  disclosure.open = expandedNotes.has(key) || editingNoteId === note.id ||
+    confirmingDeleteId === note.id;
+  disclosure.addEventListener("toggle", () => {
+    if (!disclosure.isConnected) return;
+    if (disclosure.open) expandedNotes.add(key);
+    else expandedNotes.delete(key);
+  });
+  const summary = document.createElement("summary");
+  summary.className = "note-summary";
+  const title = document.createElement("span");
+  title.className = "note-summary-title";
+  const firstLine = note.text.trim().split(/\r?\n/, 1)[0];
+  title.textContent = firstLine.replace(/^#{1,6}\s+/, "");
+  title.title = firstLine;
+  const badges = document.createElement("span");
+  badges.className = "note-summary-badges";
+  if (note.bugReport) {
+    const source = note.bugReport.sourceScope;
+    badges.append(createBadge("source", "From " + notebookName(source), source));
+  }
+  const state = note.status === "done" ?
+    (note.bugReport ? "Fix available" : "Done") : "Pending";
+  badges.append(createBadge(note.status === "done" ? "done" : "pending",
+    note.bugReport ? state + " · " + notebookName(viewedScope) : state,
+    viewedScope));
+  const shortId = document.createElement("span");
+  shortId.className = "note-short-id";
+  shortId.textContent = "#" + note.id.slice(0, 8);
+  shortId.title = note.id;
+  summary.append(title, badges, shortId);
+  disclosure.append(summary);
+
   const body = document.createElement("div");
   body.className = "note-main";
-  if (note.bugReport) {
-    const header = document.createElement("div");
-    header.className = "report-head";
-    const sourceScope = note.bugReport.sourceScope;
-    header.append(
-      createBadge("source", "From " + notebookName(sourceScope), sourceScope),
-      createBadge(note.status === "done" ? "done" : "pending",
-        (note.status === "done" ? "Fix available" : "Pending") + " · " +
-        notebookName(viewedScope), viewedScope),
-    );
-    body.append(header);
-  }
-
   const text = document.createElement("div");
   text.className = "note-text note-markdown";
   showMarkdown(text, note.html, note.text);
@@ -422,12 +451,7 @@ function createNoteCard(note, viewedScope, inInbox) {
   metadata.className = "note-meta";
   const identifiers = document.createElement("div");
   identifiers.className = "note-identifiers";
-  const shortId = document.createElement("span");
-  shortId.className = "note-short-id";
-  shortId.textContent = "#" + note.id.slice(0, 8);
-  shortId.title = note.id;
-  identifiers.append(shortId,
-    createCopyButton("id", note.id),
+  identifiers.append(createCopyButton("id", note.id),
     createCopyButton("reference", `Human Review note: ${note.id}\nProject: ${viewedScope}`));
   metadata.append(byline, identifiers);
   body.append(text, metadata);
@@ -546,7 +570,11 @@ function createNoteCard(note, viewedScope, inInbox) {
     });
     actions.append(remove);
   }
-  row.append(body, actions);
+  const expanded = document.createElement("div");
+  expanded.className = "note-expanded";
+  expanded.append(body, actions);
+  disclosure.append(expanded);
+  row.append(disclosure);
   return row;
 }
 
@@ -575,7 +603,18 @@ function render() {
   updateSelection();
   const visible = inbox ? reports : notes.filter(note => filter === "all" || note.status === filter);
   const scrollPosition = list.scrollTop;
+  const focusedNoteId = document.activeElement?.matches(".note-summary")
+    ? document.activeElement.parentElement.dataset.noteId : null;
+  for (const disclosure of list.querySelectorAll(".note-disclosure")) {
+    const key = expansionKey(disclosure.dataset.scope, disclosure.dataset.noteId);
+    if (disclosure.open) expandedNotes.add(key);
+    else expandedNotes.delete(key);
+  }
   list.replaceChildren(...[...visible].reverse().map(note => createNoteCard(note, scope, inbox)));
+  if (focusedNoteId) {
+    [...list.querySelectorAll(".note-disclosure")].find(item =>
+      item.dataset.noteId === focusedNoteId)?.querySelector("summary")?.focus();
+  }
   empty.hidden = visible.length !== 0;
   empty.textContent = inbox ? "No incoming issue reports." : "No notes yet.";
   list.scrollTop = scrollPosition;

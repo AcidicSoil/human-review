@@ -161,6 +161,8 @@ For non-blocking capture during a task, use
 \`npx -y human-review notes edit <id> "revised text"\`. The HUD supports
 inline Edit, Save and Cancel. Saved notes scroll inside a bounded,
 keyboard-focusable list without growing the page; refresh preserves position.
+Notes and incoming issue reports start collapsed. Activate their summary to
+show full Markdown and controls; expanded cards stay open through refresh.
 Each note shows a short ID; use the HUD's Copy ID control for its full UUID,
 or Copy Ref for a plain-text reference with full UUID and project scope.
 CLI operations always use the full UUID plus \`--scope /project/path\`.

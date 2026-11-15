@@ -104,7 +104,6 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
 .inbox-count { display: inline-block; min-width: 22px; padding: 1px 5px; border: 1px solid #6084ac; border-radius: 6px; color: #eef5ff; background: #2d4d70; font-variant-numeric: tabular-nums; }
 .capture[hidden], .filters[hidden], .send-row[hidden] { display: none; }
 .inbox-report { border-color: #44617f; }
-.report-head { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
 .note-badge { display: inline-block; max-width: 100%; padding: 3px 8px; border: 1px solid; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
 .badge-source { background: #24466d; color: #e0f0ff; border-color: #719bc5; }
 .badge-pending { background: #5a401b; color: #ffefca; border-color: #ad813a; }
@@ -132,3 +131,16 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
   .note-badge, .inbox-count { background: Canvas; color: CanvasText; border-color: ButtonText; }
   .notebook-view.active::after { border-color: Highlight; }
 }
+
+/* Native disclosure keeps long cards compact and searchable while closed. */
+.note-disclosure { flex: 1; min-width: 0; }
+.note-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 8px; list-style: none; cursor: pointer; color: #e6edf7; }
+.note-summary::-webkit-details-marker { display: none; }
+.note-summary::before { content: "›"; flex: none; font-size: 20px; line-height: 1; color: #aecaf0; }
+.note-disclosure[open] > .note-summary::before { transform: rotate(90deg); }
+.note-summary:focus-visible { outline: 2px solid #7ba5ff; outline-offset: 3px; border-radius: 3px; }
+.note-summary-title { flex: 1 1 120px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 650; }
+.note-summary-badges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.note-summary-badges .note-badge { max-width: 130px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.note-summary .note-short-id { margin-left: auto; }
+.note-expanded { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #344a64; }
