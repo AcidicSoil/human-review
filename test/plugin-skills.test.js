@@ -24,6 +24,11 @@ const cases = [
     forbidden: ["human-review-plan.mjs"],
   },
   {
+    name: "checklist-review",
+    command: "human-review-checklist.mjs",
+    forbidden: ["human-review-plan.mjs", "human-review-loa.mjs"],
+  },
+  {
     name: "human-review-notepad",
     command: "human-review notes open",
     forbidden: ["human-review-plan.mjs", "human-review-loa.mjs"],

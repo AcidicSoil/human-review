@@ -22,6 +22,10 @@ test("packaged Human Review skill is generated from the source skill for plugin 
     .replaceAll(
       "human-review-loa path/to/loa.json",
       'node "$SKILL_DIR/human-review-loa.mjs" path/to/loa.json',
+    )
+    .replaceAll(
+      "human-review-checklist path/to/options.json",
+      'node "$SKILL_DIR/human-review-checklist.mjs" path/to/options.json',
     );
 
   assert.equal(packaged, expected);
@@ -34,6 +38,8 @@ test("packaged Human Review skill carries its offline planning and LOA runtimes"
     "fallback-client.js",
     "artifact-tools.js",
     "human-review-loa.mjs",
+    "human-review-checklist.mjs",
+    "checklist-generator.mjs",
     "loa-generator.mjs",
     "loa-client.js",
     "codex-catalog.mjs",

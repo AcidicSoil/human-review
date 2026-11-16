@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { installLoaRuntime, installPlanRuntime, readSkill } from "../src/setup.js";
+import { installLoaRuntime, installPlanRuntime, installChecklistRuntime, readSkill } from "../src/setup.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const skillDir = path.join(root, "skills", "human-review");
@@ -10,6 +10,7 @@ const skillFile = path.join(skillDir, "SKILL.md");
 fs.mkdirSync(skillDir, { recursive: true });
 installPlanRuntime(skillDir);
 installLoaRuntime(skillDir);
+installChecklistRuntime(skillDir);
 
 const packagedSkill = readSkill()
   .replace(
@@ -23,6 +24,10 @@ const packagedSkill = readSkill()
   .replaceAll(
     "human-review-loa path/to/loa.json",
     'node "$SKILL_DIR/human-review-loa.mjs" path/to/loa.json',
+  )
+  .replaceAll(
+    "human-review-checklist path/to/options.json",
+    'node "$SKILL_DIR/human-review-checklist.mjs" path/to/options.json',
   );
 
 fs.writeFileSync(skillFile, packagedSkill);

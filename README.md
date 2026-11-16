@@ -32,11 +32,11 @@ You can also install it with `npx`:
 npx -y human-review setup --global
 ```
 
-Setup synchronizes **all six Human Review skills** (Human Review, Ordinary Review,
-Planning Review, LOA Review, Notepad, and Host Workspace Operator) into Claude Code, Codex,
+Setup synchronizes **all seven Human Review skills** (Human Review, Ordinary Review,
+Planning Review, LOA Review, Checklist Review, Notepad, and Host Workspace Operator) into Claude Code, Codex,
 and shared agents when run with `--global`. It preserves existing skill-directory
 symlinks and unrelated files, and refreshes each skill's agent metadata. The
-umbrella Human Review skill also installs the planning/LOA runtimes **inside its
+umbrella Human Review skill also installs planning/LOA/checklist runtimes **inside its
 skill directory**, not just `SKILL.md`. That local runtime includes the generator,
 artifact navigation/export tools, a built-in editor fallback, and the prebuilt
 Plate browser bundle when the package was built normally. Agents therefore do not
@@ -71,14 +71,16 @@ After selecting or @-mentioning **Human Review**, name the entry skill in the sa
 @Human Review — ordinary-review: Review ./prototype.html and apply my browser feedback.
 @Human Review — planning-review: Turn docs/implementation-plan.md into an editable review artifact.
 @Human Review — loa-review: Build a reviewable LOA for shipping the settings feature. Populate the component rail from my installed Codex plugins and skills.
+@Human Review — checklist-review: Show me checkboxes to select frontend, database, and infrastructure choices.
 @Human Review — human-review-notepad: Open my project Notepad, capture deferred observations, and handle only explicitly sent handoffs.
 ```
 
-The plugin exposes four focused entry skills:
+The plugin exposes five focused entry skills:
 
 - `ordinary-review` — HTML, rendered Markdown, or localhost pages with the live feedback loop.
 - `planning-review` — plans, specs, PRDs, roadmaps, and implementation proposals.
 - `loa-review` — structured Lists of Actions with plugin/skill composition.
+- `checklist-review` — grouped checkboxes for selecting tech stacks, tools, and features.
 - `human-review-notepad` — persistent project notes, non-blocking capture, and explicit user handoffs.
 
 The existing `human-review` skill remains as a backwards-compatible umbrella and shared runtime support.
@@ -247,6 +249,46 @@ In Claude Code, the agent waits in the background and picks up your feedback the
 Note: For HTML files, direct edits and resizes save automatically, so closing the tab doesn't undo them — Discard on your next open, or Revert all during the review, puts the file back. Native HTML form controls (dropdowns, checkboxes, radio buttons, text inputs and textareas) also autosave their selected/typed values; password and file input values are not copied into the saved artifact. Their changes are included in review feedback. For Markdown and localhost pages, click Send so your agent can apply them to the source.
 
 The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; selection comments, block comments, drag handles, links, lists, image editing, and the polling workflow continue to work there.
+
+## Checklist Review — choose options
+
+Use a dedicated checkbox review when deciding which tech stacks, tools, or
+features to include, rather than creating a Notepad entry or an LOA. Choices
+are independent and grouped for easier scanning.
+
+```json
+{
+  "title": "Stack selection",
+  "groups": [
+    { "id": "frontend", "title": "Frontend", "items": [
+      { "id": "react", "label": "React" },
+      { "id": "vue", "label": "Vue" }
+    ] },
+    { "id": "database", "title": "Database", "items": [
+      { "id": "postgres", "label": "PostgreSQL", "checked": true }
+    ] }
+  ]
+}
+```
+
+Save this as `choices.json` and let the agent generate and open the review:
+
+```sh
+human-review-checklist choices.json choices.checklist.review.html --no-open
+human-review choices.checklist.review.html
+human-review poll choices.checklist.review.html
+```
+
+Clicking **Send** returns the checked state through ordinary Human Review
+edits. The HTML autosaves checkbox selections; an agent can read the selected
+stable IDs from the saved artifact:
+
+```sh
+human-review-checklist --extract choices.checklist.review.html
+```
+
+This prints `selectedIds` and grouped labels as JSON. It uses the existing
+DOM autosave and feedback protocol rather than a duplicate checklist store.
 
 ## Shared live review sessions
 

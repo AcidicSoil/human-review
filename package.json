@@ -15,7 +15,8 @@
   "bin": {
     "human-review": "src/cli.js",
     "human-review-plan": "src/plate-review/artifact.js",
-    "human-review-loa": "src/loa-review/artifact.js"
+    "human-review-loa": "src/loa-review/artifact.js",
+    "human-review-checklist": "src/checklist-review/artifact.js"
   },
   "files": [
     "src",

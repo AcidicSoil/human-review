@@ -9,7 +9,7 @@ import { installSkills, invocation, isTransientBin, mergeAgentsBlock } from "../
 
 const FOCUSED_SKILLS = [
   "human-review", "ordinary-review", "planning-review", "loa-review",
-  "host-workspace-operator", "human-review-notepad",
+  "checklist-review", "host-workspace-operator", "human-review-notepad",
 ];
 
 test("global setup installs the skill and local planning runtime for every agent root", () => {
@@ -27,6 +27,8 @@ test("global setup installs the skill and local planning runtime for every agent
       const loaGenerator = path.join(skillDir, "loa-generator.mjs");
       const loaClient = path.join(skillDir, "loa-client.js");
       const loaRunner = path.join(skillDir, "human-review-loa.mjs");
+      const checklistRunner = path.join(skillDir, "human-review-checklist.mjs");
+      const checklistGenerator = path.join(skillDir, "checklist-generator.mjs");
 
       assert.equal(fs.existsSync(skill), true);
       assert.equal(fs.existsSync(runner), true);
@@ -36,6 +38,8 @@ test("global setup installs the skill and local planning runtime for every agent
       assert.equal(fs.existsSync(loaGenerator), true);
       assert.equal(fs.existsSync(loaClient), true);
       assert.equal(fs.existsSync(loaRunner), true);
+      assert.equal(fs.existsSync(checklistRunner), true);
+      assert.equal(fs.existsSync(checklistGenerator), true);
       for (const name of FOCUSED_SKILLS) {
         for (const relative of ["agents/openai.yaml", ...(name === "human-review" ? [] : ["SKILL.md"])]) {
           const expected = fs.readFileSync(path.join(import.meta.dirname, "..", "skills", name, relative), "utf8");
@@ -53,7 +57,8 @@ test("global setup installs the skill and local planning runtime for every agent
       assert.match(installedSkill, /human-review notes inbox/);
       assert.match(installedSkill, /human-review-plan\.mjs/);
       assert.match(installedSkill, /human-review-loa\.mjs/);
-      assert.match(installedSkill, /third review mode|LOA review/i);
+      assert.match(installedSkill, /human-review-checklist\.mjs/);
+      assert.match(installedSkill, /LOA component review/i);
       assert.match(installedSkill, /Do not stop and tell the user to run a generator later/);
     }
     assert.match(result.join("\n"), /Claude Code plan runtime/);

@@ -1,0 +1,8 @@
+interface:
+  display_name: Checklist Review
+  short_description: Check off options in Human Review
+  brand_color: "#E4572E"
+  default_prompt: Turn these grouped options into a selectable Human Review checklist and collect my selections.
+policy:
+  products: [CHAT, CODEX]
+  allow_implicit_invocation: true

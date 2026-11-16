@@ -11,20 +11,22 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Human Review",
-    "shortDescription": "Review pages, plans, and LOAs",
-    "longDescription": "Human Review provides focused skills for ordinary page review, planning-document review, structured LOA composition, and persistent project Notepad capture. Each workflow uses the existing Human Review browser or offline artifact runtime, while the original human-review skill remains available for backwards compatibility.",
+    "shortDescription": "Review pages, plans, checklists, and LOAs",
+    "longDescription": "Human Review provides focused skills for ordinary page review, planning documents, grouped checklist selections, structured LOA composition, and persistent project Notepad capture. Each workflow uses the existing browser or offline artifact runtime, while the original human-review skill remains available for backwards compatibility.",
     "developerName": "AcidicSoil",
     "category": "Productivity",
     "capabilities": [
       "Visually review HTML, Markdown, and localhost pages",
       "Edit content directly and send comments to your agent",
       "Review plans and structured Lists of Actions offline",
+      "Select grouped tech-stack and feature options with checkboxes",
       "Track unfinished project notes, cross-project tool bug reports, linked fixes, and delivered handoffs"
     ],
     "defaultPrompt": [
       "ordinary-review: Review this HTML, Markdown, or localhost page and apply my browser feedback.",
       "planning-review: Turn this plan, spec, PRD, or roadmap into an editable Human Review artifact.",
       "loa-review: Turn this task or LOA into a reviewable action list with plugin and skill references.",
+      "checklist-review: Show my tech-stack, feature, or tool choices as checkboxes and return selected options.",
       "human-review-notepad: Check project Issue Inbox and handoffs first, resolve actionable owner reports before new work, verify fixes, and close reports with their original IDs."
     ],
     "brandColor": "#E4572E",

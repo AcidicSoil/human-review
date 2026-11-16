@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const plateHere = path.join(here, "plate-review");
 const loaHere = path.join(here, "loa-review");
+const checklistHere = path.join(here, "checklist-review");
 
 /**
  * Teach agents the command that will actually work here. A global install or
@@ -88,6 +89,12 @@ function bundleSharedImports(source) {
     .replaceAll('from "../browser-open.js"', 'from "./browser-open.mjs"');
 }
 
+function installRunner(skillDir, name, generator) {
+  const file = path.join(skillDir, name);
+  fs.writeFileSync(file, `#!/usr/bin/env node\nimport { runCli } from "./${generator}";\nrunCli().then(code => { process.exitCode = code; }).catch(error => { console.error(error.message || error); process.exitCode = 1; });\n`);
+  return file;
+}
+
 export function installPlanRuntime(skillDir) {
   fs.mkdirSync(skillDir, { recursive: true });
 
@@ -102,10 +109,7 @@ export function installPlanRuntime(skillDir) {
   if (fs.existsSync(prebuilt)) fs.copyFileSync(prebuilt, installedBundle);
   else if (fs.existsSync(installedBundle)) fs.unlinkSync(installedBundle);
 
-  const runner = `#!/usr/bin/env node\nimport { runCli } from "./generator.mjs";\nrunCli().then((code) => { process.exitCode = code; }).catch((error) => { console.error(error.message || error); process.exitCode = 1; });\n`;
-  const runnerFile = path.join(skillDir, "human-review-plan.mjs");
-  fs.writeFileSync(runnerFile, runner);
-  return runnerFile;
+  return installRunner(skillDir, "human-review-plan.mjs", "generator.mjs");
 }
 
 export function installLoaRuntime(skillDir) {
@@ -119,16 +123,22 @@ export function installLoaRuntime(skillDir) {
   fs.copyFileSync(path.join(loaHere, "runtime.js"), path.join(skillDir, "loa-client.js"));
   fs.copyFileSync(path.join(loaHere, "catalog.js"), path.join(skillDir, "codex-catalog.mjs"));
   fs.copyFileSync(path.join(loaHere, "resource-manifest.js"), path.join(skillDir, "resource-manifest.mjs"));
-  const runner = `#!/usr/bin/env node\nimport { runCli } from "./loa-generator.mjs";\nrunCli().then((code) => { process.exitCode = code; }).catch((error) => { console.error(error.message || error); process.exitCode = 1; });\n`;
-  const runnerFile = path.join(skillDir, "human-review-loa.mjs");
-  fs.writeFileSync(runnerFile, runner);
-  return runnerFile;
+  return installRunner(skillDir, "human-review-loa.mjs", "loa-generator.mjs");
 }
 
-export const skillFor = (cmd, planCmd, loaCmd = "human-review-loa") => readSkill()
+export function installChecklistRuntime(skillDir) {
+  fs.mkdirSync(skillDir, { recursive: true });
+  installReviewHostRuntime(skillDir);
+  fs.writeFileSync(path.join(skillDir, "checklist-generator.mjs"),
+    bundleSharedImports(fs.readFileSync(path.join(checklistHere, "generator.js"), "utf8")));
+  return installRunner(skillDir, "human-review-checklist.mjs", "checklist-generator.mjs");
+}
+
+export const skillFor = (cmd, planCmd, loaCmd = "human-review-loa", checklistCmd = "human-review-checklist") => readSkill()
   .replaceAll("npx -y human-review", cmd)
   .replaceAll("human-review-plan path/to/plan.md", `${planCmd} path/to/plan.md`)
-  .replaceAll("human-review-loa path/to/loa.json", `${loaCmd} path/to/loa.json`);
+  .replaceAll("human-review-loa path/to/loa.json", `${loaCmd} path/to/loa.json`)
+  .replaceAll("human-review-checklist path/to/options.json", `${checklistCmd} path/to/options.json`);
 
 const CODEX_BLOCK = `
 ## Reviewing files and localhost pages with human-review
@@ -221,8 +231,12 @@ Note polling is separate from ordinary Human Review polling.
 For large plans, specs, or PRDs, generate an offline editable artifact with
 \`__PLAN__ <source> <output.review.html>\`. For structured Lists of Actions and
 plugin/skill catalogs, use \`__LOA__ <input.json> <output.loa.review.html>\`.
-Both generators are installed with the skill and work without network access
-or installing Plate, React, or esbuild at review time.
+For selecting tech stacks, tools, or other independent choices, use
+\`__CHECKLIST__ <options.json> <output.checklist.review.html> --no-open\`.
+The checklist is a separate ordinary HTML review artifact (not Notepad).
+Open it through \`human-review <artifact>\`, poll for feedback, then run
+\`__CHECKLIST__ --extract <artifact>\` to read selected IDs. The installed
+generators work without network access at review time.
 
 The batch groups feedback by page under \`pages\`, so fix every page listed. Items
 under \`edits\` are changes the user already made: \`after\` is their exact wording,
@@ -284,22 +298,27 @@ export function installSkills(cwd, { global: isGlobal = false, home = os.homedir
 
   let projectPlanCmd = "";
   let projectLoaCmd = "";
+  let projectChecklistCmd = "";
   for (const [agent, base] of skillRoots) {
     const skillDir = path.join(base, "skills", "human-review");
     const skillFile = path.join(skillDir, "SKILL.md");
     const runnerFile = installPlanRuntime(skillDir);
     const loaRunnerFile = installLoaRuntime(skillDir);
+    const checklistRunnerFile = installChecklistRuntime(skillDir);
     const planCmd = `node ${shellQuote(runnerFile)}`;
     const loaCmd = `node ${shellQuote(loaRunnerFile)}`;
+    const checklistCmd = `node ${shellQuote(checklistRunnerFile)}`;
     if (!projectPlanCmd) projectPlanCmd = planCmd;
     if (!projectLoaCmd) projectLoaCmd = loaCmd;
-    fs.writeFileSync(skillFile, skillFor(cmd, planCmd, loaCmd));
+    if (!projectChecklistCmd) projectChecklistCmd = checklistCmd;
+    fs.writeFileSync(skillFile, skillFor(cmd, planCmd, loaCmd, checklistCmd));
     copySkillFiles(path.join(skillsRoot, "human-review", "agents"), path.join(skillDir, "agents"));
     const focused = installFocusedSkills(base);
     done.push(`${agent} skill  ${skillFile}${isGlobal ? "   (all projects)" : ""}`);
     done.push(`${agent} focused skills  ${focused.join(", ")}`);
     done.push(`${agent} plan runtime  ${runnerFile}`);
     done.push(`${agent} LOA runtime  ${loaRunnerFile}`);
+    done.push(`${agent} checklist runtime  ${checklistRunnerFile}`);
   }
 
   if (!isGlobal) {
@@ -308,7 +327,8 @@ export function installSkills(cwd, { global: isGlobal = false, home = os.homedir
     const block = CODEX_BLOCK
       .replaceAll("npx -y human-review", cmd)
       .replaceAll("__PLAN__", projectPlanCmd)
-      .replaceAll("__LOA__", projectLoaCmd);
+      .replaceAll("__LOA__", projectLoaCmd)
+      .replaceAll("__CHECKLIST__", projectChecklistCmd);
     const { text, action } = mergeAgentsBlock(existing, block);
     if (action === "custom") done.push("AGENTS.md mentions human-review in its own words — left it alone");
     else if (action === "current") done.push("AGENTS.md already current   (Codex)");
@@ -321,6 +341,7 @@ export function installSkills(cwd, { global: isGlobal = false, home = os.homedir
   done.push("", `Agents will be told to run: ${cmd}`);
   done.push(`Planning artifacts use: ${projectPlanCmd}`);
   done.push(`LOA artifacts use: ${projectLoaCmd}`);
+  done.push(`Checklist artifacts use: ${projectChecklistCmd}`);
   if (cmd.startsWith("npx")) {
     done.push("Ordinary human-review commands still use npx until the package is installed or linked.");
     done.push("Planning artifact generation does not depend on that npx call after setup.");
