@@ -7,6 +7,14 @@ const ID = /^[a-z0-9][a-z0-9._:-]*$/i;
 const escapeHtml = text => String(text).replace(/[&<>"']/g, char =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
 const isRecord = value => value && typeof value === "object" && !Array.isArray(value);
+const sectionsFor = input => Array.isArray(input.questions)
+  ? input.questions.map(question => ({
+    id: question.id,
+    title: question.prompt,
+    items: question.options,
+    type: question.type ?? "single",
+  }))
+  : input.groups.map(group => ({ ...group, type: "multiple" }));
 
 export const CHECKLIST_CSS = `
 :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; background: #101720; color: #eaf1fb; }
@@ -33,6 +41,8 @@ legend { padding-inline: .5rem; color: #f4f7ff; font-size: 1.1rem; font-weight: 
 .option-copy { display: grid; gap: .2rem; min-width: 0; overflow-wrap: anywhere; }
 .option-title { font-weight: 650; }
 .option-description { color: #cfdeef; line-height: 1.45; font-size: .875rem; }
+.question-hint { color: #bdd0e7; font-size: .86rem; margin: -.25rem 0 .85rem; }
+.question-number { color: #a8c8f3; margin-right: .4rem; }
 .annotate { flex: none; min-height: 2.75rem; padding: .6rem .85rem; color: #e3efff;
   background: #293c55; border: 1px solid #5d81ad; border-radius: 8px; cursor: pointer; font: inherit; font-size: .875rem; }
 .annotate:hover { background: #35547a; border-color: #97c5ff; }
@@ -44,19 +54,28 @@ footer { padding-block: 1rem; border-top: 1px solid #475a70; }
 `;
 
 export function validateChecklistInput(input) {
-  if (!isRecord(input) || typeof input.title !== "string" || !input.title.trim() || !Array.isArray(input.groups)) {
-    throw new TypeError("Checklist requires a title and groups.");
+  if (!isRecord(input) || typeof input.title !== "string" || !input.title.trim()) {
+    throw new TypeError("Review requires a title.");
+  }
+  const hasQuestions = Object.hasOwn(input, "questions");
+  const hasGroups = Object.hasOwn(input, "groups");
+  if (hasQuestions === hasGroups || !Array.isArray(hasQuestions ? input.questions : input.groups)) {
+    throw new TypeError("Provide either questionnaire questions or checklist groups.");
   }
   if (input.description !== undefined && typeof input.description !== "string") throw new TypeError("Invalid description.");
   const groupIds = new Set();
   const choiceIds = new Set();
-  for (const group of input.groups) {
-    if (!isRecord(group) || typeof group.title !== "string" || !group.title.trim() || !ID.test(group.id || "")) {
-      throw new TypeError("Invalid group title or ID.");
+  for (const group of sectionsFor(input)) {
+    if (!group || typeof group.title !== "string" || !group.title.trim() || !ID.test(group.id || "")) {
+      throw new TypeError("Invalid question/group title or ID.");
     }
-    if (groupIds.has(group.id)) throw new TypeError("Duplicate group ID.");
+    if (groupIds.has(group.id)) throw new TypeError("Duplicate question/group ID.");
     groupIds.add(group.id);
-    if (!Array.isArray(group.items)) throw new TypeError("Group items must be an array.");
+    if (!["single", "multiple"].includes(group.type)) {
+      throw new TypeError("Question type must be single or multiple.");
+    }
+    if (!Array.isArray(group.items)) throw new TypeError("Question options/group items must be an array.");
+    let defaults = 0;
     for (const item of group.items) {
       if (!isRecord(item) || !ID.test(item.id || "") || typeof item.label !== "string" || !item.label.trim()) {
         throw new TypeError("Invalid choice ID or label.");
@@ -65,6 +84,10 @@ export function validateChecklistInput(input) {
       choiceIds.add(item.id);
       if (item.description !== undefined && typeof item.description !== "string") throw new TypeError("Invalid choice description.");
       if (item.checked !== undefined && typeof item.checked !== "boolean") throw new TypeError("Invalid checked state.");
+      if (item.checked) defaults += 1;
+    }
+    if (group.type === "single" && defaults > 1) {
+      throw new TypeError("Single-answer question cannot have multiple selected defaults.");
     }
   }
   return input;
@@ -72,18 +95,22 @@ export function validateChecklistInput(input) {
 
 export function createChecklistReviewHtml(input) {
   const checklist = validateChecklistInput(input);
+  const questionnaire = Array.isArray(checklist.questions);
   const annotateButton = label => `<button type="button" class="annotate" data-hr-annotate
     aria-label="Comment on ${escapeHtml(label)}">Comment</button>`;
-  const groups = checklist.groups.map(group => `
+  const groups = sectionsFor(checklist).map((group, index) => `
     <fieldset id="hr-group-${group.id}" data-hr-group="${group.id}"
-      data-hr-annotatable="${escapeHtml(group.title)}">
-      <legend>${escapeHtml(group.title)}</legend>
+      data-hr-annotatable="${escapeHtml(group.title)}"${questionnaire ? ` aria-describedby="hr-hint-${group.id}"` : ""}>
+      <legend>${questionnaire ? `<span class="question-number">${index + 1}.</span> ` : ""}${escapeHtml(group.title)}</legend>
       <div class="group-actions">${annotateButton(group.title)}</div>
+      ${questionnaire ? `<p id="hr-hint-${group.id}" class="question-hint">${group.type === "single" ? "Choose one answer" : "Choose all that apply"}</p>` : ""}
       <div class="options">${group.items.map(item => `
         <div class="option-row" id="hr-choice-${item.id}"
           data-hr-annotatable="${escapeHtml(item.label)}">
           <label class="option">
-            <input type="checkbox" name="choices" value="${item.id}" data-hr-choice="${item.id}"${item.checked ? " checked" : ""}>
+            <input type="${group.type === "single" ? "radio" : "checkbox"}"
+              name="${questionnaire ? `answer-${group.id}` : "choices"}"
+              value="${item.id}" data-hr-choice="${item.id}"${item.checked ? " checked" : ""}>
             <span class="option-copy"><span class="option-title">${escapeHtml(item.label)}</span>
               ${item.description ? `<span class="option-description">${escapeHtml(item.description)}</span>` : ""}</span>
           </label>
@@ -94,11 +121,11 @@ export function createChecklistReviewHtml(input) {
   const manifest = JSON.stringify({ format: FORMAT, checklist }).replace(/</g, "\\u003c");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(checklist.title)} — Checklist Review</title><style>${CHECKLIST_CSS}</style></head>
-<body><main><header><div class="eyebrow">HUMAN REVIEW / CHECKLIST</div>
+<title>${escapeHtml(checklist.title)} — ${questionnaire ? "Questionnaire" : "Checklist"} Review</title><style>${CHECKLIST_CSS}</style></head>
+<body><main><header><div class="eyebrow">HUMAN REVIEW / ${questionnaire ? "QUESTIONNAIRE" : "CHECKLIST"}</div>
 <h1>${escapeHtml(checklist.title)}</h1>
 ${checklist.description ? `<p class="intro">${escapeHtml(checklist.description)}</p>` : ""}
-<p class="hint">Check all that apply. Use Send in Human Review to return your selections to the agent.</p>
+<p class="hint">${questionnaire ? "Answer the questions below." : "Check all that apply."} Use Send in Human Review to return your selections to the agent.</p>
 </header><form class="checklist" aria-label="Review selections">${groups}</form>
 <footer>Selections save automatically in live Human Review.</footer></main>
 <script type="application/json" id="hr-checklist-manifest">${manifest}</script></body></html>`;
@@ -114,10 +141,20 @@ export function readChecklistSelections(html) {
   for (const [, tag, id] of html.matchAll(/(<input\b[^>]*\bdata-hr-choice="([^"]+)"[^>]*>)/gi)) {
     if (/(?:^|\s)checked(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?(?=\s|\/?>)/i.test(tag)) checked.add(id);
   }
-  const selections = checklist.groups.flatMap(group => group.items
+  const groups = sectionsFor(checklist);
+  const selections = groups.flatMap(group => group.items
     .filter(item => checked.has(item.id))
     .map(item => ({ id: item.id, label: item.label, groupId: group.id, group: group.title })));
-  return { title: checklist.title, selectedIds: selections.map(item => item.id), selections };
+  const result = { title: checklist.title, selectedIds: selections.map(item => item.id), selections };
+  if (Array.isArray(checklist.questions)) {
+    result.answers = groups.map(group => ({
+      questionId: group.id,
+      prompt: group.title,
+      type: group.type,
+      selectedIds: group.items.filter(item => checked.has(item.id)).map(item => item.id),
+    }));
+  }
+  return result;
 }
 
 export async function generateChecklistArtifact(inputFile, outputFile) {

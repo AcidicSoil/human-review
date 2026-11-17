@@ -1,8 +1,8 @@
 interface:
-  display_name: Checklist Review
-  short_description: Check off options in Human Review
+  display_name: Checklist & Questionnaire Review
+  short_description: Checklists, single-choice and multi-choice questions
   brand_color: "#E4572E"
-  default_prompt: Turn these grouped options into a selectable Human Review checklist and collect my selections.
+  default_prompt: Turn my options or questions into a Human Review checklist or multiple-choice questionnaire, collect selected answers and annotations, and return structured results.
 policy:
   products: [CHAT, CODEX]
   allow_implicit_invocation: true

@@ -1,6 +1,6 @@
 ---
 name: checklist-review
-description: Use when the user wants to choose, include, exclude, or check off multiple options (for example tech stacks, features, or tools) in Human Review instead of reviewing a regular document.
+description: Use when the user wants a Human Review checklist or multiple-choice questionnaire, with single-answer radio questions, multi-answer checkbox questions, and per-choice annotations.
 ---
 
 # Checklist Review
@@ -33,7 +33,37 @@ Prepare a JSON file using the user's actual options. Group related choices; keep
 }
 ```
 
-The `checked` field is optional. All choices are **independent checkboxes**, not radio buttons, and can be changed freely. The user can **Comment** on a whole group or a particular option in the live Human Review session; each annotation anchors to that group's or option's stable ID. Generate the review artifact with the installed runner:
+For a **multiple-choice questionnaire**, supply `questions` instead of `groups`:
+
+```json
+{
+  "title": "Architecture decisions",
+  "questions": [
+    {
+      "id": "frontend",
+      "prompt": "Which UI framework should we use?",
+      "type": "single",
+      "options": [
+        { "id": "react", "label": "React" },
+        { "id": "vue", "label": "Vue" }
+      ]
+    },
+    {
+      "id": "storage",
+      "prompt": "Which storage systems should we include?",
+      "type": "multiple",
+      "options": [
+        { "id": "postgresql", "label": "PostgreSQL" },
+        { "id": "redis", "label": "Redis" }
+      ]
+    }
+  ]
+}
+```
+
+Each question has a stable ID, prompt, and options. `single` (the default) uses **radio buttons**; `multiple` uses **checkboxes**. `checked` preselects an option, with at most one default in a single-answer question. Existing `groups` checklists still use independent checkboxes and produce the same output. Use only real options from the request.
+
+The reviewer can **Comment** on any question/group or individual option; annotations anchor to stable IDs in the same live feedback session. Generate either artifact with the installed runner:
 
 ```sh
 node "$SKILLS_ROOT/human-review/human-review-checklist.mjs" path/to/options.json path/to/options.checklist.review.html --no-open
@@ -49,4 +79,4 @@ Once the user clicks **Send**, read the reviewed HTML and extract the selected I
 node "$SKILLS_ROOT/human-review/human-review-checklist.mjs" --extract path/to/options.checklist.review.html
 ```
 
-The JSON result includes `selectedIds` and labeled `selections` with group IDs. **Also process `pages[].comments` from the same poll**: group comments anchor to `#hr-group-<id>`, and option comments to `#hr-choice-<id>`. These annotations remain separate from the checked choices and can express exceptions or requested changes. Apply the selections and their associated comments together, then run `human-review poll <artifact> --ack --timeout 600`. If the user has not sent the review, do not infer choices from an unmodified artifact. Offline HTML supports checkbox selection; annotations require a live Human Review session.
+The JSON result keeps `selectedIds` and labeled `selections` for compatibility. Questionnaires additionally return `answers[]`, containing each `questionId`, `prompt`, `type`, and `selectedIds` (including unanswered questions as empty arrays). **Also process `pages[].comments` from the same poll**: question/group comments anchor to `#hr-group-<id>`, and option comments to `#hr-choice-<id>`. These annotations remain separate from the checked choices and can express exceptions or requested changes. Apply the selections and their associated comments together, then run `human-review poll <artifact> --ack --timeout 600`. If the user has not sent the review, do not infer choices from an unmodified artifact. Offline HTML supports checkbox selection; annotations require a live Human Review session.

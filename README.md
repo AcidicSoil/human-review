@@ -258,11 +258,12 @@ while Planning keeps embedded discussion threads in its structured document.
 All annotations remain review feedback and are applied by the agent alongside
 the edited content or selected options.
 
-## Checklist Review — choose options
+## Checklist & Questionnaire Review
 
-Use a dedicated checkbox review when deciding which tech stacks, tools, or
-features to include, rather than creating a Notepad entry or an LOA. Choices
-are independent and grouped for easier scanning.
+Use `human-review-checklist` for grouped checkbox selections **or** multiple-choice
+questionnaires. Both are distinct from Notepad and LOA Review. Existing
+checklists use independent checkboxes; questionnaire questions can each
+request a single answer or multiple answers.
 
 ```json
 {
@@ -279,7 +280,39 @@ are independent and grouped for easier scanning.
 }
 ```
 
-Save this as `choices.json` and let the agent generate and open the review:
+To create a **questionnaire**, use `questions` instead of `groups`:
+
+```json
+{
+  "title": "Architecture questionnaire",
+  "questions": [
+    {
+      "id": "frontend",
+      "prompt": "Which frontend framework?",
+      "type": "single",
+      "options": [
+        { "id": "react", "label": "React" },
+        { "id": "vue", "label": "Vue" }
+      ]
+    },
+    {
+      "id": "storage",
+      "prompt": "Which databases?",
+      "type": "multiple",
+      "options": [
+        { "id": "postgres", "label": "PostgreSQL" },
+        { "id": "redis", "label": "Redis" }
+      ]
+    }
+  ]
+}
+```
+
+Each question uses radio buttons for `single` (the default) or checkboxes for
+`multiple`. Every question and option has its own stable ID. Unanswered
+questions are retained in the extracted result.
+
+Save either format as `choices.json` and let the agent generate and open the review:
 
 ```sh
 human-review-checklist choices.json choices.checklist.review.html --no-open
@@ -300,7 +333,9 @@ read the selected stable IDs from the saved artifact:
 human-review-checklist --extract choices.checklist.review.html
 ```
 
-This prints `selectedIds` and grouped labels as JSON. The agent also reads
+This prints `selectedIds` and grouped labels as JSON. Questionnaires also
+return an `answers[]` entry per question, containing `questionId`, `prompt`,
+`type`, and `selectedIds`. The agent also reads
 `pages[].comments` from the live poll: option annotations use
 `#hr-choice-<id>`, and group annotations use `#hr-group-<id>`.
 Selections and comments share the existing feedback protocol—no separate

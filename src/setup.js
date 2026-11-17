@@ -231,14 +231,16 @@ Note polling is separate from ordinary Human Review polling.
 For large plans, specs, or PRDs, generate an offline editable artifact with
 \`__PLAN__ <source> <output.review.html>\`. For structured Lists of Actions and
 plugin/skill catalogs, use \`__LOA__ <input.json> <output.loa.review.html>\`.
-For selecting tech stacks, tools, or other independent choices, use
+For checklists or multiple-choice questionnaires, use
 \`__CHECKLIST__ <options.json> <output.checklist.review.html> --no-open\`.
-The checklist is a separate ordinary HTML review artifact (not Notepad).
+A \`groups\` checklist uses independent checkboxes; a \`questions\` questionnaire
+uses \`type: "single"\` radio options or \`type: "multiple"\` checkboxes per question.
+Both are separate ordinary HTML reviews (not Notepad).
 Reviewers can add group or item comments using the existing feedback panel.
 Ordinary Review supports element/text comments; Planning supports discussions;
 LOA supports action comments. Keep annotation anchors alongside selected IDs.
 Open it through \`human-review <artifact>\`, poll for feedback, then run
-\`__CHECKLIST__ --extract <artifact>\` to read selected IDs. The installed
+\`__CHECKLIST__ --extract <artifact>\` to read selected IDs and questionnaire \`answers[]\`. The installed
 generators work without network access at review time.
 
 The batch groups feedback by page under \`pages\`, so fix every page listed. Items

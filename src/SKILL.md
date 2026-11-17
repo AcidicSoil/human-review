@@ -16,13 +16,15 @@ Apply annotations alongside edits and choices without treating them as selection
 - **Ordinary HTML, Markdown, and localhost pages:** use the normal Human Review polling loop.
 - **Large plans, specs, roadmaps, PRDs, and implementation proposals:** generate one standalone editable `.review.html` artifact with `human-review-plan`.
 - **Structured Lists of Actions with plugin/skill catalogs:** generate an offline, editable LOA composition artifact with `human-review-loa`.
-- **Option selection and tech-stack decisions:** generate a grouped checklist artifact with `human-review-checklist`; keep it separate from the Notepad HUD. Each checkbox is independent, saved through ordinary HTML review, and returned as selected IDs.
+- **Option selection, tech-stack decisions, and questionnaires:** generate a checklist or multi-choice questionnaire with `human-review-checklist`; keep it separate from Notepad. Questionnaires support per-question radio (single) or checkbox (multiple) answers.
 
 ## Checklist Review
 
-When the user wants to check off options (tech stacks, features, tools), use the
-`checklist-review` skill. Create grouped JSON with stable `groups[].id` and
-`groups[].items[].id`, then generate a review artifact:
+When the user wants to check off options, use the `checklist-review` skill.
+For a standard checklist, supply `groups[].id` and `groups[].items[].id`.
+For a questionnaire, supply `questions[].id`, `questions[].prompt`,
+`questions[].type` (`single` radio or `multiple` checkbox), and
+`questions[].options[]` with stable option IDs. Generate either artifact:
 
 ```sh
 human-review-checklist path/to/options.json path/to/options.checklist.review.html --no-open
@@ -32,9 +34,11 @@ human-review poll path/to/options.checklist.review.html
 
 This reuses ordinary HTML checkbox autosaving. The reviewer can **Comment**
 on an entire group or individual choice using the shared feedback panel.
-After **Send**, extract choices using `human-review-checklist --extract
-path/to/options.checklist.review.html`. Apply both `selectedIds` and the
-anchored `pages[].comments` from the live poll, preserving group and item IDs. Do not assume a generated default
+After **Send**, extract with `human-review-checklist --extract
+path/to/options.checklist.review.html`. Checklists return `selectedIds` and
+`selections`; questionnaires additionally return `answers[]` for each question,
+including unanswered questions. Apply the selected answers and anchored
+`pages[].comments` together, preserving question and option IDs. Do not assume a generated default
 selection represents feedback until the user submits the review.
 
 ## Required planning-artifact behavior

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { JSDOM } from "jsdom";
+import { serializeDocument } from "../src/serialize.js";
 
 import {
   createChecklistReviewHtml,
@@ -128,17 +129,24 @@ test("installed checklist runner works independently of the source checkout", as
     const runner = path.join(home, ".agents/skills/human-review/human-review-checklist.mjs");
     const input = path.join(home, "choices.json");
     const artifact = path.join(home, "selection.review.html");
-    fs.writeFileSync(input, JSON.stringify(techStack));
-    const generate = spawnSync(process.execPath, [runner, input, artifact, "--no-open"], {
-      encoding: "utf8", cwd: home, env: { ...process.env, NODE_PATH: "" },
-    });
-    assert.equal(generate.status, 0, generate.stderr);
-    assert.ok(fs.existsSync(artifact));
-    const extracted = spawnSync(process.execPath, [runner, "--extract", artifact], {
-      encoding: "utf8", cwd: home, env: { ...process.env, NODE_PATH: "" },
-    });
-    assert.equal(extracted.status, 0, extracted.stderr);
-    assert.deepEqual(JSON.parse(extracted.stdout).selectedIds, ["react"]);
+    for (const [inputData, expectedIds, expectedAnswers] of [
+      [techStack, ["react"], undefined],
+      [questionnaire, ["react", "postgres"], [["react"], ["postgres"], []]],
+    ]) {
+      fs.writeFileSync(input, JSON.stringify(inputData));
+      const generate = spawnSync(process.execPath, [runner, input, artifact, "--no-open"], {
+        encoding: "utf8", cwd: home, env: { ...process.env, NODE_PATH: "" },
+      });
+      assert.equal(generate.status, 0, generate.stderr);
+      assert.ok(fs.existsSync(artifact));
+      const extracted = spawnSync(process.execPath, [runner, "--extract", artifact], {
+        encoding: "utf8", cwd: home, env: { ...process.env, NODE_PATH: "" },
+      });
+      assert.equal(extracted.status, 0, extracted.stderr);
+      const result = JSON.parse(extracted.stdout);
+      assert.deepEqual(result.selectedIds, expectedIds);
+      assert.deepEqual(result.answers?.map(answer => answer.selectedIds), expectedAnswers);
+    }
   } finally {
     fs.rmSync(home, { recursive: true, force: true });
   }
@@ -190,5 +198,111 @@ test("checklist group and option annotations reach the agent alongside choices",
     if (previousState === undefined) delete process.env.HUMAN_REVIEW_STATE_DIR;
     else process.env.HUMAN_REVIEW_STATE_DIR = previousState;
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const questionnaire = {
+  title: "Architecture questionnaire",
+  description: "Choose the stack requirements.",
+  questions: [
+    { id: "frontend", prompt: "Which frontend framework?", type: "single", options: [
+      { id: "react", label: "React", checked: true },
+      { id: "vue", label: "Vue" },
+    ] },
+    { id: "storage", prompt: "Which data stores?", type: "multiple", options: [
+      { id: "postgres", label: "PostgreSQL", checked: true },
+      { id: "redis", label: "Redis" },
+    ] },
+    { id: "deploy", prompt: "Where should it deploy?", options: [
+      { id: "vercel", label: "Vercel" },
+      { id: "docker", label: "Docker" },
+    ] },
+  ],
+};
+
+test("questionnaires validate answer types and single-answer defaults", () => {
+  assert.equal(validateChecklistInput(questionnaire), questionnaire);
+  assert.throws(() => validateChecklistInput({
+    ...questionnaire, groups: techStack.groups,
+  }), /questions.*groups|groups.*questions/i);
+  assert.throws(() => validateChecklistInput({
+    ...questionnaire, questions: [
+      { ...questionnaire.questions[0], type: "ranked" },
+    ],
+  }), /type/i);
+  assert.throws(() => validateChecklistInput({
+    ...questionnaire, questions: [{
+      ...questionnaire.questions[0],
+      options: questionnaire.questions[0].options.map(item => ({ ...item, checked: true })),
+    }],
+  }), /single|selected/i);
+  assert.throws(() => validateChecklistInput({
+    ...questionnaire, questions: [
+      questionnaire.questions[0],
+      { ...questionnaire.questions[1], options: [{ id: "react", label: "Repeated ID" }] },
+    ],
+  }), /duplicate/i);
+});
+
+test("questionnaire uses radio groups and multi-answer checkboxes with comment anchors", () => {
+  const doc = new JSDOM(createChecklistReviewHtml(questionnaire)).window.document;
+  const form = doc.querySelector("form");
+  assert.match(doc.querySelector(".eyebrow").textContent, /QUESTIONNAIRE/);
+  assert.equal(form.querySelectorAll("fieldset").length, 3);
+  assert.equal(doc.querySelector("#hr-group-frontend legend").textContent.trim(),
+    "1. Which frontend framework?");
+  assert.match(doc.querySelector("#hr-group-frontend").textContent, /Choose one/i);
+  const frontend = [...form.querySelectorAll("#hr-group-frontend input")];
+  const storage = [...form.querySelectorAll("#hr-group-storage input")];
+  assert.deepEqual(frontend.map(input => input.type), ["radio", "radio"]);
+  assert.equal(frontend[0].name, frontend[1].name);
+  assert.deepEqual(storage.map(input => input.type), ["checkbox", "checkbox"]);
+  assert.equal(doc.querySelector("#hr-group-frontend").dataset.hrAnnotatable,
+    "Which frontend framework?");
+  assert.equal(doc.querySelector("#hr-choice-react button[data-hr-annotate]")
+    ?.getAttribute("aria-label"), "Comment on React");
+});
+
+test("questionnaire returns every question including unanswered, preserving native input changes", () => {
+  const dom = new JSDOM(createChecklistReviewHtml(questionnaire));
+  try {
+    const { document } = dom.window;
+    const react = document.querySelector('[data-hr-choice="react"]');
+    const vue = document.querySelector('[data-hr-choice="vue"]');
+    const redis = document.querySelector('[data-hr-choice="redis"]');
+    vue.click();
+    redis.click();
+    assert.equal(react.checked, false, "radio group must select only one");
+    assert.equal(vue.checked, true);
+    const extracted = readChecklistSelections(serializeDocument(document));
+    assert.deepEqual(extracted.selectedIds, ["vue", "postgres", "redis"]);
+    assert.deepEqual(extracted.answers, [
+      { questionId: "frontend", prompt: "Which frontend framework?", type: "single", selectedIds: ["vue"] },
+      { questionId: "storage", prompt: "Which data stores?", type: "multiple", selectedIds: ["postgres", "redis"] },
+      { questionId: "deploy", prompt: "Where should it deploy?", type: "single", selectedIds: [] },
+    ]);
+    assert.equal(readChecklistSelections(createChecklistReviewHtml(techStack)).answers, undefined,
+      "legacy checklists retain the original output contract");
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("questionnaire works through the installed standalone generator and extraction command", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hr-questionnaire-"));
+  try {
+    const input = path.join(dir, "questionnaire.json");
+    const output = path.join(dir, "questionnaire.review.html");
+    fs.writeFileSync(input, JSON.stringify(questionnaire));
+    const runner = path.resolve("src/checklist-review/artifact.js");
+    const make = spawnSync(process.execPath, [runner, input, output, "--no-open"], { encoding: "utf8" });
+    assert.equal(make.status, 0, make.stderr);
+    const extract = spawnSync(process.execPath, [runner, "--extract", output], { encoding: "utf8" });
+    assert.equal(extract.status, 0, extract.stderr);
+    const result = JSON.parse(extract.stdout);
+    assert.deepEqual(result.answers.map(answer => answer.selectedIds), [["react"], ["postgres"], []]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
