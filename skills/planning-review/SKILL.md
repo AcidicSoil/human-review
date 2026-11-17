@@ -25,7 +25,7 @@ When the local `human-review` command is available, generate with
 `--no-open`, then run `human-review path/to/plan.review.html` and
 `human-review poll path/to/plan.review.html`. The agent receives
 `pages[].structured_review.document` with the complete Plate or fallback
-planning state, alongside comments and the overall note. Apply direct
+planning state, alongside live anchored `pages[].comments` and the overall note. Preserve in-document discussions as well; apply both annotation channels without dropping or duplicating feedback. Apply direct
 edits before unresolved discussions and section actions. Poll with
 `--ack` only after applying the batch. If no live server exists,
 return the self-contained file and retain offline exports.

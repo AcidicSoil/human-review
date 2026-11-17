@@ -22,7 +22,9 @@ h1 { margin: .5rem 0; font-size: clamp(1.5rem, 3vw, 2.25rem); }
 fieldset { min-width: 0; padding: 1rem; margin: 0; border: 1px solid #465e78; border-radius: 12px; background: #172435; }
 legend { padding-inline: .5rem; color: #f4f7ff; font-size: 1.1rem; font-weight: 700; }
 .options { display: grid; gap: .6rem; }
-.option { display: flex; align-items: center; gap: 1rem; min-height: 3rem; padding: .85rem 1rem;
+.group-actions { display: flex; justify-content: end; margin: -.25rem 0 .75rem; }
+.option-row { display: flex; align-items: center; gap: .65rem; min-width: 0; }
+.option { flex: 1; min-width: 0; display: flex; align-items: center; gap: 1rem; min-height: 3rem; padding: .85rem 1rem;
   border: 1px solid #45617e; border-radius: 9px; background: #22334a; cursor: pointer; }
 .option:hover { border-color: #91bbef; }
 .option:has(input:checked) { border-color: #9dc8ff; background: #2b4e75; }
@@ -31,6 +33,12 @@ legend { padding-inline: .5rem; color: #f4f7ff; font-size: 1.1rem; font-weight: 
 .option-copy { display: grid; gap: .2rem; min-width: 0; overflow-wrap: anywhere; }
 .option-title { font-weight: 650; }
 .option-description { color: #cfdeef; line-height: 1.45; font-size: .875rem; }
+.annotate { flex: none; min-height: 2.75rem; padding: .6rem .85rem; color: #e3efff;
+  background: #293c55; border: 1px solid #5d81ad; border-radius: 8px; cursor: pointer; font: inherit; font-size: .875rem; }
+.annotate:hover { background: #35547a; border-color: #97c5ff; }
+.annotate:focus-visible { outline: 2px solid #96c4ff; outline-offset: 2px; }
+.option-row[data-eh-el] .option, fieldset[data-eh-el] { border-color: #e5b369; }
+@media (max-width: 460px) { .option-row { flex-wrap: wrap; } .annotate { margin-inline-start: auto; } }
 footer { padding-block: 1rem; border-top: 1px solid #475a70; }
 @media (forced-colors: active) { .option:has(input:checked) { border: 2px solid Highlight; } }
 `;
@@ -64,14 +72,25 @@ export function validateChecklistInput(input) {
 
 export function createChecklistReviewHtml(input) {
   const checklist = validateChecklistInput(input);
+  const annotateButton = label => `<button type="button" class="annotate" data-hr-annotate
+    aria-label="Comment on ${escapeHtml(label)}">Comment</button>`;
   const groups = checklist.groups.map(group => `
-    <fieldset data-hr-group="${group.id}"><legend>${escapeHtml(group.title)}</legend><div class="options">
-      ${group.items.map(item => `<label class="option">
-        <input type="checkbox" name="choices" value="${item.id}" data-hr-choice="${item.id}"${item.checked ? " checked" : ""}>
-        <span class="option-copy"><span class="option-title">${escapeHtml(item.label)}</span>
-          ${item.description ? `<span class="option-description">${escapeHtml(item.description)}</span>` : ""}</span>
-      </label>`).join("")}
-    </div></fieldset>`).join("");
+    <fieldset id="hr-group-${group.id}" data-hr-group="${group.id}"
+      data-hr-annotatable="${escapeHtml(group.title)}">
+      <legend>${escapeHtml(group.title)}</legend>
+      <div class="group-actions">${annotateButton(group.title)}</div>
+      <div class="options">${group.items.map(item => `
+        <div class="option-row" id="hr-choice-${item.id}"
+          data-hr-annotatable="${escapeHtml(item.label)}">
+          <label class="option">
+            <input type="checkbox" name="choices" value="${item.id}" data-hr-choice="${item.id}"${item.checked ? " checked" : ""}>
+            <span class="option-copy"><span class="option-title">${escapeHtml(item.label)}</span>
+              ${item.description ? `<span class="option-description">${escapeHtml(item.description)}</span>` : ""}</span>
+          </label>
+          ${annotateButton(item.label)}
+        </div>`).join("")}
+      </div>
+    </fieldset>`).join("");
   const manifest = JSON.stringify({ format: FORMAT, checklist }).replace(/</g, "\\u003c");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

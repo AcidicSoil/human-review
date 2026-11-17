@@ -26,7 +26,7 @@
       "ordinary-review: Review this HTML, Markdown, or localhost page and apply my browser feedback.",
       "planning-review: Turn this plan, spec, PRD, or roadmap into an editable Human Review artifact.",
       "loa-review: Turn this task or LOA into a reviewable action list with plugin and skill references.",
-      "checklist-review: Show my tech-stack, feature, or tool choices as checkboxes and return selected options.",
+      "checklist-review: Show tech-stack, feature, or tool choices as checkboxes, let me annotate options, and return both selections and comments.",
       "human-review-notepad: Check project Issue Inbox and handoffs first, resolve actionable owner reports before new work, verify fixes, and close reports with their original IDs."
     ],
     "brandColor": "#E4572E",

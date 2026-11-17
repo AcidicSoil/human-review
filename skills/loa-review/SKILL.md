@@ -47,10 +47,11 @@ The bundled runner resolves the Codex plugin catalog only when `catalog`, `resou
 
 When a local `human-review` session is available, prefer the live agent feedback loop:
 generate with `--no-open`, then run `human-review path/to/loa.loa.review.html` and
-`human-review poll path/to/loa.loa.review.html`. The reviewer edits actions,
-attaches skills, and comments on action cards, then clicks **Send**. Apply the
-received `pages[].structured_review.document` as canonical LOA data, with
-attached comments and the overall note. Poll again with `--ack` after
+`human-review poll path/to/loa.loa.review.html`. The reviewer edits actions, attaches skills, and uses each action's **Comment**
+button to annotate a particular action, then clicks **Send**. Apply the
+received `pages[].structured_review.document` as canonical LOA data, and
+`pages[].comments` as annotations anchored to stable action IDs, along with
+the overall note. Poll again with `--ack` after
 applying. Never assume the snapshot is already written to the source JSON.
 
 If the host lacks the live server or execution access, return/open the

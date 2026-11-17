@@ -624,6 +624,7 @@ async function openCompose(detail) {
   render();
   toFrame({ type: "eh:composeOpen" });
   $("composeText").value = "";
+  if (detail.viaControl) $("composeText").focus();
 }
 
 function cancelCompose() {
@@ -739,7 +740,7 @@ window.addEventListener("message", async (event) => {
     }
     case "hr:comment":
       if (msg.nonce !== state.reviewNonce || msg.mode !== state.page?.reviewMode) return;
-      await openCompose({ kind: "element", quote: String(msg.quote || ""), anchor: msg.anchor });
+      await openCompose({ kind: "element", quote: String(msg.quote || ""), anchor: msg.anchor, viaControl: true });
       break;
     case "eh:ready": {
       toFrame({ type: "eh:anchors", comments: state.page ? state.page.comments : [] });
@@ -762,7 +763,7 @@ window.addEventListener("message", async (event) => {
       break;
     }
     case "eh:compose":
-      await openCompose({ kind: msg.kind, quote: msg.quote, anchor: msg.anchor });
+      await openCompose({ kind: msg.kind, quote: msg.quote, anchor: msg.anchor, viaControl: msg.viaControl });
       break;
     case "eh:dismiss":
       if (!$("composeText").value.trim()) cancelCompose();

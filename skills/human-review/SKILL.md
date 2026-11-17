@@ -5,7 +5,13 @@ description: Review HTML, Markdown, localhost pages, and large planning document
 
 # human-review
 
-Use the review surface that matches the artifact.
+Use the review surface that matches the artifact. **Annotations are supported
+through the appropriate existing editor in every review variant.** In ordinary
+HTML, select text or click a block; in Checklist Review, use **Comment** on a
+group or choice; in Planning, use comments/discussions; in LOA, use **Comment**
+on an action. Live anchored comments arrive as `pages[].comments`, while
+Planning's in-document discussions also live in its structured review state.
+Apply annotations alongside edits and choices without treating them as selections.
 
 - **Ordinary HTML, Markdown, and localhost pages:** use the normal Human Review polling loop.
 - **Large plans, specs, roadmaps, PRDs, and implementation proposals:** generate one standalone editable `.review.html` artifact with `human-review-plan`.
@@ -24,11 +30,11 @@ human-review path/to/options.checklist.review.html
 human-review poll path/to/options.checklist.review.html
 ```
 
-This deliberately reuses ordinary HTML checkbox autosaving, not the Planning
-or LOA structured protocol. After the user's **Send**, extract their saved
-choices with `human-review-checklist --extract path/to/options.checklist.review.html`.
-The command emits `selectedIds` and labeled `selections`, which the agent
-applies to the original decision/task. Do not assume a generated default
+This reuses ordinary HTML checkbox autosaving. The reviewer can **Comment**
+on an entire group or individual choice using the shared feedback panel.
+After **Send**, extract choices using `human-review-checklist --extract
+path/to/options.checklist.review.html`. Apply both `selectedIds` and the
+anchored `pages[].comments` from the live poll, preserving group and item IDs. Do not assume a generated default
 selection represents feedback until the user submits the review.
 
 ## Required planning-artifact behavior

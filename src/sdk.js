@@ -672,6 +672,7 @@ function openElementCompose(container) {
     kind: "element",
     quote: container.label,
     anchor: { selector: cssPath(container.el), label: container.label },
+    viaControl: container.viaControl === true,
   });
 }
 
@@ -782,7 +783,10 @@ function boot() {
   watchSelfRendering();
 
   document.addEventListener("mouseup", (event) => {
-    if (isOurs(event.target) || resizing || Date.now() < suppressUntil) return;
+    if (isOurs(event.target) || resizing || Date.now() < suppressUntil ||
+        event.target.closest?.("[data-hr-annotate]") ||
+        (event.target.closest?.("[data-hr-annotatable]") &&
+          event.target.closest?.("input, label, select, textarea, button"))) return;
     setTimeout(() => {
       if (settleSelection()) return;
       const target = targetFor(event.target);
@@ -818,6 +822,18 @@ function boot() {
     "click",
     (event) => {
       if (isOurs(event.target)) return;
+      const annotate = event.target.closest?.("button[data-hr-annotate]");
+      if (annotate) {
+        event.preventDefault();
+        event.stopPropagation();
+        const el = annotate.closest("[data-hr-annotatable]");
+        if (el) openElementCompose({
+          el,
+          label: el.getAttribute("data-hr-annotatable"),
+          viaControl: true,
+        });
+        return;
+      }
       const modified = event.metaKey || event.ctrlKey;
       const href = navigationHref(event.target);
 

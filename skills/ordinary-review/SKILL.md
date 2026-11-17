@@ -17,6 +17,8 @@ Open the target:
 npx -y human-review <target>
 ```
 
+Reviewers can annotate selected text or click an element to create an anchored comment in the shared feedback panel. Generated HTML may also expose explicit `data-hr-annotate` buttons inside `data-hr-annotatable` containers; these use the same comment protocol. Annotations are separate from direct edits.
+
 Then poll for the user's edits and comments:
 
 ```sh

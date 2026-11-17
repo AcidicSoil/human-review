@@ -337,3 +337,31 @@ test("native dropdown change is an explicit saved human edit", { skip }, async (
   assert.ok(edit, "the selected value must be included in review feedback");
   assert.match(edit.after_html, /<option value="revise" selected(?:="")?>/);
 });
+
+test("explicit annotation buttons reuse ordinary comments without toggling adjacent checkboxes", { skip }, async () => {
+  const { document, posts, fromChrome } = await bootSdk(
+    '<main><div id="hr-choice-react" data-hr-annotatable="React">' +
+    '<label><input type="checkbox" checked>React</label>' +
+    '<button type="button" data-hr-annotate>Comment</button></div></main>'
+  );
+  const row = document.getElementById("hr-choice-react");
+  const checkbox = row.querySelector("input");
+  row.querySelector("label").dispatchEvent(new window.MouseEvent("mouseup", { bubbles: true }));
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(posts.filter(message => message.type === "eh:compose").length, 0,
+    "selecting an option must not open annotation");
+  row.querySelector("button").click();
+  assert.equal(checkbox.checked, true);
+  const comments = posts.filter(message => message.type === "eh:compose");
+  assert.equal(comments.length, 1);
+  assert.equal(comments[0].viaControl, true, "explicit annotation focuses the feedback composer");
+  assert.deepEqual({ kind: comments[0].kind, quote: comments[0].quote, selector: comments[0].anchor.selector },
+    { kind: "element", quote: "React", selector: "#hr-choice-react" });
+  fromChrome({ type: "eh:commit", id: "comment_1" });
+  assert.equal(row.getAttribute("data-eh-el"), "comment_1");
+  fromChrome({ type: "eh:anchors", comments: [
+    { id: "comment_1", kind: "element", anchor: { selector: "#hr-choice-react" } },
+  ] });
+  assert.ok(posts.some(message => message.type === "eh:anchorStatus" &&
+    message.resolved.includes("comment_1")), "the annotation survives reanchoring");
+});

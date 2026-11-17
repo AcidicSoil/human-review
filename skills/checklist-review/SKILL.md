@@ -33,7 +33,7 @@ Prepare a JSON file using the user's actual options. Group related choices; keep
 }
 ```
 
-The `checked` field is optional. All choices are **independent checkboxes**, not radio buttons, and can be changed freely. Generate the review artifact with the installed runner:
+The `checked` field is optional. All choices are **independent checkboxes**, not radio buttons, and can be changed freely. The user can **Comment** on a whole group or a particular option in the live Human Review session; each annotation anchors to that group's or option's stable ID. Generate the review artifact with the installed runner:
 
 ```sh
 node "$SKILLS_ROOT/human-review/human-review-checklist.mjs" path/to/options.json path/to/options.checklist.review.html --no-open
@@ -49,4 +49,4 @@ Once the user clicks **Send**, read the reviewed HTML and extract the selected I
 node "$SKILLS_ROOT/human-review/human-review-checklist.mjs" --extract path/to/options.checklist.review.html
 ```
 
-The JSON result includes `selectedIds` and labeled `selections` with group IDs. Apply only the user's chosen options, then run `human-review poll <artifact> --ack --timeout 600` after applying the feedback. If the user has not sent the review, do not infer choices from an unmodified artifact. The same command can generate the HTML for offline viewing, but the live Human Review session is required for automatic saving and feedback.
+The JSON result includes `selectedIds` and labeled `selections` with group IDs. **Also process `pages[].comments` from the same poll**: group comments anchor to `#hr-group-<id>`, and option comments to `#hr-choice-<id>`. These annotations remain separate from the checked choices and can express exceptions or requested changes. Apply the selections and their associated comments together, then run `human-review poll <artifact> --ack --timeout 600`. If the user has not sent the review, do not infer choices from an unmodified artifact. Offline HTML supports checkbox selection; annotations require a live Human Review session.

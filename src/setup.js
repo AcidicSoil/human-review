@@ -234,6 +234,9 @@ plugin/skill catalogs, use \`__LOA__ <input.json> <output.loa.review.html>\`.
 For selecting tech stacks, tools, or other independent choices, use
 \`__CHECKLIST__ <options.json> <output.checklist.review.html> --no-open\`.
 The checklist is a separate ordinary HTML review artifact (not Notepad).
+Reviewers can add group or item comments using the existing feedback panel.
+Ordinary Review supports element/text comments; Planning supports discussions;
+LOA supports action comments. Keep annotation anchors alongside selected IDs.
 Open it through \`human-review <artifact>\`, poll for feedback, then run
 \`__CHECKLIST__ --extract <artifact>\` to read selected IDs. The installed
 generators work without network access at review time.

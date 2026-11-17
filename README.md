@@ -250,6 +250,14 @@ Note: For HTML files, direct edits and resizes save automatically, so closing th
 
 The existing DOM editor remains the default for arbitrary HTML, Markdown, and localhost pages. Hover a block and use **Edit** to focus it for inline changes; selection comments, block comments, drag handles, links, lists, image editing, and the polling workflow continue to work there.
 
+**Annotations across variants:** Ordinary Review supports selected-text and element
+comments; Checklist Review has group- and choice-level **Comment** buttons;
+Planning Review has block/inline discussions; and LOA Review has action-level
+**Comment** buttons. Live comments are collected in `pages[].comments`,
+while Planning keeps embedded discussion threads in its structured document.
+All annotations remain review feedback and are applied by the agent alongside
+the edited content or selected options.
+
 ## Checklist Review — choose options
 
 Use a dedicated checkbox review when deciding which tech stacks, tools, or
@@ -279,16 +287,25 @@ human-review choices.checklist.review.html
 human-review poll choices.checklist.review.html
 ```
 
-Clicking **Send** returns the checked state through ordinary Human Review
-edits. The HTML autosaves checkbox selections; an agent can read the selected
-stable IDs from the saved artifact:
+Each group and option also has a **Comment** button in the live review.
+Clicking it opens the shared feedback panel, where reviewers add annotations
+without changing the checkbox selection. Comments stay anchored to the
+group or option even after a reload.
+
+Clicking **Send** returns both checked-state edits and comments through
+ordinary Human Review. The HTML autosaves checkbox selections; an agent can
+read the selected stable IDs from the saved artifact:
 
 ```sh
 human-review-checklist --extract choices.checklist.review.html
 ```
 
-This prints `selectedIds` and grouped labels as JSON. It uses the existing
-DOM autosave and feedback protocol rather than a duplicate checklist store.
+This prints `selectedIds` and grouped labels as JSON. The agent also reads
+`pages[].comments` from the live poll: option annotations use
+`#hr-choice-<id>`, and group annotations use `#hr-group-<id>`.
+Selections and comments share the existing feedback protocol—no separate
+checklist annotation store. The standalone offline file supports checkbox
+selection; open it through Human Review for comments.
 
 ## Shared live review sessions
 
