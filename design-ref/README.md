@@ -20,12 +20,19 @@ short IDs and compact actions remain aligned to the right.
 | 01 — Collapsed metadata | [Desktop list](notepad-metadata-collapsed.png) | Default dense list; five cards without expanded bodies |
 | 02 — Expanded detail | [Desktop detail](notepad-metadata-expanded.png) | Preview text, expanded markdown/details, assignee and status |
 | 03 — Compact HUD | [Narrow layout](notepad-metadata-hud.png) | Same metadata hierarchy at 480px width |
+| 04 — Tasks | [Task board](notepad-route-tasks.png) | Task status metrics, a three-column board and review-specific cards |
+| 05 — Reports | [Report dashboard](notepad-route-reports.png) | Cross-project issue metrics, status distribution, activity and reports |
+| 06 — Settings | [Settings layout](notepad-route-settings.png) | Appearance, note metadata, tag placement and disclosure defaults |
 
-The desktop frames have a FigCraft prototype flow: click the third card's
-disclosure chevron to switch between the collapsed and expanded states.
-All 516 layers are editable native FigCraft nodes; the prototypes are
-**design references, not changes to the production Notepad UI**. The cards,
-labels, counts and example text are illustrative.
+The desktop frames have FigCraft prototype navigation: **Tasks**, **Reports**
+and **Settings** in the sidebar open their respective screens; **Notepads**
+returns to the collapsed list. Click the third note's disclosure chevron to
+switch between collapsed and expanded detail states.
+
+All layers are editable native FigCraft nodes. The Tasks/Reports/Settings
+screens are **proposed design routes, not implemented app features**; the
+controls and counts illustrate possible interactions and data. The entire
+document is a design reference and does not change the production Notepad UI.
 
 ```sh
 figcraft design-ref/notepad-metadata-layout.figcraft
