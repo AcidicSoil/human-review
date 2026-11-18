@@ -22,11 +22,16 @@ short IDs and compact actions remain aligned to the right.
 | 03 — Compact HUD | [Narrow layout](notepad-metadata-hud.png) | Same metadata hierarchy at 480px width |
 | 04 — Tasks | [Task board](notepad-route-tasks.png) | Task status metrics, a three-column board and review-specific cards |
 | 05 — Reports | [Report dashboard](notepad-route-reports.png) | Cross-project issue metrics, status distribution, activity and reports |
-| 06 — Settings | [Settings layout](notepad-route-settings.png) | Appearance, note metadata, tag placement and disclosure defaults |
+| 06 — Settings: Appearance | [Appearance](notepad-route-settings.png) | Theme and existing general layout preferences |
+| 07 — Settings: Notepad | [Notepad](notepad-settings-notepad.png) | Date/time gutter, tags beneath titles, collapsed cards and preview |
+| 08 — Settings: Inbox & reports | [Inbox & reports](notepad-settings-inbox-reports.png) | Source/owner badges, issue separation and incoming report preview |
+| 09 — Settings: Review workflow | [Review workflow](notepad-settings-review-workflow.png) | Review variants, anchored annotations and feedback behavior |
 
 The desktop frames have FigCraft prototype navigation: **Tasks**, **Reports**
 and **Settings** in the sidebar open their respective screens; **Notepads**
-returns to the collapsed list. Click the third note's disclosure chevron to
+returns to the collapsed list. Within Settings, **Appearance**, **Notepad**,
+**Inbox & reports**, and **Review workflow** each open their own view through
+the preferences navigation. Click the third note's disclosure chevron to
 switch between collapsed and expanded detail states.
 
 All layers are editable native FigCraft nodes. The Tasks/Reports/Settings
