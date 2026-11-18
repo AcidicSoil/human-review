@@ -7,6 +7,30 @@ These are design references, not runtime dependencies or executable reviews.
 The editable document contains four original exploratory frames, six LOA inspector
 states, and one Notepad HUD state matching the shipped non-blocking notebook.
 
+## Notepad metadata layout — design branch
+
+[Editable FigCraft prototype](notepad-metadata-layout.figcraft) explores a
+refined card layout while preserving the established dark, purple-accented
+visual language. The **date and time live in a separate left-side timeline**,
+outside each note card. Tag chips appear **directly beneath each title**;
+short IDs and compact actions remain aligned to the right.
+
+| FigCraft frame | Preview | Intent |
+| --- | --- | --- |
+| 01 — Collapsed metadata | [Desktop list](notepad-metadata-collapsed.png) | Default dense list; five cards without expanded bodies |
+| 02 — Expanded detail | [Desktop detail](notepad-metadata-expanded.png) | Preview text, expanded markdown/details, assignee and status |
+| 03 — Compact HUD | [Narrow layout](notepad-metadata-hud.png) | Same metadata hierarchy at 480px width |
+
+The desktop frames have a FigCraft prototype flow: click the third card's
+disclosure chevron to switch between the collapsed and expanded states.
+All 516 layers are editable native FigCraft nodes; the prototypes are
+**design references, not changes to the production Notepad UI**. The cards,
+labels, counts and example text are illustrative.
+
+```sh
+figcraft design-ref/notepad-metadata-layout.figcraft
+```
+
 A separate [cross-project bug-report prototype](notepad-cross-project-reports.figcraft)
 documents the implemented cross-project reporting workflow. It contains four
 native, editable FigCraft screens with click-through transitions (use FigCraft's
