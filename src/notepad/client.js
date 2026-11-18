@@ -52,7 +52,21 @@ let confirmingNotebookDelete = false;
 let deletingNotebook = false;
 let windowConnection;
 const drafts = new Map();
-const expandedNotes = new Set();
+const expandedNotes = new Map();
+const workspace = document.querySelector(".hud");
+const workspaceLinks = [...document.querySelectorAll("[data-route]")];
+const settingsLinks = [...document.querySelectorAll("[data-settings-view]")];
+const settingsInputs = [...document.querySelectorAll("[data-pref]")];
+const SETTINGS_KEY = "human-review-notepad.ui";
+const preferences = {
+  showDate: true, showTags: true, startCollapsed: true, showSource: true, showStatus: true,
+  ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"),
+};
+const initialRoute = new URL(location.href).searchParams.get("route") || "notes";
+let route = initialRoute === "inbox" ? "notes" : initialRoute;
+if (initialRoute === "inbox") view = "inbox";
+let settingsSection = "appearance";
+let overviewSignature = "";
 
 function expansionKey(scope, id) {
   return scope + ":" + id;
@@ -60,6 +74,19 @@ function expansionKey(scope, id) {
 
 function notebookName(value) {
   return value.replace(/[\\/]+$/, "").split(/[\\/]/).at(-1) || value;
+}
+
+function noteTagNames(note) {
+  const provided = Array.isArray(note.tags) ? note.tags : [];
+  const inline = [...note.text.matchAll(/(?:^|\s)#([\w-]+)/g)].map(match => match[1]);
+  const seen = new Set();
+  return [...provided, ...inline].map(tag => String(tag).replace(/^#/, ""))
+    .filter(tag => {
+      const key = tag.toLowerCase();
+      if (!tag || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 }
 
 function renderScopeOptions(select, values, placeholder = false) {
@@ -383,10 +410,42 @@ function createStatusButton(note, notePath, viewedScope, inInbox) {
   return button;
 }
 
+function createDateRail(note) {
+  const dateRail = document.createElement("div");
+  dateRail.className = "note-date-rail";
+  const created = new Date(note.createdAt);
+  const date = document.createElement("time");
+  date.className = "note-date";
+  date.dateTime = note.createdAt;
+  date.textContent = created.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  date.title = created.toLocaleDateString();
+  const time = document.createElement("time");
+  time.className = "note-time";
+  time.dateTime = note.createdAt;
+  time.textContent = created.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const caption = document.createElement("small");
+  caption.textContent = "Created";
+  dateRail.append(date, time, caption);
+  return dateRail;
+}
+
+function createTagChips(note) {
+  const tags = document.createElement("span");
+  tags.className = "note-tags";
+  for (const tag of noteTagNames(note)) {
+    const chip = document.createElement("span");
+    chip.className = "note-tag";
+    chip.textContent = tag;
+    tags.append(chip);
+  }
+  return tags;
+}
+
 function createNoteCard(note, viewedScope, inInbox) {
   const row = document.createElement("li");
   row.className = "note";
   row.classList.toggle("inbox-report", inInbox);
+  row.append(createDateRail(note));
   if (!inInbox) {
     const choice = document.createElement("input");
     choice.type = "checkbox";
@@ -408,36 +467,41 @@ function createNoteCard(note, viewedScope, inInbox) {
   disclosure.dataset.noteId = note.id;
   disclosure.dataset.scope = viewedScope;
   const key = expansionKey(viewedScope, note.id);
-  disclosure.open = expandedNotes.has(key) || editingNoteId === note.id ||
-    confirmingDeleteId === note.id;
+  disclosure.open = (expandedNotes.get(key) ?? !preferences.startCollapsed) ||
+    editingNoteId === note.id || confirmingDeleteId === note.id;
   disclosure.addEventListener("toggle", () => {
     if (!disclosure.isConnected) return;
-    if (disclosure.open) expandedNotes.add(key);
-    else expandedNotes.delete(key);
+    expandedNotes.set(key, disclosure.open);
   });
   const summary = document.createElement("summary");
   summary.className = "note-summary";
+  const content = document.createElement("span");
+  content.className = "note-summary-content";
   const title = document.createElement("span");
   title.className = "note-summary-title";
   const firstLine = note.text.trim().split(/\r?\n/, 1)[0];
   title.textContent = firstLine.replace(/^#{1,6}\s+/, "");
   title.title = firstLine;
+  const tags = createTagChips(note);
   const badges = document.createElement("span");
   badges.className = "note-summary-badges";
-  if (note.bugReport) {
+  if (note.bugReport && preferences.showSource) {
     const source = note.bugReport.sourceScope;
     badges.append(createBadge("source", "From " + notebookName(source), source));
   }
   const state = note.status === "done" ?
     (note.bugReport ? "Fix available" : "Done") : "Pending";
-  badges.append(createBadge(note.status === "done" ? "done" : "pending",
-    note.bugReport ? state + " · " + notebookName(viewedScope) : state,
-    viewedScope));
+  if (!note.bugReport || preferences.showStatus) {
+    badges.append(createBadge(note.status === "done" ? "done" : "pending",
+      note.bugReport ? state + " · " + notebookName(viewedScope) : state,
+      viewedScope));
+  }
   const shortId = document.createElement("span");
   shortId.className = "note-short-id";
   shortId.textContent = "#" + note.id.slice(0, 8);
   shortId.title = note.id;
-  summary.append(title, badges, shortId);
+  content.append(title, tags, badges);
+  summary.append(content, shortId);
   disclosure.append(summary);
 
   const body = document.createElement("div");
@@ -446,7 +510,7 @@ function createNoteCard(note, viewedScope, inInbox) {
   text.className = "note-text note-markdown";
   showMarkdown(text, note.html, note.text);
   const byline = document.createElement("small");
-  byline.textContent = `${note.author === "agent" ? "Agent" : "You"} · ${new Date(note.createdAt).toLocaleString()}`;
+  byline.textContent = note.author === "agent" ? "Agent" : "You";
   const metadata = document.createElement("div");
   metadata.className = "note-meta";
   const identifiers = document.createElement("div");
@@ -607,8 +671,7 @@ function render() {
     ? document.activeElement.parentElement.dataset.noteId : null;
   for (const disclosure of list.querySelectorAll(".note-disclosure")) {
     const key = expansionKey(disclosure.dataset.scope, disclosure.dataset.noteId);
-    if (disclosure.open) expandedNotes.add(key);
-    else expandedNotes.delete(key);
+    expandedNotes.set(key, disclosure.open);
   }
   list.replaceChildren(...[...visible].reverse().map(note => createNoteCard(note, scope, inbox)));
   if (focusedNoteId) {
@@ -618,6 +681,7 @@ function render() {
   empty.hidden = visible.length !== 0;
   empty.textContent = inbox ? "No incoming issue reports." : "No notes yet.";
   list.scrollTop = scrollPosition;
+  renderWorkspace();
 }
 
 async function refresh() {
@@ -952,3 +1016,186 @@ refresh();
 setInterval(() => {
   if (!document.hidden) refresh();
 }, 2500);
+
+
+/* The workspace views are projections of the existing scoped Notepad records. */
+function previewTitle(note) {
+  return note.text.trim().split(/\r?\n/, 1)[0].replace(/^#{1,6}\s+/, "");
+}
+
+function openFromOverview(note, incoming) {
+  route = "notes";
+  view = incoming ? "inbox" : "notes";
+  if (!incoming) {
+    filter = "all";
+  }
+  expandedNotes.set(expansionKey(scope, note.id), true);
+  const url = new URL(location.href);
+  url.searchParams.set("route", incoming ? "inbox" : "notes");
+  history.pushState(null, "", url);
+  render();
+}
+
+function overviewItem(note, incoming) {
+  const item = document.createElement("li");
+  item.className = incoming === null ? "task-item" : "report-item";
+  const title = document.createElement("strong");
+  title.textContent = previewTitle(note);
+  const details = document.createElement("small");
+  details.textContent = incoming === null
+    ? (note.author === "agent" ? "Agent" : "You") + " · " + note.status
+    : "From " + notebookName(note.bugReport.sourceScope) + " · " +
+      (note.status === "done" ? "Fix available" : "Pending");
+  const action = document.createElement("button");
+  action.type = "button";
+  action.textContent = incoming === null ? "View note" : "View report";
+  action.addEventListener("click", () => openFromOverview(note, incoming === true));
+  item.append(title, details, action);
+  return item;
+}
+
+function renderOverviews() {
+  const signature = JSON.stringify([
+    scope,
+    ...notes.map(note => [note.id, note.status, note.text, note.updatedAt]),
+    ...reports.map(report => [report.id, report.status, report.text, report.updatedAt]),
+  ]);
+  if (signature === overviewSignature) return;
+  overviewSignature = signature;
+
+  const pending = notes.filter(note => note.status === "pending");
+  const completed = notes.filter(note => note.status === "done");
+  document.getElementById("task-pending-count").textContent = String(pending.length);
+  document.getElementById("task-done-count").textContent = String(completed.length);
+  for (const [id, items] of [
+    ["task-pending-list", pending],
+    ["task-done-list", completed],
+  ]) {
+    const target = document.getElementById(id);
+    target.replaceChildren(...[...items].reverse().map(note => overviewItem(note, null)));
+    if (!items.length) {
+      const emptyItem = document.createElement("li");
+      emptyItem.className = "empty";
+      emptyItem.textContent = "Nothing here yet.";
+      target.append(emptyItem);
+    }
+  }
+
+  const owned = [
+    ...reports.map(note => ({ note, incoming: true })),
+    ...notes.filter(note => note.bugReport).map(note => ({ note, incoming: false })),
+  ];
+  document.getElementById("report-received-count").textContent = String(owned.length);
+  document.getElementById("report-pending-count").textContent =
+    String(owned.filter(item => item.note.status === "pending").length);
+  document.getElementById("report-done-count").textContent =
+    String(owned.filter(item => item.note.status === "done").length);
+  const reportList = document.getElementById("reports-list");
+  reportList.replaceChildren(...owned.reverse().map(item =>
+    overviewItem(item.note, item.incoming)));
+  document.getElementById("reports-empty").hidden = owned.length !== 0;
+}
+
+
+function renderSettingsPreview() {
+  if (route !== "settings") return;
+  const target = document.getElementById(settingsSection === "notepad"
+    ? "settings-note-preview" : settingsSection === "inbox" ? "settings-report-preview" : "");
+  if (!target) return;
+  const incoming = settingsSection === "inbox";
+  const note = (incoming ? reports : notes).reduce((latest, item) =>
+    !latest || item.createdAt > latest.createdAt ? item : latest, null);
+  if (!note) {
+    target.textContent = incoming ? "No incoming reports to preview." : "Add a note to preview its layout.";
+    return;
+  }
+  const wrapper = document.createElement("div");
+  wrapper.className = "settings-record-preview";
+  if (preferences.showDate) wrapper.append(createDateRail(note));
+  const card = document.createElement("div");
+  card.className = "settings-record-card";
+  const heading = document.createElement("strong");
+  heading.textContent = previewTitle(note);
+  card.append(heading);
+  if (preferences.showTags && noteTagNames(note).length) card.append(createTagChips(note));
+  if (incoming) {
+    const badges = document.createElement("div");
+    badges.className = "note-summary-badges";
+    if (preferences.showSource) {
+      badges.append(createBadge("source", "From " + notebookName(note.bugReport.sourceScope),
+        note.bugReport.sourceScope));
+    }
+    if (preferences.showStatus) {
+      badges.append(createBadge(note.status === "done" ? "done" : "pending",
+        (note.status === "done" ? "Fix available" : "Pending") + " · " + notebookName(scope), scope));
+    }
+    card.append(badges);
+  }
+  wrapper.append(card);
+  target.replaceChildren(wrapper);
+}
+
+function renderWorkspace() {
+  const activeRoute = route === "notes" && view === "inbox" ? "inbox" : route;
+  for (const link of workspaceLinks) {
+    if (link.dataset.route === activeRoute) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  }
+  for (const key of ["notes", "tasks", "reports", "settings"]) {
+    document.getElementById(key + "-page").hidden = key !== route;
+  }
+  document.getElementById("sidebar-inbox-count").textContent = String(reports.length);
+  workspace.classList.toggle("hide-date-rail", !preferences.showDate);
+  workspace.classList.toggle("hide-note-tags", !preferences.showTags);
+  for (const input of settingsInputs) input.checked = preferences[input.dataset.pref];
+  for (const link of settingsLinks) {
+    if (link.dataset.settingsView === settingsSection) {
+      link.setAttribute("aria-current", "page");
+    } else {
+      link.removeAttribute("aria-current");
+    }
+  }
+  for (const key of ["appearance", "notepad", "inbox", "workflow"]) {
+    document.getElementById("settings-" + key).hidden = key !== settingsSection;
+  }
+  renderOverviews();
+  renderSettingsPreview();
+}
+
+function navigateWorkspace(target) {
+  if (target === "inbox") {
+    route = "notes";
+    view = "inbox";
+  } else {
+    route = target;
+    if (target === "notes") view = "notes";
+  }
+  const url = new URL(location.href);
+  url.searchParams.set("route", target);
+  history.pushState(null, "", url);
+  render();
+}
+
+for (const link of workspaceLinks) {
+  link.addEventListener("click", () => navigateWorkspace(link.dataset.route));
+}
+for (const link of settingsLinks) {
+  link.addEventListener("click", () => {
+    settingsSection = link.dataset.settingsView;
+    renderWorkspace();
+  });
+}
+for (const input of settingsInputs) {
+  input.addEventListener("change", () => {
+    preferences[input.dataset.pref] = input.checked;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(preferences));
+    if (input.dataset.pref === "startCollapsed") expandedNotes.clear();
+    render();
+  });
+}
+window.addEventListener("popstate", () => {
+  const target = new URL(location.href).searchParams.get("route") || "notes";
+  route = target === "inbox" ? "notes" : target;
+  view = target === "inbox" ? "inbox" : "notes";
+  render();
+});

@@ -150,6 +150,20 @@ Notes and incoming issue reports **start collapsed**, showing their first line,
 status, and short ID. Activate the card's disclosure header to view Markdown,
 report details, and actions; multiple cards may stay open. Automatic refresh
 preserves the expanded cards and keyboard focus.
+
+**Workspace layout:** At desktop widths, the existing Notepad opens alongside a
+project selector and sidebar; in compact HUD windows, the same routes appear in
+a two-row header. Note timestamps sit in a separate left-side gutter, while
+`#tags` from note text (or stored tags) appear directly beneath the title.
+The **Tasks** page groups the project's existing pending and completed notes;
+**Reports** summarizes its actual incoming and promoted issue reports, with
+links back to the corresponding cards. Neither creates a separate task/report
+store. **Settings** has Appearance, Notepad, Inbox & reports, and Review
+workflow sections. Note/date/tag/collapse and incoming badge preferences are
+saved locally in the browser; protocol and inbox-handling rules remain
+read-only. The original single-window, project-scoped CLI and actions are
+unchanged.
+
 The project selector lists existing notebooks, including empty notebooks and
 projects with the same folder name (shown with their paths). Switching changes
 the notebook inside the same window, preserves unsaved drafts for each project,

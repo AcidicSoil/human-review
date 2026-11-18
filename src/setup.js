@@ -173,6 +173,10 @@ inline Edit, Save and Cancel. Saved notes scroll inside a bounded,
 keyboard-focusable list without growing the page; refresh preserves position.
 Notes and incoming issue reports start collapsed. Activate their summary to
 show full Markdown and controls; expanded cards stay open through refresh.
+The responsive HUD includes Tasks and Reports views over existing project
+notes/issues, plus browser-local Settings. Dates are shown beside note cards,
+and tag chips beneath note titles. These routes never create extra agent
+work queues or browser windows.
 Each note shows a short ID; use the HUD's Copy ID control for its full UUID,
 or Copy Ref for a plain-text reference with full UUID and project scope.
 CLI operations always use the full UUID plus \`--scope /project/path\`.

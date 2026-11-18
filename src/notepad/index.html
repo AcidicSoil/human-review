@@ -8,12 +8,27 @@
 </head>
 <body data-token="__TOKEN__">
   <main class="hud">
+    <aside class="workspace-sidebar" aria-label="Workspace">
+      <div class="workspace-brand"><span class="brand-mark" aria-hidden="true">◇</span>
+        <div><strong>Human Review</strong><small>Project workspace</small></div></div>
+      <label class="sr-only" for="project-notebooks">Project notebook</label>
+      <select id="project-notebooks" class="project-picker" title="Switch project notebook"></select>
+      <nav class="workspace-nav" aria-label="Workspace navigation">
+        <button class="workspace-link" data-route="notes" type="button" aria-current="page"><span aria-hidden="true">▤</span> Notepad</button>
+        <button class="workspace-link" data-route="inbox" type="button"><span aria-hidden="true">▢</span> Issue Inbox <span id="sidebar-inbox-count" class="nav-count">0</span></button>
+        <button class="workspace-link" data-route="tasks" type="button"><span aria-hidden="true">☑</span> Tasks</button>
+        <button class="workspace-link" data-route="reports" type="button"><span aria-hidden="true">▥</span> Reports</button>
+        <button class="workspace-link" data-route="settings" type="button"><span aria-hidden="true">⚙</span> Settings</button>
+      </nav>
+      <p class="workspace-sidebar-caption">Notes and reports stay linked to their project.</p>
+    </aside>
+    <div class="workspace-main">
+      <div id="notes-page" class="workspace-page">
     <header class="heading">
       <span class="symbol" aria-hidden="true">✎</span>
       <div class="identity">
         <h1>Notepad</h1>
-        <label class="sr-only" for="project-notebooks">Project notebook</label>
-        <select id="project-notebooks" class="project-picker" title="Switch project notebook"></select>
+        <p class="notebook-subtitle">Manual notes, findings, and handoffs</p>
       </div>
       <span id="count" class="count" aria-label="Pending notes">0</span>
       <button id="delete-notebook" class="project-delete" type="button" title="Delete project notebook" aria-label="Delete selected project notebook">Delete</button>
@@ -96,6 +111,87 @@
     <footer>
       <span class="connection" id="message" role="status" aria-live="polite">Ready</span>
     </footer>
+
+      </div>
+      <section id="tasks-page" class="workspace-page" aria-labelledby="tasks-title" hidden>
+        <header class="route-heading"><span class="route-mark" aria-hidden="true">☑</span>
+          <div><h1 id="tasks-title">Tasks</h1>
+          <p>Pending and completed work from this project's saved notes.</p></div></header>
+        <div class="stat-grid" aria-label="Task summary">
+          <div class="stat-card"><span>Pending</span><strong id="task-pending-count">0</strong><small>Awaiting action</small></div>
+          <div class="stat-card"><span>Completed</span><strong id="task-done-count">0</strong><small>Verified and marked done</small></div>
+        </div>
+        <div class="task-board">
+          <section class="task-column" aria-labelledby="tasks-pending-heading"><h2 id="tasks-pending-heading">To do</h2><ul id="task-pending-list"></ul></section>
+          <section class="task-column" aria-labelledby="tasks-done-heading"><h2 id="tasks-done-heading">Completed</h2><ul id="task-done-list"></ul></section>
+        </div>
+      </section>
+      <section id="reports-page" class="workspace-page" aria-labelledby="reports-title" hidden>
+        <header class="route-heading"><span class="route-mark" aria-hidden="true">▥</span>
+          <div><h1 id="reports-title">Reports</h1><p>Cross-project issues received and promoted to notes.</p></div></header>
+        <div class="stat-grid" aria-label="Report summary">
+          <div class="stat-card"><span>Received</span><strong id="report-received-count">0</strong><small>Reports in this project</small></div>
+          <div class="stat-card"><span>Pending</span><strong id="report-pending-count">0</strong><small>Awaiting resolution</small></div>
+          <div class="stat-card"><span>Resolved</span><strong id="report-done-count">0</strong><small>Marked fix available</small></div>
+        </div>
+        <section class="report-overview" aria-labelledby="recent-reports-heading">
+          <h2 id="recent-reports-heading">Recent reports</h2>
+          <ul id="reports-list"></ul>
+          <p id="reports-empty" class="empty" hidden>No reports for this project.</p>
+        </section>
+      </section>
+      <section id="settings-page" class="workspace-page" aria-labelledby="settings-title" hidden>
+        <header class="route-heading"><span class="route-mark" aria-hidden="true">⚙</span>
+          <div><h1 id="settings-title">Settings</h1><p>Appearance and Notepad display preferences.</p></div></header>
+        <div class="settings-layout">
+          <nav class="settings-nav" aria-label="Settings sections">
+            <button type="button" data-settings-view="appearance" aria-current="page">Appearance</button>
+            <button type="button" data-settings-view="notepad">Notepad</button>
+            <button type="button" data-settings-view="inbox">Inbox &amp; reports</button>
+            <button type="button" data-settings-view="workflow">Review workflow</button>
+          </nav>
+          <div class="settings-panels">
+            <section id="settings-appearance" class="settings-panel" aria-labelledby="appearance-heading">
+              <h2 id="appearance-heading">Appearance</h2>
+              <p>The Human Review workspace follows its established dark theme.</p>
+              <div class="preference-row"><span><strong>Color scheme</strong><small>Dark · Human Review</small></span><span class="setting-value">Dark</span></div>
+              <div class="preference-row"><span><strong>Workspace layout</strong><small>Full workspace on wide screens; compact HUD on narrow windows.</small></span><span class="setting-value">Adaptive</span></div>
+            </section>
+            <section id="settings-notepad" class="settings-panel" aria-labelledby="notepad-settings-heading" hidden>
+              <h2 id="notepad-settings-heading">Notepad</h2><p>Control the density and metadata of saved note cards.</p>
+              <label class="preference-row"><span><strong>Date and time gutter</strong><small>Show timestamps outside each note, alongside the card.</small></span><input data-pref="showDate" type="checkbox" checked></label>
+              <label class="preference-row"><span><strong>Tags beneath titles</strong><small>Display inline #tags and saved tags under note headings.</small></span><input data-pref="showTags" type="checkbox" checked></label>
+              <label class="preference-row"><span><strong>Start notes collapsed</strong><small>Expand only when you need Markdown or actions.</small></span><input data-pref="startCollapsed" type="checkbox" checked></label>
+              <section class="settings-preview" aria-labelledby="settings-note-preview-heading">
+                <h3 id="settings-note-preview-heading">Note card preview</h3>
+                <div id="settings-note-preview"></div>
+              </section>
+            </section>
+            <section id="settings-inbox" class="settings-panel" aria-labelledby="inbox-settings-heading" hidden>
+              <h2 id="inbox-settings-heading">Inbox &amp; reports</h2><p>Control how incoming issues are presented.</p>
+              <label class="preference-row"><span><strong>Source project badges</strong><small>Show which project sent an issue.</small></span><input data-pref="showSource" type="checkbox" checked></label>
+              <label class="preference-row"><span><strong>Owner and status badges</strong><small>Display pending and fix-available states on each report.</small></span><input data-pref="showStatus" type="checkbox" checked></label>
+              <div class="preference-row"><span><strong>Separate Issue Inbox</strong><small>Incoming reports stay separate until explicitly moved to Notes.</small></span><span class="setting-value">Enabled</span></div>
+              <section class="settings-preview" aria-labelledby="settings-report-preview-heading">
+                <h3 id="settings-report-preview-heading">Incoming report preview</h3>
+                <div id="settings-report-preview"></div>
+              </section>
+            </section>
+            <section id="settings-workflow" class="settings-panel" aria-labelledby="workflow-settings-heading" hidden>
+              <h2 id="workflow-settings-heading">Review workflow</h2><p>Available Human Review variants and shared feedback behavior.</p>
+              <div class="review-mode-grid">
+                <article><strong>Ordinary Review</strong><p>Text and element annotations</p></article>
+                <article><strong>Planning Review</strong><p>Documents and discussions</p></article>
+                <article><strong>LOA Review</strong><p>Actions and comments</p></article>
+                <article><strong>Checklist &amp; questionnaire</strong><p>Selected answers and annotations</p></article>
+              </div>
+              <div class="preference-row"><span><strong>Anchored annotations</strong><small>Comments remain tied to reviewed content.</small></span><span class="setting-value">Enabled</span></div>
+              <div class="preference-row"><span><strong>Explicit Send and acknowledgment</strong><small>Agents act on feedback only after submission.</small></span><span class="setting-value">Enabled</span></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
   </main>
   <script type="module" src="/notepad.js"></script>
 </body>
