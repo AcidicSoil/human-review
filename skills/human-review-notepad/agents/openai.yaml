@@ -1,7 +1,7 @@
 interface:
   display_name: "Human Review Notepad"
-  short_description: "Check project issue inboxes and close verified fixes"
-  default_prompt: "Use $human-review-notepad at the start of project work: check the owning repository's incoming Issue Inbox and handoff inbox, resolve actionable bug reports before new changes, test fixes, and mark owner reports done."
+  short_description: "Maintain project notes and follow up on inboxes"
+  default_prompt: "Use $human-review-notepad at project start and checkpoints: triage incoming issues, handoffs, and aging notes; respond in the active conversation, follow up on blockers, verify closures, and request approval before permanent pruning or unrelated work."
 policy:
   products: [CHAT, CODEX]
   allow_implicit_invocation: true

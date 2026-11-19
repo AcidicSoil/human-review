@@ -232,6 +232,7 @@ footer { border-top: 1px solid #29374a; padding-top: 11px; display: flex; justif
 .note-date-rail .note-date { font-size: 12px; color: #aebcda; line-height: 1.4; }
 .note-date-rail .note-time { font-size: 13px; margin-block-start: 5px; color: var(--ink); font-weight: 700; }
 .note-date-rail small { color: #8798b5; margin-block-start: 8px; font-size: 10px; }
+.note-date-rail .note-relative-time { color: #aebcda; font-size: 11px; margin-block-start: 3px; }
 #notes-page .note-choice { grid-column: 2; grid-row: 1; margin: 22px 0 0; accent-color: var(--accent); }
 #notes-page .note-disclosure {
   grid-column: 3;

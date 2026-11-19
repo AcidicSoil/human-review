@@ -263,6 +263,72 @@ test("questionnaire uses radio groups and multi-answer checkboxes with comment a
     ?.getAttribute("aria-label"), "Comment on React");
 });
 
+test("questionnaire advances one question at a time while retaining earlier answers", () => {
+  const dom = new JSDOM(createChecklistReviewHtml(questionnaire), { runScripts: "dangerously" });
+  try {
+    const { document } = dom.window;
+    const groups = [...document.querySelectorAll("form.checklist fieldset")];
+    const visible = () => groups.filter(group => !group.hidden).map(group => group.dataset.hrGroup);
+    const progress = document.querySelector("#hr-question-progress");
+    const back = document.querySelector("#hr-question-back");
+    const next = document.querySelector("#hr-question-next");
+    const complete = document.querySelector("#hr-question-complete");
+
+    assert.deepEqual(visible(), ["frontend"]);
+    assert.match(progress.textContent, /1 of 3/);
+    assert.equal(document.querySelector("#hr-question-next").type, "button");
+
+    document.querySelector('[data-hr-choice="vue"]').click();
+    assert.deepEqual(visible(), ["storage"], "radio selection advances automatically");
+    assert.match(progress.textContent, /2 of 3/);
+
+    document.querySelector('[data-hr-choice="redis"]').click();
+    assert.deepEqual(visible(), ["storage"], "checkbox selection stays until Continue");
+    next.click();
+    assert.deepEqual(visible(), ["deploy"]);
+
+    back.click();
+    assert.deepEqual(visible(), ["storage"]);
+    assert.equal(document.querySelector('[data-hr-choice="redis"]').checked, true);
+    back.click();
+    assert.equal(document.querySelector('[data-hr-choice="vue"]').checked, true);
+
+    next.click();
+    next.click();
+    next.click();
+    assert.deepEqual(visible(), []);
+    assert.equal(complete.hidden, false, "completion is shown after the final question");
+    assert.equal(next.hidden, true);
+    back.click();
+    assert.deepEqual(visible(), ["deploy"], "completion allows editing answers");
+
+    const saved = serializeDocument(document);
+    assert.deepEqual(readChecklistSelections(saved).answers.map(answer => answer.selectedIds),
+      [["vue"], ["postgres", "redis"], []], "reviewed HTML retains all choices and unanswered items");
+
+    const reloaded = new JSDOM(saved, { runScripts: "dangerously" });
+    try {
+      assert.deepEqual([...reloaded.window.document.querySelectorAll("form.checklist fieldset")]
+        .filter(group => !group.hidden).map(group => group.dataset.hrGroup), ["frontend"]);
+      assert.equal(reloaded.window.document.querySelector('[data-hr-choice="vue"]').checked, true);
+    } finally {
+      reloaded.window.close();
+    }
+  } finally {
+    dom.window.close();
+  }
+});
+
+test("grouped checklists keep every group visible without questionnaire navigation", () => {
+  const dom = new JSDOM(createChecklistReviewHtml(techStack), { runScripts: "dangerously" });
+  try {
+    assert.equal(dom.window.document.querySelectorAll("form.checklist fieldset:not([hidden])").length, 2);
+    assert.equal(dom.window.document.querySelector("#hr-question-next"), null);
+  } finally {
+    dom.window.close();
+  }
+});
+
 test("questionnaire returns every question including unanswered, preserving native input changes", () => {
   const dom = new JSDOM(createChecklistReviewHtml(questionnaire));
   try {

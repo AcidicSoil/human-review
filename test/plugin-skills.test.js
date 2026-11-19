@@ -93,6 +93,12 @@ test("notepad instructions proactively check unfinished work without permission 
   assert.match(skill, /Move all/);
   assert.match(skill, /--scope/);
   assert.match(skill, /delete[^\n]*explicit/i);
+  assert.match(skill, /## Proactive maintenance loop/);
+  assert.match(skill, /Age triggers review; it never proves/);
+  assert.match(skill, /respond substantively in the active user conversation/);
+  assert.match(skill, /The Notepad CLI has no outbound reply command/);
+  assert.match(skill, /one actionable approval\/decision question/);
+  assert.match(skill, /Permanent `notes delete` or \*\*Delete notebook\*\* requires explicit approval/);
 });
 
 test("loa-review defaults to the approved prototype catalog contract", () => {

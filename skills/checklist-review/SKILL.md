@@ -63,6 +63,13 @@ For a **multiple-choice questionnaire**, supply `questions` instead of `groups`:
 
 Each question has a stable ID, prompt, and options. `single` (the default) uses **radio buttons**; `multiple` uses **checkboxes**. `checked` preselects an option, with at most one default in a single-answer question. Existing `groups` checklists still use independent checkboxes and produce the same output. Use only real options from the request.
 
+Questionnaires show one question at a time. Radio answers advance on selection;
+multiple-answer checkboxes remain on the question until **Continue**. **Back**
+allows corrections; unanswered questions can be skipped. The reviewer must still
+press **Send** after the final question. Keep separate decisions in separate
+questions rather than cramming unrelated choices into one. Grouped checklists
+retain their all-groups view.
+
 The reviewer can **Comment** on any question/group or individual option; annotations anchor to stable IDs in the same live feedback session. Generate either artifact with the installed runner:
 
 ```sh

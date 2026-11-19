@@ -324,7 +324,11 @@ To create a **questionnaire**, use `questions` instead of `groups`:
 
 Each question uses radio buttons for `single` (the default) or checkboxes for
 `multiple`. Every question and option has its own stable ID. Unanswered
-questions are retained in the extracted result.
+questions are retained in the extracted result. Questionnaire review shows one
+question at a time: choosing a radio answer advances immediately, while a
+multiple-answer question stays open until **Continue**. **Back** revisits earlier
+answers, **Continue** can leave a question unanswered, and the completion view
+still requires **Send** to return feedback. Grouped checklists show all groups.
 
 Save either format as `choices.json` and let the agent generate and open the review:
 

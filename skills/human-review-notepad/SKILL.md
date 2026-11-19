@@ -1,11 +1,11 @@
 ---
 name: human-review-notepad
-description: Use when starting project work to check the owning repository's Issue Inbox and handoff inbox first, resolve and verify incoming cross-project issues before new work, and preserve linked reports and unfinished notes.
+description: Use when starting or revisiting project work to proactively triage notes, respond to incoming handoffs and issue reports, follow up on blockers, and maintain a verified, clean project backlog.
 ---
 
 # Human Review Notepad
 
-Treat Notepad as the project's live record of unfinished work. **Check applicable inboxes before new project work; prioritize resolving their actionable issues.** Run the CLI yourself—reading requires no permission.
+Treat Notepad as an actively maintained project backlog, not passive storage. **Check applicable inboxes before new project work, respond to incoming items, and clean up stale state at natural checkpoints.** Run the CLI yourself—reading requires no permission.
 
 ## Routine
 
@@ -16,7 +16,7 @@ Treat Notepad as the project's live record of unfinished work. **Check applicabl
    If status cannot verify a running older server, inspect the existing browser HUD before opening anything. Never manually open another HUD URL or browser window while one exists.
 2. **Inbox-first gate, before new project work:** Verify the owning Git root of each repository you work in. Run `human-review notes reports --scope /actual/repository` (Issue Inbox) and `human-review notes inbox --scope /actual/repository` (sent handoffs) first; resolve actionable pending owner reports before new features, then inspect `human-review notes list --scope /actual/repository` for promoted reports. Recheck at natural checkpoints. Acknowledge handoff receipt with `notes ack`; execute only authorized handoff work.
 3. Capture unfinished work, blockers, observations, ideas, and next actions with `human-review notes add "Actionable note"`. Revise existing notes using `human-review notes edit <id> "Updated text"` instead of creating duplicates. In the HUD, use **Edit**, then **Save** or **Cancel**. Editing keeps the original note identity and completion state; sent handoffs remain historical snapshots.
-4. Use relevant notes to plan or continue work already within the active project/task. Keep notes current, and mark completed work done **after verification**. Avoid duplicating existing notes.
+4. Use relevant notes to plan or continue authorized work in the active project. Apply the proactive maintenance workflow below at session start, after material changes, and before handoff or completion; verify resolutions before marking notes done.
 5. Keep the HUD open during the session. The saved-note list scrolls inside a bounded area, even with many notes; keyboard-focus the list to scroll older entries. Polling preserves the scroll position. Note and Issue Inbox cards start collapsed; activate their summary to reveal full Markdown, details, and controls. Expanded cards remain open during refresh. Each note shows a short display ID; **⧉ ID** copies its full UUID and **⧉ Ref** copies a reference with the full UUID and project scope. Always use the full UUID plus `--scope` for CLI operations, never the short prefix. Do not open another HUD to browse notes. Note review is non-blocking. The responsive sidebar also exposes **Tasks**
 (derived from pending/completed saved notes), **Reports** (received/promoted
 issues), and **Settings** (Appearance, Notepad, Inbox & reports, and
@@ -24,6 +24,17 @@ Review workflow). These are views of existing project records, not separate
 agent queues or permissions. Timestamps render outside cards, and saved/inline
 tags appear below titles. Display preferences persist only in the browser;
 workflow and ownership rules are unchanged.
+
+## Proactive maintenance loop
+
+Run this loop for the verified owning repository at session start, when new inbox items arrive, after relevant work, and before handoff or completion. Read **Issue Inbox** (`notes reports`), user-sent **handoffs** (`notes inbox`), and saved **notes** (`notes list`), all with the same explicit `--scope`.
+
+1. **Triage, don't just collect.** Review pending and completed records, old unanswered questions, duplicates, linked `reportedTo` fixes, and reports awaiting owner action. Check current source, tests, decisions, or the originating workflow before deciding an item is stale. **Age triggers review; it never proves that a note is obsolete.** Identify the next action, responsible project, and whether approval is missing.
+2. **Maintain the queue.** Act on authorized, actionable work; update outdated descriptions and blockers with `notes edit` instead of adding more copies. Consolidate duplicate context into the surviving note and retain relevant IDs/links. If evidence shows an item resolved or superseded, record the reason and mark it `done`; keep unverified or still-relevant work pending. Reopen items when a fix regresses. Preserve the distinction between an owner report marked **Fix available** and a source note awaiting independent verification.
+3. **Respond to inboxes.** Read every new handoff, acknowledge receipt with `notes ack <handoff-id> --scope /actual/repository`, then **respond substantively in the active user conversation**: what was completed, what remains blocked, and any required decision. Acknowledging a handoff is not replying or completing it. For owner Issue Inbox reports, investigate and report verified outcomes through the linked report status; tell the user about unresolved blockers. The Notepad CLI has no outbound reply command: do not claim an edit, acknowledgement, or local note sent a message. If no communication channel is active, record the needed follow-up in the pending note for the next interaction.
+4. **Follow up before work goes stale.** When a note is blocked, aging without progress, or waiting on someone, check whether the prerequisite changed. Send a concise follow-up in the available, authorized conversation channel, or ask the user **one actionable approval/decision question** with the note ID, exact proposed action, and consequence. Avoid duplicate reminders; update the existing note with the outstanding decision and continue other authorized work. Never initiate external messages, unrelated tasks, or cross-project edits solely because a note exists.
+5. **Prune with evidence and consent.** Remove obsolete items from the *active queue* by verifying and marking them `done`, not by automatically deleting them. Permanent `notes delete` or **Delete notebook** requires explicit approval for the specific records, or an existing user-approved retention rule that covers them; seek approval before any ambiguous deletion. Preserve historical handoffs, provenance, linked issue reports, and unfinished notes. Do not infer a deletion deadline from creation age.
+6. **Close the loop.** Recheck affected records and report what was completed, what was cleaned up, which replies or follow-ups actually went out, and which items need approval or another check. Do this within the active session; Notepad does not autonomously wake agents or send follow-ups after the conversation ends.
 
 ## CLI
 

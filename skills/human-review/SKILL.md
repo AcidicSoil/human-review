@@ -34,6 +34,10 @@ human-review poll path/to/options.checklist.review.html
 
 This reuses ordinary HTML checkbox autosaving. The reviewer can **Comment**
 on an entire group or individual choice using the shared feedback panel.
+Questionnaires show one question at a time. Single-choice answers advance
+automatically; multi-answer questions use **Continue**. **Back** preserves answers,
+and **Send** is still required after the last question. Use separate focused
+questions instead of combining unrelated decisions. Grouped checklists are unchanged.
 After **Send**, extract with `human-review-checklist --extract
 path/to/options.checklist.review.html`. Checklists return `selectedIds` and
 `selections`; questionnaires additionally return `answers[]` for each question,

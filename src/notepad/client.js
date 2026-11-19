@@ -410,6 +410,27 @@ function createStatusButton(note, notePath, viewedScope, inInbox) {
   return button;
 }
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: "always" });
+const ageUnits = [
+  ["year", 31536000], ["month", 2592000], ["day", 86400],
+  ["hour", 3600], ["minute", 60],
+];
+
+function formatNoteAge(createdAt) {
+  const seconds = Math.max(0, (Date.now() - new Date(createdAt).getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const [unit, duration] = ageUnits.find(([, threshold]) => seconds >= threshold);
+  const count = unit === "minute" || unit === "hour"
+    ? Math.ceil(seconds / duration) : Math.floor(seconds / duration);
+  return relativeTimeFormatter.format(-count, unit);
+}
+
+function updateRelativeTimes() {
+  for (const time of document.querySelectorAll("time.note-relative-time")) {
+    time.textContent = formatNoteAge(time.dateTime);
+  }
+}
+
 function createDateRail(note) {
   const dateRail = document.createElement("div");
   dateRail.className = "note-date-rail";
@@ -425,7 +446,12 @@ function createDateRail(note) {
   time.textContent = created.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const caption = document.createElement("small");
   caption.textContent = "Created";
-  dateRail.append(date, time, caption);
+  const age = document.createElement("time");
+  age.className = "note-relative-time";
+  age.dateTime = note.createdAt;
+  age.textContent = formatNoteAge(note.createdAt);
+  age.title = created.toLocaleString();
+  dateRail.append(date, time, caption, age);
   return dateRail;
 }
 
@@ -1014,7 +1040,10 @@ window.addEventListener("pagehide", () => windowConnection?.abort(), { once: tru
 startObserving();
 refresh();
 setInterval(() => {
-  if (!document.hidden) refresh();
+  if (!document.hidden) {
+    refresh();
+    updateRelativeTimes();
+  }
 }, 2500);
 
 
